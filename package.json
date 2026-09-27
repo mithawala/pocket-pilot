@@ -1,0 +1,201 @@
+{
+  "name": "pocket-pilot",
+  "displayName": "Pocket Pilot",
+  "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone. Free, end-to-end encrypted, passkey-protected. No servers.",
+  "version": "0.1.0",
+  "publisher": "mithawala",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://github.com/mithawala/pocket-pilot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mithawala/pocket-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mithawala/pocket-pilot/issues"
+  },
+  "engines": {
+    "vscode": "^1.133.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "copilot",
+    "agent",
+    "remote",
+    "phone",
+    "mobile",
+    "pwa",
+    "agent host protocol"
+  ],
+  "main": "./extension/extension.js",
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pocketPilot",
+          "title": "Pocket Pilot",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "pocketPilot": [
+        {
+          "type": "webview",
+          "id": "pocketPilot.panel",
+          "name": "Remote access",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "pocketPilot.start", "title": "Start Remote Access", "category": "Pocket Pilot", "icon": "$(play)" },
+      { "command": "pocketPilot.stop", "title": "Stop Remote Access", "category": "Pocket Pilot", "icon": "$(debug-stop)" },
+      { "command": "pocketPilot.pair", "title": "Pair a Phone (Show QR Code)", "category": "Pocket Pilot", "icon": "$(device-mobile)" },
+      { "command": "pocketPilot.copyPairingLink", "title": "Copy Pairing Link", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.restartTunnel", "title": "Restart Tunnel", "category": "Pocket Pilot", "icon": "$(refresh)" },
+      { "command": "pocketPilot.removeDevice", "title": "Remove a Paired Phone…", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.removeAllDevices", "title": "Remove All Paired Phones", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.resetIdentity", "title": "Reset Identity (Invalidate Every Pairing)", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.signInRendezvous", "title": "Sign In to GitHub for Auto-Reconnect", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.takeOver", "title": "Run Pocket Pilot in This Window", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.openLocalPwa", "title": "Open the Phone App on This PC", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.showLogs", "title": "Show Logs", "category": "Pocket Pilot", "icon": "$(output)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "pocketPilot.pair", "when": "view == pocketPilot.panel && pocketPilot.running", "group": "navigation@1" },
+        { "command": "pocketPilot.restartTunnel", "when": "view == pocketPilot.panel && pocketPilot.running", "group": "navigation@2" },
+        { "command": "pocketPilot.showLogs", "when": "view == pocketPilot.panel", "group": "navigation@3" }
+      ]
+    },
+    "configuration": {
+      "title": "Pocket Pilot",
+      "properties": {
+        "pocketPilot.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start remote access automatically when VS Code starts (only after you have started it once yourself)."
+        },
+        "pocketPilot.pwaUrl": {
+          "type": "string",
+          "default": "https://mithawala.github.io/pocket-pilot/",
+          "markdownDescription": "Where the phone app is hosted (the QR code opens this URL). Leave empty to serve the app through the tunnel itself (not recommended: the tunnel URL changes, so the installed app and its keys would not survive a restart)."
+        },
+        "pocketPilot.extraAllowedOrigins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional web origins allowed to connect (e.g. a self-hosted copy of the app)."
+        },
+        "pocketPilot.tunnel.mode": {
+          "type": "string",
+          "enum": ["quick", "custom", "none"],
+          "enumDescriptions": [
+            "Free Cloudflare quick tunnel (no account). A new URL is created every time; phones find it again automatically.",
+            "Use your own public HTTPS URL that forwards to the local port (named Cloudflare tunnel, dev tunnel, Tailscale Funnel…).",
+            "No tunnel: only usable from this PC (testing)."
+          ],
+          "default": "quick",
+          "description": "How phones reach this PC."
+        },
+        "pocketPilot.tunnel.customUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Public HTTPS URL forwarding to the local Pocket Pilot port (tunnel mode 'custom')."
+        },
+        "pocketPilot.tunnel.cloudflaredPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to an existing cloudflared binary. Leave empty to use PATH or download the official release automatically."
+        },
+        "pocketPilot.port": {
+          "type": "number",
+          "default": 0,
+          "description": "Local port for the relay (0 = pick a free port). Needed for the 'custom' tunnel mode."
+        },
+        "pocketPilot.security.requireApproval": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation in VS Code before a new phone is paired."
+        },
+        "pocketPilot.security.passkey": {
+          "type": "string",
+          "enum": ["required", "optional", "off"],
+          "enumDescriptions": [
+            "Phones must register a passkey (Face ID / Touch ID / fingerprint / device PIN) and re-verify it periodically.",
+            "Use a passkey when the phone supports it.",
+            "Do not use passkeys (device keys + end-to-end encryption only)."
+          ],
+          "default": "required",
+          "description": "Biometric protection for paired phones."
+        },
+        "pocketPilot.security.passkeyGraceHours": {
+          "type": "number",
+          "default": 12,
+          "minimum": 0,
+          "description": "How long a successful Face ID / fingerprint check stays valid before the phone must verify again (0 = every connection)."
+        },
+        "pocketPilot.security.pairingCodeMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 60,
+          "description": "How long a pairing QR code stays valid. Each code works only once."
+        },
+        "pocketPilot.rendezvous.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep a secret, end-to-end encrypted GitHub gist with the current tunnel URL so phones reconnect automatically after VS Code restarts."
+        },
+        "pocketPilot.notifications.inputNeeded": {
+          "type": "boolean",
+          "default": true,
+          "description": "Push a notification when an agent needs your approval or an answer."
+        },
+        "pocketPilot.notifications.finished": {
+          "type": "boolean",
+          "default": true,
+          "description": "Push a notification when an agent finishes a turn."
+        },
+        "pocketPilot.notifications.errors": {
+          "type": "boolean",
+          "default": true,
+          "description": "Push a notification when a session fails."
+        },
+        "pocketPilot.notifications.skipWhileActive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Do not push notifications while you are actively using this VS Code window."
+        },
+        "pocketPilot.uploads.folder": {
+          "type": "string",
+          "default": ".pocket-pilot/uploads",
+          "description": "Folder (relative to the session's working folder) where files sent from the phone are saved."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test --test-timeout=60000 \"test/*.test.mjs\"",
+    "vendor": "node scripts/vendor.mjs",
+    "package": "node scripts/package-vsix.mjs",
+    "live-check": "node scripts/live-check.mjs"
+  }
+}

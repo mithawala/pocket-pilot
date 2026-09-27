@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' wss: ws://localhost:* ws://127.0.0.1:* https://api.github.com https://gist.githubusercontent.com; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0a0c11" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f6fa" media="(prefers-color-scheme: light)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pocket Pilot" />
+  <meta name="description" content="Control your VS Code agent sessions from your phone — end-to-end encrypted, passkey protected, free." />
+  <title>Pocket Pilot</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.png" type="image/png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./css/app.css" />
+  <link rel="modulepreload" href="./js/ui/app.js" />
+</head>
+<body>
+  <div id="app"></div>
+  <noscript><p style="padding:24px">Pocket Pilot needs JavaScript.</p></noscript>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

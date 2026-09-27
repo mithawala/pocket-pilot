@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Pocket Pilot PWA (static site). This file only tells Node to treat these .js files as ES modules."
+}

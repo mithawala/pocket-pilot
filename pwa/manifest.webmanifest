@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Pocket Pilot",
+  "short_name": "Pocket Pilot",
+  "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0c11",
+  "theme_color": "#0a0c11",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

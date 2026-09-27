@@ -1,0 +1,350 @@
+{
+  "pwa/vendor/preact/preact.module.js": {
+    "source": "preact@10.29.8/dist/preact.module.js",
+    "sha256": "c30e721ebfdc6e2ad4c18c14d2dfb82667829c8aec27de1207774e3fc16858a8"
+  },
+  "pwa/vendor/preact/hooks.module.js": {
+    "source": "preact@10.29.8/hooks/dist/hooks.module.js",
+    "sha256": "f3555e7a8dba84175c94f17148ba6670e4b3716888fe06b3330a485637296a38"
+  },
+  "pwa/vendor/preact/LICENSE": {
+    "source": "preact@10.29.8/LICENSE",
+    "sha256": "1fe6958409c8c257a70c587a18b6f7f412b179b456630790d30b2ec9a8e4b7d4"
+  },
+  "pwa/vendor/htm/htm.module.js": {
+    "source": "htm@3.1.1/dist/htm.module.js",
+    "sha256": "ab33dd3f38059b9be4d5f5350128eefb2356639c4e0bbe9d9e8b3ba75847e9e4"
+  },
+  "pwa/vendor/htm/LICENSE": {
+    "source": "htm@3.1.1/LICENSE",
+    "sha256": "740725f7252e750af735d0028cc534970772f513331e9f68150fede8fb3ce00f"
+  },
+  "pwa/vendor/marked/marked.esm.js": {
+    "source": "marked@18.0.14/lib/marked.esm.js",
+    "sha256": "528a1b88bef88fc27277e06036ce7f4afb6a220b18110ba57c09e292b24a7ce0"
+  },
+  "pwa/vendor/marked/LICENSE": {
+    "source": "marked@18.0.14/LICENSE",
+    "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+  },
+  "pwa/vendor/dompurify/purify.es.js": {
+    "source": "dompurify@3.4.16/dist/purify.es.mjs",
+    "sha256": "c44274a7959cfdd4da871fa78a5d5fbbef55db68d118c5c0833bc4b5cf9633ad"
+  },
+  "pwa/vendor/dompurify/LICENSE": {
+    "source": "dompurify@3.4.16/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "media/vendor/qrcode.js": {
+    "source": "qrcode-generator@2.0.4/dist/qrcode.js",
+    "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
+  },
+  "pwa/vendor/jsqr/jsQR.js": {
+    "source": "jsqr@1.4.0/dist/jsQR.js",
+    "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
+  },
+  "pwa/vendor/jsqr/LICENSE": {
+    "source": "jsqr@1.4.0/LICENSE",
+    "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+  },
+  "pwa/vendor/ahp/client/async-queue.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/async-queue.js",
+    "sha256": "8891de4f1de191d48a5831c1050b015345bd2b2de12a40636cc785425d363760"
+  },
+  "pwa/vendor/ahp/client/client.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/client.js",
+    "sha256": "645667398de93ec11fef8fff14ea35400e99987d70e6a893227fc548a89d17f9"
+  },
+  "pwa/vendor/ahp/client/error.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/error.js",
+    "sha256": "5be24ddd9a637b45ef1836b3e6255c12407f73c9aea28b34cfbe490e315d7c9e"
+  },
+  "pwa/vendor/ahp/client/events.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/events.js",
+    "sha256": "8c9a016182afc13890207cede9adc16060478fdfe3d9decb36f8066eebbd88f5"
+  },
+  "pwa/vendor/ahp/client/hosts/client-id-store.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/client-id-store.js",
+    "sha256": "c1f7d554efa7f10812c896f30b8c3c31fe2bb71debb8094ee5e6789209e83672"
+  },
+  "pwa/vendor/ahp/client/hosts/factory.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/factory.js",
+    "sha256": "24a5ff015a039e79d38d3327b814997f1207a87372a134beb4e46c4ec05f608a"
+  },
+  "pwa/vendor/ahp/client/hosts/host-client-handle.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/host-client-handle.js",
+    "sha256": "7db105af0c69a40e60af56ce6009c691ba126414a7a2bf9574680f88a6c5c649"
+  },
+  "pwa/vendor/ahp/client/hosts/index.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/index.js",
+    "sha256": "aba03345a8d08b0d4b45127619d0fde7c463b194dcb61132e2cfbe4b186d167d"
+  },
+  "pwa/vendor/ahp/client/hosts/multi.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/multi.js",
+    "sha256": "4c31df9eba9c5e0e0003ea0f24512bfd6b17e35b118b41612581eb057cc55ad9"
+  },
+  "pwa/vendor/ahp/client/hosts/policy.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/policy.js",
+    "sha256": "ff64d7055ba1e71967e653cb0cb0bf67a2812268b80e2932886120fda258ae2b"
+  },
+  "pwa/vendor/ahp/client/hosts/runtime.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/runtime.js",
+    "sha256": "6d26267aaebef6fecab0376d64f87144c6c0253acb5afb0a9bd9025114eabb54"
+  },
+  "pwa/vendor/ahp/client/hosts/state-mirror.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/state-mirror.js",
+    "sha256": "36a15dce6bd7e3844b0c2cacdd4ae065c2b8582705a275fac0a0ba93836f2f3f"
+  },
+  "pwa/vendor/ahp/client/hosts/types.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/hosts/types.js",
+    "sha256": "6ef6af550326ce0bc0032ce25bf9498ebf17b5d4f1ba7d5ee0d3616ff6f6b5d9"
+  },
+  "pwa/vendor/ahp/client/index.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/index.js",
+    "sha256": "0bf80744121e2dd609e162a3592cc4c918382e758ed170aace820c7c0d741225"
+  },
+  "pwa/vendor/ahp/client/state-mirror.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/state-mirror.js",
+    "sha256": "9cd6f8decdae7e8927c94c7a0efe8dea231118f4348cb27a6ff19ed86e92bb4d"
+  },
+  "pwa/vendor/ahp/client/transport.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/transport.js",
+    "sha256": "ce1f1e199ea4b5b997fc61b8d152cf65989de510d68baecb420b2ed47d273bc0"
+  },
+  "pwa/vendor/ahp/types/action-origin.generated.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/action-origin.generated.js",
+    "sha256": "e0d5f4504b82c9a7d068a8cb787e9ff2292e4170f5e0e74cbc256a551b2847cd"
+  },
+  "pwa/vendor/ahp/types/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/actions.js",
+    "sha256": "896fb81ac1cf001775be04b319e6f7d566eafb4b439dc159467e19f0074e25d7"
+  },
+  "pwa/vendor/ahp/types/channels-annotations/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-annotations/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-annotations/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-annotations/reducer.js",
+    "sha256": "25facf263a43098bbc7ca324f082066b551efbe2e0d20f2799f9b2a5f09d172b"
+  },
+  "pwa/vendor/ahp/types/channels-annotations/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-annotations/state.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-automation/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-automation/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation/commands.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-automation/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation/reducer.js",
+    "sha256": "9d64b682d74af2aee860c43caa27604cf6e182e0902613e1ba83b76f6ba32eeb"
+  },
+  "pwa/vendor/ahp/types/channels-automation/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation/state.js",
+    "sha256": "cbfe9d6c87c72a3047d69189b8ea7b0346a5d5a4fb2204245d4cc0a7130bcc7a"
+  },
+  "pwa/vendor/ahp/types/channels-automation-run/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation-run/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-automation-run/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation-run/reducer.js",
+    "sha256": "29dd315312d22004083fc637cf80a4265fdd8c3bcfb002b3c4b72da61634bf5f"
+  },
+  "pwa/vendor/ahp/types/channels-automation-run/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-automation-run/state.js",
+    "sha256": "81ba89e259f28170a80e73640ab46256ad8f8b285854f1cb8df6026b3cb12154"
+  },
+  "pwa/vendor/ahp/types/channels-changeset/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-changeset/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-changeset/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-changeset/commands.js",
+    "sha256": "9c9e1adff24003e35fd191ddb9fbb0db3b23d84f53ed778af92df090609a2dd1"
+  },
+  "pwa/vendor/ahp/types/channels-changeset/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-changeset/reducer.js",
+    "sha256": "defeb41e1a870b8edbb03a426a8f08623d93cd04b887f57c09901a0b9afabca0"
+  },
+  "pwa/vendor/ahp/types/channels-changeset/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-changeset/state.js",
+    "sha256": "266edc40771510386a7cb1df4cb60572a58f1e43fb24962009221155ba880c54"
+  },
+  "pwa/vendor/ahp/types/channels-chat/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-chat/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-chat/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-chat/commands.js",
+    "sha256": "6c3040de81a3e0a54a17f5cda789d7cadde05fc7a46d0b511bd05b7cd4c7f298"
+  },
+  "pwa/vendor/ahp/types/channels-chat/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-chat/reducer.js",
+    "sha256": "88a36bcf2d2d8f1712f4b6fbca1ecb534a50cc0f5ee060f40a6cdbe78ae96474"
+  },
+  "pwa/vendor/ahp/types/channels-chat/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-chat/state.js",
+    "sha256": "d59398eef5445aee4a4db9ea0e396ed3ad4dbd36def974f1c374cc45cb41db39"
+  },
+  "pwa/vendor/ahp/types/channels-otlp/notifications.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-otlp/notifications.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-otlp/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-otlp/state.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-resource-watch/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-resource-watch/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-resource-watch/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-resource-watch/commands.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-resource-watch/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-resource-watch/reducer.js",
+    "sha256": "fa9ea8a20fac25d2bd800d600a1c5cdf7a8d73c4404a669de7bcd425af9ec404"
+  },
+  "pwa/vendor/ahp/types/channels-resource-watch/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-resource-watch/state.js",
+    "sha256": "1f8cd3c0368b1ef0f0bb24e323824ef525a197a25256de28f4aa535ec30cc13b"
+  },
+  "pwa/vendor/ahp/types/channels-root/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-root/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-root/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-root/commands.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-root/notifications.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-root/notifications.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-root/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-root/reducer.js",
+    "sha256": "d697ba978eaed4f6c6d0d412a7423f72dd8a8a241a1a1500aec0bc980c8f447f"
+  },
+  "pwa/vendor/ahp/types/channels-root/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-root/state.js",
+    "sha256": "d82c7dfe8e5be08a575ceda5b5b3f97e75ac547d93cd1eca9fe25b416aefd4c1"
+  },
+  "pwa/vendor/ahp/types/channels-session/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-session/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-session/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-session/commands.js",
+    "sha256": "9b1181e36b75263319e8c3ec5ced24046630787381a49c0c2d2d52d1e0268973"
+  },
+  "pwa/vendor/ahp/types/channels-session/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-session/reducer.js",
+    "sha256": "aeb23b76993615b6f472a1cd8cc60ef1e43e28baf49b82f0cef686488a9ffaac"
+  },
+  "pwa/vendor/ahp/types/channels-session/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-session/state.js",
+    "sha256": "ea53299a97baa3cfcc08c6da83cfa4e7feb7723455c0b1f554955a292c54dd2b"
+  },
+  "pwa/vendor/ahp/types/channels-terminal/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-terminal/actions.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-terminal/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-terminal/commands.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/channels-terminal/reducer.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-terminal/reducer.js",
+    "sha256": "6de1feb7eabcb47ae18e829fd8845c3f1c369834782f6a9a8d0d3f2b9752025c"
+  },
+  "pwa/vendor/ahp/types/channels-terminal/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/channels-terminal/state.js",
+    "sha256": "6c53c779d8bc3e89f844980be81e8a6b22786b579219a48d683bf42cd4d28f8e"
+  },
+  "pwa/vendor/ahp/types/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/commands.js",
+    "sha256": "2fa9a9532f8d32fb077ee37b4b40be91384a3c07d2be15ec9f77f4a0d4e9206c"
+  },
+  "pwa/vendor/ahp/types/common/actions.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/actions.js",
+    "sha256": "f1f1c170e15f2abd716f89a4aa5e6a92585f61559b6d3803edbc30d6df8d4618"
+  },
+  "pwa/vendor/ahp/types/common/commands.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/commands.js",
+    "sha256": "ae7a1b7e17e35e8e3556f38089fa915e648215b11b8f26d47df73d17db13648d"
+  },
+  "pwa/vendor/ahp/types/common/errors.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/errors.js",
+    "sha256": "f79caa8a6dc23ac92bfb7fef509e0005af801f101317cf2e24cd5bcadb0e46e0"
+  },
+  "pwa/vendor/ahp/types/common/messages.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/messages.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/common/notifications.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/notifications.js",
+    "sha256": "4bc49f732261b501f02eca1a5e70b1692d3fa498b8a5e8b848fd796e3b0be0b3"
+  },
+  "pwa/vendor/ahp/types/common/reducer-helpers.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/reducer-helpers.js",
+    "sha256": "5274fe33a7d7fb68d04e80d4aee9a5a22cc9c89cbf08ff4b9947df443b94cbb7"
+  },
+  "pwa/vendor/ahp/types/common/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/state.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/common/timestamps.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/common/timestamps.js",
+    "sha256": "5d8e3410b4e11b5deee016709579eeae069e0e57dcdabb88f1e70f89623ad7b7"
+  },
+  "pwa/vendor/ahp/types/errors.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/errors.js",
+    "sha256": "8ae164462687df11c6ce0af311dd0aa07becc06240f4d14e7f30a1e584849801"
+  },
+  "pwa/vendor/ahp/types/index.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/index.js",
+    "sha256": "053edf4d1f093036b07f470691fab40715e1a62199b25b7cb8555c8679c119a6"
+  },
+  "pwa/vendor/ahp/types/messages.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/messages.js",
+    "sha256": "0f37642754080090038c8925029edfeba4bdc0f8ae02f219203bd7d3ed04200e"
+  },
+  "pwa/vendor/ahp/types/notifications.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/notifications.js",
+    "sha256": "80c7d651eb7dc55cc00af9d440569e93d2930a8cd9aa9ebe592c4d6a844b6601"
+  },
+  "pwa/vendor/ahp/types/reducers.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/reducers.js",
+    "sha256": "d5fd53a0b05387ccd54abfbfa2808ea8ca06cf74264733f181f26ce9b7cb3f5c"
+  },
+  "pwa/vendor/ahp/types/state.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/state.js",
+    "sha256": "67a83d5ab4bdf4b4f8014c9e628a4e795fe177d6b0ecb67d01406b5486a9969a"
+  },
+  "pwa/vendor/ahp/types/version/message-checks.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/version/message-checks.js",
+    "sha256": "c5fd19d60ea125df0e4f2eb8a356bac9e432b6fd689bf47cad402ea701ad1f54"
+  },
+  "pwa/vendor/ahp/types/version/registry.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/types/version/registry.js",
+    "sha256": "ba5b6119495951c9bbd57a65a0227eed8a5c60b91927e8ebceb0e6113e696de8"
+  },
+  "pwa/vendor/ahp/ws/index.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/ws/index.js",
+    "sha256": "6c353fba0408c7ced11e53ee4dc6115ca9d0b9f420daba0ba5a39acaafd21ee9"
+  },
+  "pwa/vendor/ahp/ws/transport.js": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/dist/ws/transport.js",
+    "sha256": "ee674065181dc4b23480a1688e4783882082a5fbd93316525715cf3f5ff8166c"
+  },
+  "pwa/vendor/ahp/LICENSE": {
+    "source": "@microsoft/agent-host-protocol@0.9.0/LICENSE",
+    "sha256": "dea9265341829002e2c23a7372393eb2ed6e26085fb623f38a4ba0af833f30a6"
+  }
+}

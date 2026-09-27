@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify vendored libraries against the lock file
+        run: node scripts/vendor.mjs
+      - name: Tests
+        run: node --test --test-timeout=60000 "test/*.test.mjs"
+      - name: Package VSIX
+        run: node scripts/package-vsix.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: '*.vsix'
