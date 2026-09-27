@@ -24,7 +24,7 @@ function parseRoute() {
 }
 
 export class AppController extends EventTarget {
-  constructor({ pendingFragment }) {
+  constructor({ pendingFragment, demo = false }) {
     super();
     this.hosts = [];
     this.currentId = null;
@@ -33,6 +33,7 @@ export class AppController extends EventTarget {
     this.theme = 'system';
     this.installEvent = null;
     this.ready = false;
+    this.demo = demo;
   }
 
   _emit() {
@@ -41,10 +42,21 @@ export class AppController extends EventTarget {
   }
 
   async init() {
-    persistStorage();
-    this.hosts = await db.hosts().catch(() => []);
     this.theme = (await db.get('theme').catch(() => null)) || 'system';
     this._applyTheme();
+    if (this.demo) {
+      // Sample data only: never touches the real paired PCs stored on this device.
+      const { createDemo } = await import('../demo/demo.js');
+      const d = createDemo();
+      this.hosts = [d.host];
+      this.currentId = d.host.hostId;
+      this.active = d;
+      this.ready = true;
+      this._emit();
+      return;
+    }
+    persistStorage();
+    this.hosts = await db.hosts().catch(() => []);
     const saved = await db.get('currentHost').catch(() => null);
     this.currentId = this.hosts.find((h) => h.hostId === saved)?.hostId || this.hosts[0]?.hostId || null;
     this._connectCurrent();
@@ -68,6 +80,7 @@ export class AppController extends EventTarget {
   }
 
   _connectCurrent() {
+    if (this.demo) return;
     if (this.active) {
       this.active.conn.stop();
       this.active.store.dispose();
@@ -90,6 +103,7 @@ export class AppController extends EventTarget {
   }
 
   async selectHost(hostId) {
+    if (this.demo) return;
     this.currentId = hostId;
     await db.set('currentHost', hostId);
     this._connectCurrent();
@@ -104,6 +118,7 @@ export class AppController extends EventTarget {
   }
 
   async forgetHost(host) {
+    if (this.demo) return toast('This is the demo — nothing to forget.');
     if (this.active?.host.hostId === host.hostId) {
       await this.active.conn.forget();
       this.active.conn.stop();
@@ -135,6 +150,7 @@ export class AppController extends EventTarget {
   }
 
   async enablePush(host) {
+    if (this.demo) throw new Error('Notifications work once you pair your own PC');
     if (!this.active || this.active.host.hostId !== host.hostId || this.active.conn.state !== 'online') throw new Error('Connect to the PC first');
     if (!host.vapidPublicKey) throw new Error('This PC did not provide a push key');
     const sub = await pushSubscribe(host.vapidPublicKey);
@@ -258,10 +274,10 @@ export function App({ app }) {
   } else if (app.active) {
     const pushPrompt = html`<${NotificationSetup} app=${app} host=${app.current} compact=${true} />`;
     screen = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
-      pushPrompt=${app.active.conn.state === 'online' ? pushPrompt : null}
+      pushPrompt=${app.active.conn.state === 'online' && !app.demo ? pushPrompt : null}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}
       onSwitchHost=${() => setSwitcher(true)} />`;
   }
-  return html`<${Toasts} />${screen}<${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}`;
+  return html`<${Toasts} />${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my PC →</b></a>`}${screen}<${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}`;
 }

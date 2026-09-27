@@ -63,7 +63,7 @@ button.icon:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground
 .row { display: grid; grid-template-columns: 20px 92px 1fr; align-items: start; gap: 4px; padding: 5px 0; border-bottom: 1px dashed var(--vscode-widget-border, rgba(128,128,128,.18)); font-size: 12px; }
 .row:last-child { border-bottom: none; }
 .row .rt { opacity: .75; }
-.row .rv { word-break: break-all; }
+.row .rv { overflow-wrap: anywhere; }
 .row a { color: var(--vscode-textLink-foreground); text-decoration: none; }
 .device { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--vscode-widget-border, rgba(128,128,128,.15)); }
 .device:first-of-type { border-top: none; }

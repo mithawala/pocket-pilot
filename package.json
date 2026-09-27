@@ -6,7 +6,7 @@
   "publisher": "mithawala",
   "license": "MIT",
   "icon": "media/icon.png",
-  "homepage": "https://github.com/mithawala/pocket-pilot",
+  "homepage": "https://mithawala.github.io/pocket-pilot/",
   "repository": {
     "type": "git",
     "url": "https://github.com/mithawala/pocket-pilot.git"
@@ -95,7 +95,7 @@
         },
         "pocketPilot.pwaUrl": {
           "type": "string",
-          "default": "https://mithawala.github.io/pocket-pilot/",
+          "default": "https://mithawala.github.io/pocket-pilot/app/",
           "markdownDescription": "Where the phone app is hosted (the QR code opens this URL). Leave empty to serve the app through the tunnel itself (not recommended: the tunnel URL changes, so the installed app and its keys would not survive a restart)."
         },
         "pocketPilot.extraAllowedOrigins": {

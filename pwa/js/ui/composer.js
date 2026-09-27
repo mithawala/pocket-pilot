@@ -1,5 +1,6 @@
 import { html, useState, useRef, useEffect } from '../lib/ui.js';
 import { Icon, Sheet, toast } from './common.js';
+import { ModelSheet, modelSummary } from './model-picker.js';
 import { b64 } from '../core/bytes.js';
 import { haptic } from '../lib/format.js';
 
@@ -35,11 +36,22 @@ function enumOptions(schema) {
 
 export function Composer({ store, conn, sessionUri, session, chat, chatState }) {
   const draftKey = `draft:${sessionUri}`;
+  const modelKey = `model:${sessionUri}`;
   const [text, setText] = useState(() => sessionStorage.getItem(draftKey) || '');
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(0);
   const [sheet, setSheet] = useState(null);
-  const [model, setModel] = useState(null);
+  const [model, setModelState] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(modelKey) || 'null');
+    } catch {
+      return null;
+    }
+  });
+  const setModel = (m) => {
+    setModelState(m);
+    sessionStorage.setItem(modelKey, JSON.stringify(m));
+  };
   const [steer, setSteer] = useState(false);
   const ta = useRef(null);
   const fileInput = useRef(null);
@@ -64,7 +76,6 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState }) 
   const modeOpts = enumOptions(props.mode);
   const approveOpts = enumOptions(props.autoApprove);
   const label = (opts, v) => opts.find((o) => o.value === v)?.label || v;
-  const modelName = (id) => models.find((m) => m.id === id)?.name || id;
 
   async function addFiles(files) {
     for (const file of files) {
@@ -126,7 +137,7 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState }) 
     </div>`}
     <div class="composer">
       <div class="pills">
-        ${models.length > 0 && html`<button class="chip" onClick=${() => setSheet('model')}><${Icon} name="cpu" />${currentModel ? modelName(currentModel.id) : 'Default model'}</button>`}
+        ${models.length > 0 && html`<button class="chip" onClick=${() => setSheet('model')}><${Icon} name="cpu" />${modelSummary(models, currentModel)}</button>`}
         ${modeOpts.length > 0 && html`<button class="chip" onClick=${() => setSheet('mode')}><${Icon} name="wand" />${label(modeOpts, values.mode || props.mode?.default)}</button>`}
         ${approveOpts.length > 0 && html`<button class="chip" onClick=${() => setSheet('approve')}><${Icon} name="shield" />${label(approveOpts, values.autoApprove || props.autoApprove?.default)}</button>`}
         ${active && html`<button class=${`chip ${steer ? 'on' : ''}`} onClick=${() => setSteer(!steer)}><${Icon} name="bolt" />Steer now</button>`}
@@ -143,9 +154,7 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState }) 
         <button class="send" disabled=${(!text.trim() && !attachments.length) || uploading > 0} onClick=${send} aria-label="Send"><${Icon} name="send" /></button>
       </div>
     </div>
-    <${OptionSheet} open=${sheet === 'model'} title="Model" value=${currentModel?.id}
-      options=${models.filter((m) => m.policyState !== 'disabled').map((m) => ({ value: m.id, label: m.name || m.id, description: m.maxContextWindow ? `${Math.round(m.maxContextWindow / 1000)}k context${m.supportsVision ? ' · vision' : ''}` : '' }))}
-      onPick=${(id) => setModel(lastModel && lastModel.id === id ? lastModel : { id })} onClose=${() => setSheet(null)} />
+    <${ModelSheet} open=${sheet === 'model'} onClose=${() => setSheet(null)} models=${models} value=${currentModel} onChange=${setModel} />
     <${OptionSheet} open=${sheet === 'mode'} title="Mode" value=${values.mode} options=${modeOpts} onPick=${(v) => store.setConfig(sessionUri, { mode: v })} onClose=${() => setSheet(null)} />
     <${OptionSheet} open=${sheet === 'approve'} title="Tool approvals" value=${values.autoApprove} options=${approveOpts} onPick=${(v) => store.setConfig(sessionUri, { autoApprove: v })} onClose=${() => setSheet(null)} />
   </div>`;

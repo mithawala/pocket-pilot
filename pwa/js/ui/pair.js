@@ -6,6 +6,9 @@ import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { deviceDescription } from '../lib/format.js';
 import { isIos, isStandalone } from '../lib/push.js';
 
+// The product page sits one level above the app on GitHub Pages (…/pocket-pilot/app/ → …/pocket-pilot/).
+const PRODUCT_URL = /\/app\/$/.test(location.pathname) ? new URL('../', location.href).href : 'https://mithawala.github.io/pocket-pilot/';
+
 export function fingerprintText(fp) {
   return [...fp].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase().match(/.{4}/g).join('-');
 }
@@ -29,7 +32,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     ${iosSafari && html`<div class="ios-tip"><b>iPhone:</b> first tap <b>Share → Add to Home Screen</b>, then open Pocket Pilot from your Home Screen and scan the code there. The Home Screen app keeps its own storage and is the only place iOS shows notifications.</div>`}
     <button class="btn primary block" style="margin-top:14px" onClick=${onScan}><${Icon} name="phone" /> Scan the QR code</button>
     <ol class="steps">
-      <li><div><b>Install the extension</b><div class="muted small">“Pocket Pilot” in VS Code on your PC.</div></div></li>
+      <li><div><b>Install the extension</b><div class="muted small">Get Pocket Pilot for VS Code at <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
       <li><div><b>Click “Start remote access”</b><div class="muted small">In the Pocket Pilot panel of the activity bar.</div></div></li>
       <li><div><b>Scan the QR code</b><div class="muted small">${iosSafari ? 'From the Home Screen app (button above).' : 'With the button above or your phone’s camera.'}</div></div></li>
     </ol>
@@ -39,6 +42,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
       <div><${Icon} name="bolt" size="18" /> Free: no accounts, no servers, no tracking</div>
     </div>
     ${installPrompt}
+    <a class="btn block" style="margin-top:10px" href="./?demo">Try the demo first</a>
     <details class="card" style="margin-top:14px">
       <summary class="muted">I have a pairing link</summary>
       <div class="stack" style="margin-top:12px">

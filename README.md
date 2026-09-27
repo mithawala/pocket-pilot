@@ -2,10 +2,12 @@
 
 **Your VS Code agents, in your pocket.** Chat with your GitHub Copilot and Claude agent sessions, approve their tool calls and get notified when they need you — from your phone, anywhere. Free, end-to-end encrypted, passkey-protected, no servers.
 
+**[Product page](https://mithawala.github.io/pocket-pilot/) · [Live demo](https://mithawala.github.io/pocket-pilot/app/?demo) · [Download the extension](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix)**
+
 <p align="center"><img src="media/icon.png" width="96" alt="Pocket Pilot"></p>
 
 - **Same sessions, same history.** The phone app is a real client of VS Code's *Agent Host Protocol*: you see exactly the sessions and full history VS Code shows, live, token by token.
-- **Everything you can do at your desk.** Send messages, queue follow-ups, steer a running agent, stop it, approve or skip tool calls (with the same options VS Code offers), answer the agent's questions, change mode / approvals / model, start new sessions in any folder, send photos and files.
+- **Everything you can do at your desk.** Send messages, queue follow-ups, steer a running agent, stop it, approve or skip tool calls (with the same options VS Code offers), answer the agent's questions, pick the model with its thinking level and context size, switch mode (Interactive / Plan / Autopilot) and approvals, start new sessions in any folder, send photos and files.
 - **Push notifications** when an agent needs approval, asks a question, finishes or fails — sent directly from your PC with standard Web Push (no Firebase, no account).
 - **Secure by design:** QR pairing with approval in VS Code, per-device keys that can't be exported, Face ID / fingerprint (passkeys), end-to-end encryption through the tunnel, instant revocation.
 - **Free:** Cloudflare quick tunnel (no account) + a static PWA on GitHub Pages. Your GitHub token never leaves your PC.
@@ -44,7 +46,7 @@
 
 ## Get started
 
-1. **Install the extension**: `code --install-extension pocket-pilot-0.1.0.vsix` (or *Extensions → … → Install from VSIX*).
+1. **Install the extension**: download [`pocket-pilot.vsix`](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix) from the [latest release](https://github.com/mithawala/pocket-pilot/releases/latest), then *Extensions → … → Install from VSIX* (or `code --install-extension pocket-pilot.vsix`).
 2. Open the **Pocket Pilot** view in the activity bar and click **Start remote access**. The first time, VS Code asks to:
    - let Pocket Pilot use your GitHub account (so phone requests are authenticated to the agent host),
    - download `cloudflared` (~55 MB, verified),
@@ -54,14 +56,14 @@
    - **iPhone:** notifications require the app on your Home Screen — in Safari tap **Share → Add to Home Screen**, then open Pocket Pilot from there and enable notifications.
    - **Android:** tap **Install** (or Chrome menu → *Add to Home screen*) for an app-like experience; notifications work in the browser too.
 
-The phone app lives at **https://mithawala.github.io/pocket-pilot/**.
+The phone app lives at **https://mithawala.github.io/pocket-pilot/app/** — try it without pairing at [`/app/?demo`](https://mithawala.github.io/pocket-pilot/app/?demo). The product page is **https://mithawala.github.io/pocket-pilot/**.
 
 ## Settings
 
 | Setting | Default | Description |
 |---|---|---|
 | `pocketPilot.autoStart` | `true` | Start remote access when VS Code starts (after you started it once). |
-| `pocketPilot.pwaUrl` | GitHub Pages URL | Where the phone app is hosted (the QR code opens it). |
+| `pocketPilot.pwaUrl` | `https://mithawala.github.io/pocket-pilot/app/` | Where the phone app is hosted (the QR code opens it). |
 | `pocketPilot.tunnel.mode` | `quick` | `quick` (Cloudflare, free), `custom` (your own HTTPS URL: named Cloudflare tunnel, dev tunnel, Tailscale Funnel…), `none`. |
 | `pocketPilot.tunnel.customUrl` | | Public URL for `custom` mode (set `pocketPilot.port` too). |
 | `pocketPilot.security.requireApproval` | `true` | Confirm new phones in VS Code. |
@@ -82,7 +84,7 @@ The phone app lives at **https://mithawala.github.io/pocket-pilot/**.
 
 ## Self-hosting the phone app
 
-The PWA is a static site in [`pwa/`](pwa/) with no build step. `scripts/publish.ps1` creates the repo, publishes `pwa/` to the `gh-pages` branch (`git subtree split --prefix pwa`) and enables GitHub Pages — it only needs the normal `repo` permission. Fork, run it with your account, then set `pocketPilot.pwaUrl` to your URL. Any static host works (the app needs HTTPS for WebCrypto, passkeys and push). Optional GitHub Actions workflows (CI, Pages via Actions) are in [`docs/github-actions/`](docs/github-actions/) — copy them to `.github/workflows/` if your token has the `workflow` scope.
+The PWA is a static site in [`pwa/`](pwa/) with no build step; the product page is in [`site/`](site/). `node scripts/build-site.mjs` assembles both into `dist/site` (product page at `/`, app at `/app/`, with a content-hashed service worker cache). `scripts/publish.ps1` pushes `main`, publishes `dist/site` to the `gh-pages` branch, enables GitHub Pages and attaches the VSIX to a GitHub release — it only needs the normal `repo` permission. Fork, run it with your account (`PP_SITE_URL` is set for you), then set `pocketPilot.pwaUrl` to your `…/app/` URL. Any static host works (the app needs HTTPS for WebCrypto, passkeys and push). Optional GitHub Actions workflows (CI, Pages via Actions) are in [`docs/github-actions/`](docs/github-actions/) — copy them to `.github/workflows/` if your token has the `workflow` scope.
 
 ## Development
 
@@ -95,12 +97,15 @@ node scripts/dev-relay.mjs       # standalone relay + PWA on http://localhost:87
 node scripts/live-check.mjs      # read-only end-to-end check against your VS Code agent host
 node scripts/make-icons.mjs      # regenerate icons
 node scripts/package-vsix.mjs    # build pocket-pilot-<version>.vsix
-pwsh scripts/publish.ps1         # push to GitHub and (re)publish the phone app on GitHub Pages
+node scripts/build-site.mjs      # assemble dist/site (product page + app under /app/)
+node scripts/serve.mjs           # serve dist/site on http://127.0.0.1:8790 (the demo is at /app/?demo)
+node scripts/screenshots.mjs     # regenerate site/img/* from the demo app with headless Edge/Chrome
+pwsh scripts/publish.ps1         # push to GitHub, publish the site to GitHub Pages and the VSIX to a release
 ```
 
-Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `pwa/` (phone app; `pwa/js/core/` is shared with the extension), `media/` (sidebar), `scripts/`, `test/`.
+Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `pwa/` (phone app; `pwa/js/core/` is shared with the extension, `pwa/js/demo/` drives the demo mode), `site/` (product page), `media/` (sidebar), `scripts/`, `test/`.
 
-Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
+Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
 
 ## License
 

@@ -2,6 +2,7 @@ import { html, useState, useEffect, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
 import { statusOf, ago, folderName, providerLabel, filePath, S, has } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
+import { ModelSheet, modelSummary } from './model-picker.js';
 
 function SessionRow({ s, onOpen }) {
   const st = statusOf(s.status);
@@ -64,9 +65,17 @@ function NewSession({ store, open, onClose, onCreated }) {
   const [mode, setMode] = useState('interactive');
   const [approve, setApprove] = useState('default');
   const [isolation, setIsolation] = useState('folder');
-  const [modelId, setModelId] = useState('');
+  const [modelSel, setModelSel] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pp:newSessionModel') || 'null');
+    } catch {
+      return null;
+    }
+  });
+  const [modelOpen, setModelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const models = store.models(provider).filter((m) => m.policyState !== 'disabled');
+  const chosenModel = modelSel && models.some((m) => m.id === modelSel.id) ? modelSel : null;
   useEffect(() => {
     if (open) setFolder((f) => f || folders[0] || store.defaultDirectory || '');
   }, [open]);
@@ -78,9 +87,10 @@ function NewSession({ store, open, onClose, onCreated }) {
         provider,
         folder,
         text: text.trim(),
-        model: modelId ? { id: modelId } : undefined,
+        model: chosenModel || undefined,
         config: { mode, autoApprove: approve, isolation },
       });
+      if (chosenModel) localStorage.setItem('pp:newSessionModel', JSON.stringify(chosenModel));
       setText('');
       onClose();
       onCreated(uri);
@@ -92,7 +102,7 @@ function NewSession({ store, open, onClose, onCreated }) {
   }
   return html`<${Sheet} open=${open} onClose=${onClose} title="New session">
     <div class="stack">
-      ${agents.length > 1 && html`<div class="seg">${agents.map((a) => html`<button class=${provider === a.provider ? 'on' : ''} onClick=${() => { setProvider(a.provider); setModelId(''); }}>${a.displayName}</button>`)}</div>`}
+      ${agents.length > 1 && html`<div class="seg">${agents.map((a) => html`<button class=${provider === a.provider ? 'on' : ''} onClick=${() => { setProvider(a.provider); setModelSel(null); }}>${a.displayName}</button>`)}</div>`}
       <div class="field"><label>Folder on your PC</label>
         ${allFolders.slice(0, 5).map((f) => html`<button class=${`list-item ${f === folder ? 'on' : ''}`} key=${f} onClick=${() => setFolder(f)}>
           <${Icon} name="folder" /><div class="grow"><div>${folderName(f)}</div><div class="muted tiny">${filePath(f)}</div></div>${f === folder && html`<span class="check"><${Icon} name="check" /></span>`}
@@ -103,10 +113,8 @@ function NewSession({ store, open, onClose, onCreated }) {
         <textarea class="input" rows="4" placeholder="e.g. Fix the failing tests and explain what was wrong" value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
       </div>
       ${models.length > 0 && html`<div class="field"><label>Model</label>
-        <select class="input" value=${modelId} onChange=${(e) => setModelId(e.target.value)}>
-          <option value="">Default</option>
-          ${models.map((m) => html`<option value=${m.id}>${m.name || m.id}</option>`)}
-        </select></div>`}
+        <button class="list-item on" onClick=${() => setModelOpen(true)}><${Icon} name="cpu" /><span class="grow">${modelSummary(models, chosenModel)}</span><${Icon} name="right" /></button>
+      </div>`}
       <div class="field"><label>Mode</label>
         <div class="seg">${[['interactive', 'Interactive'], ['plan', 'Plan'], ['autopilot', 'Autopilot']].map(([v, l]) => html`<button class=${mode === v ? 'on' : ''} onClick=${() => setMode(v)}>${l}</button>`)}</div>
       </div>
@@ -119,6 +127,7 @@ function NewSession({ store, open, onClose, onCreated }) {
       <button class="btn primary block" disabled=${busy || !folder} onClick=${create}>${busy ? html`<${Spinner} /> Starting…` : 'Start session'}</button>
     </div>
     ${browse && html`<${FolderBrowser} store=${store} start=${folder || store.defaultDirectory} onPick=${setFolder} onClose=${() => setBrowse(false)} />`}
+    <${ModelSheet} open=${modelOpen} onClose=${() => setModelOpen(false)} models=${models} value=${chosenModel} onChange=${setModelSel} />
   </${Sheet}>`;
 }
 

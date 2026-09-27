@@ -19,7 +19,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-const app = new AppController({ pendingFragment });
+const demo = new URLSearchParams(location.search).has('demo');
+const app = new AppController({ pendingFragment: demo ? null : pendingFragment, demo });
 if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__pocketPilot = app;
 render(html`<${App} app=${app} />`, document.getElementById('app'));
 app.init();

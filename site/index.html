@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#07090e" />
+  <title>Pocket Pilot — your VS Code agents, in your pocket</title>
+  <meta name="description" content="Chat with your GitHub Copilot and Claude agent sessions from VS Code on your phone. Same live history, tool approvals, models and push notifications. End-to-end encrypted, passkey-protected and free." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Pocket Pilot — your VS Code agents, in your pocket" />
+  <meta property="og:description" content="See every Copilot and Claude session from VS Code on your phone. Reply, approve tool calls, pick models and get notified. End-to-end encrypted and free." />
+  <meta property="og:url" content="https://mithawala.github.io/pocket-pilot/" />
+  <meta property="og:image" content="https://mithawala.github.io/pocket-pilot/img/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="./app/icons/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./app/favicon.png" type="image/png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="./app/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./site.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></symbol>
+    <symbol id="i-face" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" /><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1" /><path d="M9.5 16a3.5 3.5 0 0 0 5 0" /></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2l10 5-10 5L2 7z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M11 18h2" /></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12.5 3.5 3.5 0 0 0 6.5 19z" /></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5" /><path d="M5 21h14" /></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" /></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" /></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M18 5l2 2" /></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18" /><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.4 6.4L3 16" /><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8" /><path d="M21 3v5h-5M3 21v-5h5" /></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="7" r="2" /><path d="M6 7v10M18 9c0 5-6 4-11 9" /></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.5l-5.2 1.7L12 16l-1.8-4.8L5 9.5l5.2-1.6z" /><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z" /></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z" /></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></symbol>
+    <symbol id="i-devices" viewBox="0 0 24 24"><rect x="2" y="4" width="14" height="10" rx="2" /><path d="M6 18h6" /><rect x="17" y="8" width="5" height="12" rx="1.5" /></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
+    <symbol id="i-github" viewBox="0 0 16 16"><path fill="currentColor" stroke="none" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></symbol>
+  </svg>
+
+  <header class="nav" id="top">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top"><img src="./app/icons/icon.svg" alt="" width="30" height="30" /><span>Pocket Pilot</span></a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#security">Security</a>
+        <a href="#start">Get started</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="icon-link" href="https://github.com/mithawala/pocket-pilot" aria-label="Source code on GitHub"><svg class="ic"><use href="#i-github" /></svg></a>
+        <a class="btn btn-sm btn-primary" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg><span>Download</span></a>
+        <button class="menu-btn" type="button" aria-label="Menu" aria-expanded="false"><svg class="ic"><use href="#i-menu" /></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="glow glow-a"></div>
+      <div class="glow glow-b"></div>
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <a class="phone-callout" href="./app/"><svg class="ic"><use href="#i-phone" /></svg><span>On your phone? <b>Open the Pocket Pilot app</b></span><svg class="ic"><use href="#i-arrow" /></svg></a>
+          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · for VS Code</div>
+          <h1>Your VS Code agents, <span class="grad">in your pocket.</span></h1>
+          <p class="lead">See every GitHub Copilot and Claude agent session running in VS Code on your phone, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary btn-lg" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download for VS Code</a>
+            <a class="btn btn-ghost btn-lg" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Try the live demo</a>
+          </div>
+          <p class="fineprint">Version %VERSION% · VS Code 1.133+ on Windows, macOS &amp; Linux · iPhone &amp; Android</p>
+        </div>
+
+        <div class="hero-visual" aria-label="Pocket Pilot in VS Code and on a phone">
+          <div class="window">
+            <div class="window-bar"><i></i><i></i><i></i><span>acme-web — Visual Studio Code</span></div>
+            <div class="window-body">
+              <div class="activity">
+                <span class="act"></span><span class="act"></span><span class="act"></span><span class="act"></span>
+                <img class="act-pp" src="./app/icons/icon.svg" alt="" />
+              </div>
+              <div class="sidebar-shot"><img src="./img/sidebar.webp" alt="The Pocket Pilot panel in VS Code showing a pairing QR code" width="330" height="900" /></div>
+              <div class="editor">
+                <div class="tabs"><span class="tab on">ThemeToggle.tsx</span><span class="tab">Page.tsx</span></div>
+<pre class="code"><code><span class="k">export function</span> <span class="f">ThemeToggle</span>() {
+  <span class="k">const</span> [<span class="v">theme</span>, <span class="v">setTheme</span>] = <span class="f">useTheme</span>();
+  <span class="k">return</span> (
+    &lt;<span class="t">Switch</span>
+      <span class="v">checked</span>={<span class="v">theme</span> === <span class="s">'dark'</span>}
+      <span class="v">onChange</span>={(<span class="v">on</span>) =&gt;
+        <span class="f">setTheme</span>(<span class="v">on</span> ? <span class="s">'dark'</span> : <span class="s">'light'</span>)}
+      <span class="v">label</span>=<span class="s">"Dark mode"</span>
+    /&gt;
+  );
+}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone hero-phone">
+            <div class="screen">
+              <div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div>
+              <img src="./img/sessions.webp" alt="Pocket Pilot on a phone: sessions that need you, are working, or finished" width="390" height="844" />
+            </div>
+          </div>
+
+          <div class="notif">
+            <img src="./app/icons/icon.svg" alt="" />
+            <div><b>Refactor auth module needs you</b><span>Run in terminal? npm test -- --coverage</span></div>
+            <em>now</em>
+          </div>
+          <div class="e2e-chip"><svg class="ic"><use href="#i-lock" /></svg>End-to-end encrypted</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="strip">
+      <div class="wrap strip-grid">
+        <div><svg class="ic"><use href="#i-lock" /></svg><span><b>End-to-end encrypted</b>even the tunnel can't read it</span></div>
+        <div><svg class="ic"><use href="#i-face" /></svg><span><b>Face ID &amp; fingerprint</b>passkey on every phone</span></div>
+        <div><svg class="ic"><use href="#i-eye-off" /></svg><span><b>No servers, no accounts</b>nothing to sign up for</span></div>
+        <div><svg class="ic"><use href="#i-gift" /></svg><span><b>Free</b>$0, not freemium</span></div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">Features</div>
+          <h2>Everything you do at your desk.<br /><span class="grad">Now from anywhere.</span></h2>
+          <p>Pocket Pilot speaks VS Code's own Agent Host Protocol, so your phone isn't a remote screen. It's a real client of the sessions on your PC.</p>
+        </div>
+
+        <div class="showcase" data-reveal>
+          <div class="show-copy">
+            <div class="badge"><svg class="ic"><use href="#i-chat" /></svg>Live sessions</div>
+            <h3>Same session. Same history. Live.</h3>
+            <p>Your phone shows exactly what VS Code shows: messages, reasoning, tool calls and code, streaming as they happen. Pick up any session where you left it and keep going.</p>
+            <ul class="checks">
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Every agent session from every VS Code window</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Queue follow-ups, steer a running agent or stop it</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Send photos, screenshots and files to the agent</span></li>
+            </ul>
+          </div>
+          <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/chat.webp" alt="A finished agent session with a code fix" width="390" height="844" loading="lazy" /></div></div></div>
+        </div>
+
+        <div class="showcase flip" data-reveal>
+          <div class="show-copy">
+            <div class="badge warn"><svg class="ic"><use href="#i-shield" /></svg>Approvals</div>
+            <h3>Approve in one tap.</h3>
+            <p>When an agent wants to run a command or touch your files, your phone buzzes. See exactly what it wants to do and answer with the same options VS Code gives you.</p>
+            <ul class="checks">
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Allow once, allow for the session, or skip</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Answer the questions agents ask you</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Notifications for “needs you”, “done” and errors</span></li>
+            </ul>
+          </div>
+          <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/approval.webp" alt="A tool approval card: Run in terminal? npm test -- --coverage" width="390" height="844" loading="lazy" /></div></div></div>
+        </div>
+
+        <div class="showcase" data-reveal>
+          <div class="show-copy">
+            <div class="badge"><svg class="ic"><use href="#i-sparkles" /></svg>Models &amp; modes</div>
+            <h3>Your model. Your rules.</h3>
+            <p>Pick any model your plan includes, with the same thinking-level and context-size options as VS Code. Switch between Interactive, Plan and Autopilot, and decide how tools get approved.</p>
+            <ul class="checks">
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Thinking level from Low to Max</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Context size up to 1M tokens, where the model supports it</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Interactive, Plan and Autopilot modes</span></li>
+            </ul>
+          </div>
+          <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/models.webp" alt="The model picker with thinking level and context size" width="390" height="844" loading="lazy" /></div></div></div>
+        </div>
+
+        <div class="showcase flip" data-reveal>
+          <div class="show-copy">
+            <div class="badge"><svg class="ic"><use href="#i-folder" /></svg>New sessions</div>
+            <h3>Start work from the couch.</h3>
+            <p>Kick off a new session on your PC from your phone: choose a folder, describe the task, pick the model and mode, and keep the changes in a separate git worktree if you like.</p>
+            <ul class="checks">
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Recent folders plus a folder browser</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Copilot and Claude agents</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Shows up in VS Code right away</span></li>
+            </ul>
+          </div>
+          <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/new-session.webp" alt="Starting a new agent session from the phone" width="390" height="844" loading="lazy" /></div></div></div>
+        </div>
+
+        <div class="grid-head" data-reveal><h3>And the details you'd expect</h3></div>
+        <div class="feature-grid" data-reveal>
+          <div class="feature"><svg class="ic"><use href="#i-bell" /></svg><h4>Push notifications</h4><p>Standard Web Push, sent straight from your PC. No Firebase, no push account.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-devices" /></svg><h4>Multiple PCs</h4><p>Pair your desktop and your laptop, and switch between them in one tap.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-refresh" /></svg><h4>Auto-reconnect</h4><p>If the tunnel URL changes, phones find your PC again through an encrypted secret gist.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-phone" /></svg><h4>Installable app</h4><p>Add it to your Home Screen for a full-screen app that opens instantly.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-globe" /></svg><h4>Any network</h4><p>A Cloudflare quick tunnel means no port forwarding, no VPN and no firewall changes.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-layers" /></svg><h4>Multi-window aware</h4><p>One VS Code window hosts the tunnel. If you close it, another one takes over.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-image" /></svg><h4>Files &amp; photos</h4><p>Attach a photo of a whiteboard or a screenshot, or preview the files the agent links to.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-moon" /></svg><h4>Light &amp; dark</h4><p>Follows your phone's theme, or you can pick one.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="section alt">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">How it works</div>
+          <h2>Your phone talks to VS Code.<br /><span class="grad">Nothing in between can listen.</span></h2>
+          <p>There's no cloud service. The extension opens a free, encrypted path from your phone to the agent host that VS Code already runs on your PC.</p>
+        </div>
+
+        <div class="diagram" data-reveal>
+          <div class="node">
+            <div class="node-ic"><svg class="ic"><use href="#i-phone" /></svg></div>
+            <h4>Your phone</h4>
+            <p>The Pocket Pilot app, a static PWA hosted on GitHub Pages</p>
+          </div>
+          <div class="link"><span class="pulse"></span><em><svg class="ic"><use href="#i-lock" /></svg>E2E encrypted</em></div>
+          <div class="node">
+            <div class="node-ic cloud"><svg class="ic"><use href="#i-cloud" /></svg></div>
+            <h4>Cloudflare quick tunnel</h4>
+            <p>Free, no account. It only ever sees ciphertext.</p>
+          </div>
+          <div class="link"><span class="pulse"></span><em><svg class="ic"><use href="#i-lock" /></svg>E2E encrypted</em></div>
+          <div class="node">
+            <div class="node-ic pc"><svg class="ic"><use href="#i-monitor" /></svg></div>
+            <h4>Your PC</h4>
+            <p>The Pocket Pilot extension relays to VS Code's agent host (Copilot &amp; Claude)</p>
+          </div>
+        </div>
+
+        <div class="how-points" data-reveal>
+          <div><b>1 · A tiny relay on your PC.</b> The extension listens on <code>127.0.0.1</code> and publishes it through a Cloudflare quick tunnel. <code>cloudflared</code> is downloaded once from its official release and checksum-verified.</div>
+          <div><b>2 · A real protocol client.</b> The phone app speaks VS Code's Agent Host Protocol inside an end-to-end encrypted channel, using the official reducers, so it shows exactly what VS Code shows.</div>
+          <div><b>3 · Your token stays home.</b> The relay authenticates to the agent host with your GitHub account on the PC and forwards only an allow-list of methods. The phone never sees a token.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="start" class="section">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">Get started</div>
+          <h2>Set up in two minutes.</h2>
+          <p>You'll need VS Code 1.133 or later with GitHub Copilot or Claude agent sessions, and a phone running iOS 16.4+ or Android.</p>
+        </div>
+
+        <ol class="steps">
+          <li class="step" data-reveal>
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>Install the extension</h3>
+              <p>Download <b>pocket-pilot.vsix</b>. In VS Code, open <b>Extensions → ··· → Install from VSIX…</b>, or run:</p>
+              <div class="cmd"><code>code --install-extension pocket-pilot.vsix</code><button type="button" class="copy" data-copy="code --install-extension pocket-pilot.vsix" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+              <a class="btn btn-primary" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download pocket-pilot.vsix</a>
+            </div>
+          </li>
+          <li class="step with-media" data-reveal>
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>Start remote access</h3>
+              <p>Open the <b>Pocket Pilot</b> panel in the activity bar and click <b>Start remote access</b>. The first time, VS Code asks you to:</p>
+              <ul class="checks small">
+                <li><svg class="ic"><use href="#i-check" /></svg><span>let Pocket Pilot use your GitHub account, so it can authenticate to the agent host for your phone</span></li>
+                <li><svg class="ic"><use href="#i-check" /></svg><span>download <code>cloudflared</code> once (about 55 MB, verified)</span></li>
+                <li><svg class="ic"><use href="#i-check" /></svg><span>optionally turn on auto-reconnect (an encrypted secret gist)</span></li>
+              </ul>
+            </div>
+            <div class="step-media sidebar-frame"><img src="./img/sidebar.webp" alt="Pocket Pilot panel with the pairing QR code" width="330" height="900" loading="lazy" /></div>
+          </li>
+          <li class="step with-media" data-reveal>
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>Scan &amp; pair your phone</h3>
+              <p>Scan the QR code, check that the fingerprint matches, click <b>Allow</b> in VS Code and set up Face ID or your fingerprint.</p>
+              <div class="tabs-box" data-tabs>
+                <div class="tab-btns" role="tablist">
+                  <button type="button" role="tab" data-tab="ios" aria-selected="true">iPhone</button>
+                  <button type="button" role="tab" data-tab="android" aria-selected="false">Android</button>
+                </div>
+                <div class="tab-panel" data-panel="ios">
+                  <ol>
+                    <li>Open <a href="./app/">the app</a> in <b>Safari</b> and tap <b>Share → Add to Home Screen</b>.</li>
+                    <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.</li>
+                    <li>iOS only shows notifications for Home Screen apps, so always use that icon.</li>
+                  </ol>
+                </div>
+                <div class="tab-panel" data-panel="android" hidden>
+                  <ol>
+                    <li>Point your camera at the QR code in VS Code and open the link.</li>
+                    <li>Tap <b>Install</b> (or Chrome menu → <b>Add to Home screen</b>) for an app-like experience.</li>
+                    <li>Notifications work in the browser too.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+            <div class="step-media phone-mini"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/pair.webp" alt="The Pocket Pilot app's pairing screen" width="390" height="844" loading="lazy" /></div></div></div>
+          </li>
+          <li class="step" data-reveal>
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h3>Turn on notifications</h3>
+              <p>Tap <b>Enable notifications</b>, and your agents can reach you when they need approval, have a question, or finish.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="open-app" data-reveal>
+          <img class="qr" src="./img/app-qr.svg" alt="QR code that opens the Pocket Pilot app" width="148" height="148" />
+          <div>
+            <h3>Open the app on your phone</h3>
+            <p>Scan this code with your phone, or visit <b>mithawala.github.io/pocket-pilot/app</b>. You can try the demo without pairing anything.</p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="./app/"><svg class="ic"><use href="#i-phone" /></svg>Open the app</a>
+              <a class="btn btn-ghost" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Try the demo</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="security" class="section alt">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">Security</div>
+          <h2>Built for a tunnel<br /><span class="grad">you don't have to trust.</span></h2>
+          <p>Your agents can run commands on your PC, so Pocket Pilot treats every hop between your phone and VS Code as hostile.</p>
+        </div>
+        <div class="sec-grid" data-reveal>
+          <div class="sec"><svg class="ic"><use href="#i-lock" /></svg><h4>End-to-end encrypted</h4><p>ECDH P-256 with forward secrecy and AES-256-GCM on every frame, with strict sequence numbers. Cloudflare, GitHub and your network only see ciphertext.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-shield" /></svg><h4>Paired phones only</h4><p>QR codes are single-use, expire after 10 minutes and must be approved in VS Code. The phone pins your PC's key fingerprint.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-face" /></svg><h4>Face ID &amp; fingerprint</h4><p>Each phone registers a passkey. The extension verifies the WebAuthn assertion itself and asks again after 12 hours, or at every connection if you prefer.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-key" /></svg><h4>Keys that can't leave</h4><p>Phone keys are non-extractable WebCrypto keys. Your GitHub token and the agent host's token never leave your PC.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-layers" /></svg><h4>Least privilege</h4><p>The relay forwards only an allow-list of agent protocol methods: no terminals and no file writes, and file reads stay inside your session folders.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-bolt" /></svg><h4>Instant revoke</h4><p>Remove a phone in VS Code and it's disconnected immediately. <i>Reset identity</i> invalidates every pairing at once.</p></div>
+        </div>
+        <p class="center-link" data-reveal><a href="https://github.com/mithawala/pocket-pilot#security-model">Read the full security model <svg class="ic"><use href="#i-arrow" /></svg></a></p>
+      </div>
+    </section>
+
+    <section id="free" class="section">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">Pricing</div>
+          <h2>Free. <span class="grad">Not freemium.</span></h2>
+          <p>Every piece is free, and none of it runs on our servers, because there aren't any. You only pay for the Copilot or Claude plan you already have.</p>
+        </div>
+        <div class="free-grid" data-reveal>
+          <div class="free"><div class="price">$0</div><h4>Cloudflare quick tunnel</h4><p>A public HTTPS address for your PC. No account and no configuration.</p></div>
+          <div class="free"><div class="price">$0</div><h4>GitHub Pages</h4><p>The phone app is a static site. No backend and no database.</p></div>
+          <div class="free"><div class="price">$0</div><h4>Web Push</h4><p>Notifications go from your PC through your phone's own push service.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="demo" class="section alt demo-section">
+      <div class="wrap demo-grid">
+        <div class="demo-copy" data-reveal>
+          <div class="kicker">Live demo</div>
+          <h2>Try it right here.</h2>
+          <p>This is the real app, connected to a scripted demo PC with sample sessions. Nothing is paired and nothing leaves your browser.</p>
+          <ul class="checks">
+            <li><svg class="ic"><use href="#i-check" /></svg><span>Open <b>Refactor auth module</b> and approve the test run</span></li>
+            <li><svg class="ic"><use href="#i-check" /></svg><span>Change the model, thinking level or mode</span></li>
+            <li><svg class="ic"><use href="#i-check" /></svg><span>Send a message, or start a new session with <b>+ New</b></span></li>
+          </ul>
+          <a class="btn btn-ghost" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Open the demo full screen</a>
+        </div>
+        <div class="demo-phone" data-reveal>
+          <div class="phone live"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><iframe title="Pocket Pilot live demo" data-src="./app/?demo"></iframe></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="section">
+      <div class="wrap narrow">
+        <div class="section-head" data-reveal>
+          <div class="kicker">FAQ</div>
+          <h2>Questions, answered.</h2>
+        </div>
+        <div class="faq" data-reveal>
+          <details><summary>Which sessions show up?</summary><p>Every session hosted by VS Code's agent host, including GitHub Copilot (Copilot CLI) and Claude agent sessions, from every open VS Code window. Classic chat-panel conversations that don't run in the agent host aren't part of the protocol, so they don't show up.</p></details>
+          <details><summary>Is it really free?</summary><p>Yes. Cloudflare quick tunnels are free and need no account, the app is a static site on GitHub Pages, and notifications use your phone's built-in push service. Pocket Pilot has no servers and no paid tier.</p></details>
+          <details><summary>Can Cloudflare, GitHub or anyone else read my code?</summary><p>No. Everything between your phone and your PC is end-to-end encrypted, so the tunnel only relays ciphertext. The optional auto-reconnect gist only holds your PC's current address, encrypted with a key that only your paired phones have.</p></details>
+          <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code must be running and the PC awake. If the VS Code window hosting the tunnel closes, another open window takes over automatically.</p></details>
+          <details><summary>Does it work on iPhone?</summary><p>Yes. Add the app to your Home Screen from Safari to get notifications (iOS 16.4+) and a full-screen experience, then pair with the scanner built into the app.</p></details>
+          <details><summary>What if I lose my phone?</summary><p>Remove it in the Pocket Pilot panel and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the phone would also need your Face ID or fingerprint.</p></details>
+          <details><summary>My network blocks the tunnel. Now what?</summary><p>Quick tunnels need outbound port 7844. Set <code>pocketPilot.tunnel.mode</code> to <code>custom</code> and use a tunnel your network allows, such as a named Cloudflare tunnel, Dev Tunnels or Tailscale Funnel.</p></details>
+          <details><summary>How do I update?</summary><p>Download the latest <code>.vsix</code> and install it over the old one. The phone app updates itself.</p></details>
+          <details><summary>Is this an official Microsoft or GitHub product?</summary><p>No. Pocket Pilot is an independent open-source project built on the Agent Host Protocol that VS Code exposes locally.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="wrap final-inner" data-reveal>
+        <img src="./app/icons/icon.svg" alt="" width="64" height="64" />
+        <h2>Take your agents with you.</h2>
+        <div class="cta-row center">
+          <a class="btn btn-primary btn-lg" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download for VS Code</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/mithawala/pocket-pilot"><svg class="ic"><use href="#i-github" /></svg>View on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="brand"><img src="./app/icons/icon.svg" alt="" width="24" height="24" /><span>Pocket Pilot</span></div>
+      <nav aria-label="Footer">
+        <a href="./app/">Phone app</a>
+        <a href="./app/?demo">Demo</a>
+        <a href="https://github.com/mithawala/pocket-pilot/releases">Releases</a>
+        <a href="https://github.com/mithawala/pocket-pilot">Source</a>
+      </nav>
+      <p>MIT licensed. An independent project, not affiliated with Microsoft, GitHub, Anthropic or Cloudflare. All trademarks belong to their owners.</p>
+    </div>
+  </footer>
+</body>
+</html>
