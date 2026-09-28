@@ -204,3 +204,33 @@ test('updates: a VSIX install is offered a newer GitHub release and installs it 
     uninstall();
   }
 });
+
+test('settings: pairing links always open the hosted app, even with an old or unreachable app URL', async () => {
+  const APP = 'https://mithawala.github.io/pocket-pilot/app/';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error('offline');
+  };
+  try {
+    for (const [value, expected] of [[undefined, APP], ['https://mithawala.github.io/pocket-pilot/', APP], ['https://mithawala.github.io/pocket-pilot', APP], ['https://mithawala.github.io/pocket-pilot/app', APP], ['https://example.com/pp', 'https://example.com/pp/']]) {
+      const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-url-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+      const mock = createVscodeMock(value === undefined ? {} : { pwaUrl: value }, {});
+      const uninstall = installMock(mock.api);
+      let service;
+      try {
+        delete require.cache[require.resolve('../extension/extension.js')];
+        ({ service } = await require('../extension/extension.js').activate(makeContext(storage)));
+        await service._checkPwaUrl();
+        const s = service.viewState().settings;
+        assert.equal(s.pwaUrl, expected, `pwaUrl ${value}`);
+        // Only a self-hosted copy that can't be reached falls back to the app served through the tunnel.
+        assert.equal(s.pwaFallback, expected !== APP, `fallback for ${value}`);
+      } finally {
+        await service?.dispose();
+        uninstall();
+      }
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

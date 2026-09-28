@@ -107,7 +107,7 @@
         "pocketPilot.pwaUrl": {
           "type": "string",
           "default": "https://mithawala.github.io/pocket-pilot/app/",
-          "markdownDescription": "Where the Pocket Pilot app is hosted (the QR code opens this URL). Leave empty to serve the app through the tunnel itself (not recommended: the tunnel URL changes, so the installed app and its keys would not survive a restart)."
+          "markdownDescription": "The Pocket Pilot app your devices open: pairing QR codes and links point here. Keep the default, the hosted app at `https://mithawala.github.io/pocket-pilot/app/`, unless you host the app yourself. (Empty: the relay serves the app through the tunnel, whose address changes, so an installed app and its keys would not survive a restart.)"
         },
         "pocketPilot.extraAllowedOrigins": {
           "type": "array",

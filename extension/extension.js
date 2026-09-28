@@ -24,12 +24,21 @@ const STATE_UPDATE_NOTIFIED = 'pocketPilot.updateNotified';
 const PUSH_SUBJECT = 'mailto:pocket-pilot@users.noreply.github.com';
 const EXTENSION_ID = 'mithawala.pocket-pilot';
 const REPO = 'mithawala/pocket-pilot';
+const DEFAULT_PWA_URL = 'https://mithawala.github.io/pocket-pilot/app/';
+
+/** The app URL to put in pairing links, with a trailing slash; the product page's address means the app. */
+function normalizePwaUrl(raw) {
+  let url = String(raw || '').trim();
+  if (!url) return '';
+  if (!url.endsWith('/')) url += '/';
+  return /^https:\/\/mithawala\.github\.io\/pocket-pilot\/$/i.test(url) ? DEFAULT_PWA_URL : url;
+}
 
 function settings() {
   const c = vscode.workspace.getConfiguration('pocketPilot');
   return {
     autoStart: c.get('autoStart', true),
-    pwaUrl: String(c.get('pwaUrl', '') || '').trim(),
+    pwaUrl: normalizePwaUrl(c.get('pwaUrl', DEFAULT_PWA_URL)),
     extraAllowedOrigins: c.get('extraAllowedOrigins', []) || [],
     tunnelMode: c.get('tunnel.mode', 'quick'),
     customUrl: String(c.get('tunnel.customUrl', '') || '').trim().replace(/\/+$/, ''),
@@ -493,16 +502,20 @@ class PocketPilotService {
     return [...out];
   }
 
-  /** True when the configured app URL is not reachable (e.g. not published yet). */
+  /**
+   * True when a self-hosted app URL is not reachable yet (not published): pairing links then use the copy
+   * the relay serves through the tunnel. The hosted app is always used, even if this PC can't reach it
+   * right now: the phone loads it, not the PC.
+   */
   async _checkPwaUrl() {
     const url = settings().pwaUrl;
-    if (!url) {
+    if (!url || url === DEFAULT_PWA_URL) {
       this.pwaFallback = false;
       return;
     }
     let ok = false;
     try {
-      const res = await fetch(new URL('manifest.webmanifest', url.endsWith('/') ? url : `${url}/`), { cache: 'no-store', redirect: 'follow' });
+      const res = await fetch(new URL('manifest.webmanifest', url), { cache: 'no-store', redirect: 'follow' });
       ok = res.ok;
     } catch {
       ok = false;
