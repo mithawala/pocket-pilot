@@ -39,3 +39,5 @@ The night background from 04 and the jeans pocket from 01, combined with the fav
 | 10 | [10-monogram.svg](10-monogram.svg) | A bold "P" with a paper plane leaving its bowl. |
 
 Once one is chosen, it becomes the app icon (`pwa/icons/icon.svg` plus the generated PNGs, maskable and Home Screen variants, favicon), the extension icon (`media/icon.png`, 128 px PNG for the Marketplace) and a simplified single-colour glyph for the VS Code activity bar (`media/activity.svg`).
+
+**Chosen: 12 (visor bot in a pocket).** `node scripts/make-icons.mjs` generates every icon from it.

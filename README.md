@@ -87,7 +87,7 @@ node scripts/vendor.mjs          # verify (or --update) vendored libs from jsDel
 node --test "test/*.test.mjs"    # unit + integration tests (live tests run when a VS Code agent host is found)
 node scripts/dev-relay.mjs       # standalone relay + PWA on http://localhost:8787 (prints a pairing link)
 node scripts/live-check.mjs      # read-only end-to-end check against your VS Code agent host
-node scripts/make-icons.mjs      # regenerate icons
+node scripts/make-icons.mjs      # regenerate every icon (SVG + PNG sizes) from one design, via headless Edge/Chrome
 node scripts/package-vsix.mjs    # build pocket-pilot-<version>.vsix
 node scripts/build-site.mjs      # assemble dist/site (product page + app under /app/)
 node scripts/serve.mjs           # serve dist/site on http://127.0.0.1:8790 (the demo is at /app/?demo)
@@ -95,7 +95,7 @@ node scripts/screenshots.mjs     # regenerate site/img/* from the demo app with 
 pwsh scripts/publish.ps1         # push to GitHub, publish the site to GitHub Pages and the VSIX to a release
 ```
 
-Publishing to the VS Code Marketplace: see [docs/MARKETPLACE.md](docs/MARKETPLACE.md). Icon options for a new logo are in [design/icons/](design/icons/).
+Publishing to the VS Code Marketplace: see [docs/MARKETPLACE.md](docs/MARKETPLACE.md). The icon is option 12 from [design/icons/](design/icons/).
 
 Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `pwa/` (phone app; `pwa/js/core/` is shared with the extension, `pwa/js/demo/` drives the demo mode), `site/` (product page), `media/` (sidebar), `scripts/`, `test/`.
 

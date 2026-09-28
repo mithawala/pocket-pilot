@@ -9,3 +9,4 @@
 - The chat input is pinned to the bottom of the screen and stays above the on-screen keyboard (visual viewport sizing); the conversation follows new output unless you scroll up.
 - Desktop layout: on wide windows the sessions list is a VS Code-style sidebar and the chat fills the main area; pickers and dialogs open as centred quick picks, and the chat input is focused when a session opens.
 - The extension page and Marketplace listing render the README correctly: images are PNG/JPEG with absolute URLs (the packager rewrites relative links like `vsce`), and the text diagram is now an image. Marked as Preview, with gallery banner colours.
+- New icon: the visor bot climbing out of a jeans pocket (app, Home Screen, maskable and favicon variants, notification badge, Marketplace icon, sidebar logo and a matching outline glyph for the activity bar). `scripts/make-icons.mjs` renders every size from one SVG design with headless Edge/Chrome.

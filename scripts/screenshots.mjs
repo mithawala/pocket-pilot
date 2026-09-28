@@ -1,20 +1,18 @@
 // Regenerates the landing-page images in site/img/ — phone screenshots from the demo app (app/?demo),
-// the real VS Code sidebar webview (media/sidebar.*) with a Dark Modern theme, and the social
-// preview card — using headless Edge/Chrome over the DevTools protocol (no dependencies).
+// the real VS Code sidebar webview (media/sidebar.*) with One Dark colours, the social preview
+// card and the README images in docs/images/ — using headless Edge/Chrome (scripts/lib/headless.mjs).
 // Usage: node scripts/screenshots.mjs        (set PP_BROWSER to use a specific Chromium binary)
 import http from 'node:http';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { launchBrowser, newPage, sleep } from './lib/headless.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(repo, 'site', 'img');
 const require = createRequire(import.meta.url);
 const qrcode = require('../media/vendor/qrcode.js');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const DEMO_LINK = 'https://mithawala.github.io/pocket-pilot/app/?demo';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp' };
@@ -118,106 +116,14 @@ function startServer() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
-function findBrowser() {
-  const candidates = [
-    process.env.PP_BROWSER,
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/microsoft-edge',
-  ].filter(Boolean);
-  const bin = candidates.find((p) => fs.existsSync(p));
-  if (!bin) throw new Error('No Edge/Chrome found; set PP_BROWSER');
-  return bin;
-}
-
-class Cdp {
-  constructor(url) {
-    this.ws = new WebSocket(url);
-    this.seq = 0;
-    this.pending = new Map();
-  }
-  async open() {
-    await new Promise((resolve, reject) => {
-      this.ws.onopen = resolve;
-      this.ws.onerror = () => reject(new Error('DevTools connection failed'));
-    });
-    this.ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
-      const p = m.id && this.pending.get(m.id);
-      if (!p) return;
-      this.pending.delete(m.id);
-      if (m.error) p.reject(new Error(`${p.method}: ${m.error.message}`));
-      else p.resolve(m.result);
-    };
-  }
-  send(method, params = {}, sessionId) {
-    const id = ++this.seq;
-    this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-    return new Promise((resolve, reject) => this.pending.set(id, { resolve, reject, method }));
-  }
-}
-
-async function launchBrowser() {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-shots-'));
-  const proc = spawn(findBrowser(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dataDir}`, '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--disable-extensions', '--mute-audio', '--force-color-profile=srgb', 'about:blank'], { stdio: 'ignore' });
-  const portFile = path.join(dataDir, 'DevToolsActivePort');
-  let lines = [];
-  for (let i = 0; i < 150 && lines.length < 2; i++) {
-    await sleep(100);
-    if (fs.existsSync(portFile)) lines = fs.readFileSync(portFile, 'utf8').trim().split(/\r?\n/);
-  }
-  if (lines.length < 2) throw new Error('Browser did not start');
-  const cdp = new Cdp(`ws://127.0.0.1:${lines[0]}${lines[1]}`);
-  await cdp.open();
-  const close = async () => {
-    await cdp.send('Browser.close').catch(() => {});
-    await sleep(500);
-    proc.kill();
-    fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  };
-  return { cdp, close };
-}
-
-async function newPage(cdp, { width, height, dpr = 2, mobile = true }) {
-  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
-  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-  const send = (m, p) => cdp.send(m, p, sessionId);
-  await send('Page.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
-  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
-  const page = {
-    async eval(expression) {
-      const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-      if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
-      return r.result.value;
-    },
-    async waitFor(expression, timeout = 15000) {
-      const start = Date.now();
-      while (Date.now() - start < timeout) {
-        if (await page.eval(`!!(${expression})`).catch(() => false)) return;
-        await sleep(100);
-      }
-      throw new Error(`Timed out waiting for ${expression}`);
-    },
-    async goto(url) {
-      await send('Page.navigate', { url });
-      await sleep(300);
-      await page.waitFor('document.readyState === "complete"');
-    },
-    async shot(name, { format = 'webp', clip, dir = outDir } = {}) {
-      const r = await send('Page.captureScreenshot', { format, ...(format === 'png' ? {} : { quality: 88 }), ...(clip ? { clip: { ...clip, scale: 1 }, captureBeyondViewport: true } : {}) });
-      const buf = Buffer.from(r.data, 'base64');
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, name), buf);
-      console.log(`  ${path.relative(repo, path.join(dir, name)).split(path.sep).join('/')}  ${(buf.length / 1024).toFixed(0)} KB`);
-    },
-    reducedMotion: () => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }, { name: 'prefers-reduced-motion', value: 'reduce' }] }),
-    close: () => cdp.send('Target.closeTarget', { targetId }),
+/** Opens a page whose `shot(name, { format, clip, dir })` writes the capture into the repo and logs it. */
+async function open(cdp, opts) {
+  const page = await newPage(cdp, opts);
+  page.shot = async (name, { format = 'webp', clip, dir = outDir } = {}) => {
+    const buf = await page.capture({ format, clip });
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, name), buf);
+    console.log(`  ${path.relative(repo, path.join(dir, name)).split(path.sep).join('/')}  ${(buf.length / 1024).toFixed(0)} KB`);
   };
   return page;
 }
@@ -234,7 +140,7 @@ async function main() {
   const { cdp, close } = await launchBrowser();
   try {
     console.log('Capturing phone screens…');
-    const phone = await newPage(cdp, { width: 390, height: 844 });
+    const phone = await open(cdp, { width: 390, height: 844 });
     const demo = async (hash = '') => {
       await phone.goto(`${base}/pwa/?demo${hash}`);
       await phone.waitFor('document.querySelector(".srow, .composer")');
@@ -262,7 +168,7 @@ async function main() {
     await phone.close();
 
     console.log('Capturing the VS Code sidebar…');
-    const side = await newPage(cdp, { width: 330, height: 900, mobile: false });
+    const side = await open(cdp, { width: 330, height: 900, mobile: false });
     await side.goto(`${base}/__sidebar.html`);
     await side.waitFor('document.querySelector(".qr svg")');
     await sleep(500);
@@ -271,7 +177,7 @@ async function main() {
     await side.close();
 
     console.log('Rendering the social preview…');
-    const og = await newPage(cdp, { width: 1200, height: 630, dpr: 1, mobile: false });
+    const og = await open(cdp, { width: 1200, height: 630, dpr: 1, mobile: false });
     await og.goto(`${base}/__og.html`);
     await og.waitFor('[...document.images].every((i) => i.complete && i.naturalWidth > 0)');
     await sleep(300);
@@ -280,13 +186,13 @@ async function main() {
 
     console.log('Rendering README images…');
     const docs = path.join(repo, 'docs', 'images');
-    const banner = await newPage(cdp, { width: 1280, height: 700, dpr: 1, mobile: false });
+    const banner = await open(cdp, { width: 1280, height: 700, dpr: 1, mobile: false });
     await banner.goto(`${base}/__readme.html`);
     await banner.waitFor('[...document.images].every((i) => i.complete && i.naturalWidth > 0)');
     await sleep(300);
     await banner.shot('screens.jpg', { format: 'jpeg', dir: docs });
     await banner.close();
-    const how = await newPage(cdp, { width: 1200, height: 900, dpr: 1, mobile: false });
+    const how = await open(cdp, { width: 1200, height: 900, dpr: 1, mobile: false });
     await how.reducedMotion();
     await how.goto(`${base}/site/index.html`);
     await how.waitFor('document.querySelector("#how .diagram")');
