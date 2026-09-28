@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Robot phone — the phone is a visor bot (dome top, bolts, antenna) climbing out of the jeans pocket</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#6366f1" stop-opacity=".55"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#c3cfdf"/></linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+    <linearGradient id="pocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d42c4"/><stop offset="1" stop-color="#1b2785"/></linearGradient>
+    <filter id="lift" x="-10%" y="-20%" width="120%" height="140%"><feDropShadow dx="0" dy="-6" stdDeviation="7" flood-color="#000" flood-opacity=".4"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <path d="M298 86L320 48" stroke="#c3cfdf" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="324" cy="42" r="12" fill="#f472b6"/>
+  <path d="M168 160C168 108 206 78 256 78S344 108 344 160V412H168Z" fill="url(#metal)"/>
+  <circle cx="162" cy="214" r="11" fill="#94a3b8"/>
+  <circle cx="350" cy="214" r="11" fill="#94a3b8"/>
+  <rect x="186" y="124" width="140" height="196" rx="34" fill="#0b1224"/>
+  <rect x="198" y="160" width="116" height="62" rx="31" fill="url(#visor)"/>
+  <path d="M212 175Q236 167 262 170" stroke="#fff" stroke-opacity=".55" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <circle cx="232" cy="191" r="15" fill="#fff" opacity=".25"/>
+  <circle cx="280" cy="191" r="15" fill="#fff" opacity=".25"/>
+  <circle cx="232" cy="191" r="8" fill="#fff"/>
+  <circle cx="280" cy="191" r="8" fill="#fff"/>
+  <rect x="220" y="236" width="72" height="24" rx="12" fill="#1e293b"/>
+  <circle cx="240" cy="248" r="4" fill="#94a3b8"/>
+  <circle cx="256" cy="248" r="4" fill="#94a3b8"/>
+  <circle cx="272" cy="248" r="4" fill="#94a3b8"/>
+  <path d="M88 296Q256 262 424 296L406 416Q400 444 372 448H140Q112 444 106 416Z" fill="url(#pocket)" filter="url(#lift)"/>
+  <path d="M110 310Q256 280 402 310" stroke="#8ea4ff" stroke-width="6" stroke-dasharray="16 12" stroke-linecap="round" fill="none"/>
+  <path d="M150 342H362" stroke="#3f55d6" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+  <ellipse cx="176" cy="289" rx="28" ry="20" fill="url(#metal)"/>
+  <ellipse cx="336" cy="289" rx="28" ry="20" fill="url(#metal)"/>
+  <path d="M166 283v12M182 281v14M328 281v14M344 283v12" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+</svg>

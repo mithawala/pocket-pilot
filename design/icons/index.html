@@ -7,9 +7,12 @@
   <style>
     body { margin: 0; padding: 32px 36px 40px; background: #1b1e24; color: #d7dae0; font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; }
     h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
-    p.lead { margin: 0 0 26px; color: #9da5b4; font-size: 14px; }
+    h2 { margin: 34px 0 4px; font-size: 17px; font-weight: 700; }
+    h2 .tag { display: inline-block; margin-right: 8px; padding: 2px 8px; border-radius: 99px; font-size: 12px; color: #fff; background: #4d78cc; vertical-align: 2px; }
+    p.lead, p.sub { margin: 0 0 18px; color: #9da5b4; font-size: 14px; }
     .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
     .card { background: #21252b; border: 1px solid #3a3f4b; border-radius: 12px; padding: 18px 16px 14px; text-align: center; }
+    .card.new { border-color: #4d78cc; box-shadow: 0 0 0 1px #4d78cc inset; }
     .big { width: 160px; height: 160px; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45)); }
     .num { margin-top: 10px; font-size: 13px; color: #61afef; font-weight: 700; letter-spacing: .04em; }
     .name { font-size: 15px; font-weight: 600; margin-top: 2px; }
@@ -18,15 +21,36 @@
     .sizes img:nth-child(1) { width: 64px; height: 64px; }
     .sizes img:nth-child(2) { width: 32px; height: 32px; }
     .sizes img:nth-child(3) { width: 20px; height: 20px; }
-    .current { display: flex; align-items: center; gap: 12px; margin: 0 0 22px; color: #9da5b4; font-size: 13px; }
+    .current { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; color: #9da5b4; font-size: 13px; }
     .current img { width: 40px; height: 40px; }
+    .round1 { opacity: .8; }
   </style>
 </head>
 <body>
-  <h1>Pocket Pilot — 10 icon options</h1>
+  <h1>Pocket Pilot — icon options</h1>
   <p class="lead">Original designs (no Copilot mascot elements: no goggles-on-a-dome head or pill eyes). Each is shown large and at 64 / 32 / 20 px to check how it reads in the Marketplace, the activity bar and on a Home Screen.</p>
   <div class="current"><img src="../../pwa/icons/icon.svg" alt="" /> Current icon, for comparison</div>
+
+  <h2><span class="tag">Round 2</span>Night background (04) + jeans pocket (01)</h2>
+  <p class="sub">01, 04 and 06 in the pocket. In 13 the smile is gone and the eyes sit above the pocket.</p>
   <div class="grid">
+    <div class="card new"><img class="big" src="11-pocket-bot-night.svg" alt="" /><div class="num">11</div><div class="name">Pocket bot, night</div><div class="desc">01 on the visor-bot background.</div><div class="sizes"><img src="11-pocket-bot-night.svg" alt="" /><img src="11-pocket-bot-night.svg" alt="" /><img src="11-pocket-bot-night.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="12-visor-bot-pocket.svg" alt="" /><div class="num">12</div><div class="name">Visor bot in a pocket</div><div class="desc">04 climbing out of the jeans pocket.</div><div class="sizes"><img src="12-visor-bot-pocket.svg" alt="" /><img src="12-visor-bot-pocket.svg" alt="" /><img src="12-visor-bot-pocket.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="13-phone-bot-pocket.svg" alt="" /><div class="num">13</div><div class="name">Phone bot in a pocket</div><div class="desc">06 sliding into the pocket, without the smile.</div><div class="sizes"><img src="13-phone-bot-pocket.svg" alt="" /><img src="13-phone-bot-pocket.svg" alt="" /><img src="13-phone-bot-pocket.svg" alt="" /></div></div>
+  </div>
+
+  <h2><span class="tag">Round 2</span>The visor bot on a phone, in a pocket — 5 alternatives</h2>
+  <p class="sub">A silver phone (so it stands out on the dark background) showing the 04 visor bot, partly covered by a jeans pocket.</p>
+  <div class="grid">
+    <div class="card new"><img class="big" src="14-visor-phone-classic.svg" alt="" /><div class="num">14</div><div class="name">Visor phone, classic</div><div class="desc">The whole visor bot on the screen, phone upright.</div><div class="sizes"><img src="14-visor-phone-classic.svg" alt="" /><img src="14-visor-phone-classic.svg" alt="" /><img src="14-visor-phone-classic.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="15-visor-phone-tilted.svg" alt="" /><div class="num">15</div><div class="name">Visor phone, tilted</div><div class="desc">The phone is the robot: visor, antenna, golden jeans stitching and rivets.</div><div class="sizes"><img src="15-visor-phone-tilted.svg" alt="" /><img src="15-visor-phone-tilted.svg" alt="" /><img src="15-visor-phone-tilted.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="16-visor-phone-backpocket.svg" alt="" /><div class="num">16</div><div class="name">Visor phone, back pocket</div><div class="desc">In a jeans back pocket, with a chat bubble under the visor.</div><div class="sizes"><img src="16-visor-phone-backpocket.svg" alt="" /><img src="16-visor-phone-backpocket.svg" alt="" /><img src="16-visor-phone-backpocket.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="17-visor-phone-closeup.svg" alt="" /><div class="num">17</div><div class="name">Visor phone, close-up</div><div class="desc">A big phone and visor, antenna sending signals.</div><div class="sizes"><img src="17-visor-phone-closeup.svg" alt="" /><img src="17-visor-phone-closeup.svg" alt="" /><img src="17-visor-phone-closeup.svg" alt="" /></div></div>
+    <div class="card new"><img class="big" src="18-robot-phone-pocket.svg" alt="" /><div class="num">18</div><div class="name">Robot phone</div><div class="desc">A phone-shaped visor bot climbing out of the pocket.</div><div class="sizes"><img src="18-robot-phone-pocket.svg" alt="" /><img src="18-robot-phone-pocket.svg" alt="" /><img src="18-robot-phone-pocket.svg" alt="" /></div></div>
+  </div>
+
+  <h2>Round 1</h2>
+  <div class="grid round1">
     <div class="card"><img class="big" src="01-pocket-bot.svg" alt="" /><div class="num">01</div><div class="name">Pocket bot</div><div class="desc">A robot peeking out of a jeans pocket.</div><div class="sizes"><img src="01-pocket-bot.svg" alt="" /><img src="01-pocket-bot.svg" alt="" /><img src="01-pocket-bot.svg" alt="" /></div></div>
     <div class="card"><img class="big" src="02-headset-bot.svg" alt="" /><div class="num">02</div><div class="name">Headset bot</div><div class="desc">A friendly robot with a pilot's radio headset.</div><div class="sizes"><img src="02-headset-bot.svg" alt="" /><img src="02-headset-bot.svg" alt="" /><img src="02-headset-bot.svg" alt="" /></div></div>
     <div class="card"><img class="big" src="03-aviator-bot.svg" alt="" /><div class="num">03</div><div class="name">Aviator bot</div><div class="desc">A robot in a leather flying cap with a wings pin.</div><div class="sizes"><img src="03-aviator-bot.svg" alt="" /><img src="03-aviator-bot.svg" alt="" /><img src="03-aviator-bot.svg" alt="" /></div></div>

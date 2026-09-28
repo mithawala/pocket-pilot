@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Visor phone — close-up: a big phone with the visor face and an antenna sending signals, half in a pocket</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#6366f1" stop-opacity=".55"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#c3cfdf"/></linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+    <linearGradient id="pocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d42c4"/><stop offset="1" stop-color="#1b2785"/></linearGradient>
+    <filter id="lift" x="-10%" y="-20%" width="120%" height="140%"><feDropShadow dx="0" dy="-6" stdDeviation="8" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <path d="M366 36q14 14 0 28M380 24q26 26 0 52" stroke="#f472b6" stroke-opacity=".75" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <path d="M316 96L338 58" stroke="#c3cfdf" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="342" cy="50" r="14" fill="#f472b6"/>
+  <rect x="124" y="94" width="264" height="362" rx="58" fill="url(#metal)"/>
+  <rect x="143" y="113" width="226" height="324" rx="42" fill="#0b1224"/>
+  <rect x="226" y="127" width="60" height="15" rx="7.5" fill="#1e293b"/>
+  <rect x="166" y="170" width="180" height="94" rx="47" fill="url(#visor)"/>
+  <path d="M190 192Q228 178 272 182" stroke="#fff" stroke-opacity=".55" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <circle cx="218" cy="218" r="24" fill="#fff" opacity=".25"/>
+  <circle cx="294" cy="218" r="24" fill="#fff" opacity=".25"/>
+  <circle cx="218" cy="218" r="12.5" fill="#fff"/>
+  <circle cx="294" cy="218" r="12.5" fill="#fff"/>
+  <path d="M68 318Q256 284 444 318L426 452Q420 476 394 480H118Q92 476 86 452Z" fill="url(#pocket)" filter="url(#lift)"/>
+  <path d="M90 334Q256 302 422 334" stroke="#f5b942" stroke-width="6" stroke-dasharray="16 11" stroke-linecap="round" fill="none"/>
+</svg>

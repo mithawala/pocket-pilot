@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Visor phone — back pocket: the phone sticking out of a jeans back pocket, visor face and a chat bubble on screen</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#6366f1" stop-opacity=".55"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#c3cfdf"/></linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+    <linearGradient id="pocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d42c4"/><stop offset="1" stop-color="#1b2785"/></linearGradient>
+    <filter id="lift" x="-10%" y="-20%" width="120%" height="140%"><feDropShadow dx="0" dy="-6" stdDeviation="7" flood-color="#000" flood-opacity=".4"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <rect x="170" y="80" width="172" height="330" rx="40" fill="url(#metal)"/>
+  <rect x="183" y="94" width="146" height="302" rx="28" fill="#0b1224"/>
+  <rect x="236" y="105" width="40" height="11" rx="5.5" fill="#1e293b"/>
+  <rect x="196" y="142" width="120" height="64" rx="32" fill="url(#visor)"/>
+  <path d="M212 158Q238 149 266 152" stroke="#fff" stroke-opacity=".55" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <circle cx="230" cy="176" r="15" fill="#fff" opacity=".25"/>
+  <circle cx="282" cy="176" r="15" fill="#fff" opacity=".25"/>
+  <circle cx="230" cy="176" r="8" fill="#fff"/>
+  <circle cx="282" cy="176" r="8" fill="#fff"/>
+  <rect x="214" y="222" width="84" height="26" rx="13" fill="#1e293b"/>
+  <circle cx="238" cy="235" r="4.5" fill="#94a3b8"/>
+  <circle cx="256" cy="235" r="4.5" fill="#94a3b8"/>
+  <circle cx="274" cy="235" r="4.5" fill="#94a3b8"/>
+  <path d="M104 262H408L394 402L256 460L118 402Z" fill="url(#pocket)" filter="url(#lift)"/>
+  <path d="M104 262H408L406 284H106Z" fill="#22349e"/>
+  <path d="M114 273H398" stroke="#f5b942" stroke-width="4" stroke-dasharray="13 9" stroke-linecap="round"/>
+  <path d="M124 296H388L376 394L256 446L136 394Z" stroke="#f5b942" stroke-width="5" stroke-dasharray="13 9" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+</svg>
