@@ -253,6 +253,27 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .phone.live .status { position: relative; flex: none; background: #21252b; }
 .phone.live iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #282c34; display: block; }
 
+/* ---------- comparison with Copilot remote control */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.h-code { padding: 0; font-size: 0.9em; background: none; border: 0; border-radius: 0; }
+.cmp { max-width: 1060px; margin: 0 auto; overflow: hidden; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); }
+.cmp-row { display: grid; grid-template-columns: 210px 1fr 1fr; border-top: 1px solid var(--line); }
+.cmp-row:first-child { border-top: none; }
+.cmp-row > div { padding: 15px 20px; font-size: 14.5px; line-height: 1.55; color: var(--text-2); }
+.cmp-row > div:first-child { font-weight: 650; color: var(--text); }
+.cmp-row > div + div { border-left: 1px solid var(--line); }
+.cmp-row > div:last-child { background: rgba(79, 120, 255, 0.05); }
+.cmp-head > div { padding-top: 13px; padding-bottom: 13px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: rgba(255, 255, 255, 0.03); }
+.cmp-head > div:last-child { color: var(--blue); background: rgba(79, 120, 255, 0.1); }
+.cmp code { font-size: 0.84em; }
+.cmp-when { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1060px; margin: 20px auto 0; }
+.when { padding: 24px 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+.when.pp { background: rgba(79, 120, 255, 0.06); border-color: rgba(79, 120, 255, 0.4); }
+.when h3 { margin: 0 0 14px; font-size: 19px; }
+.when .checks li { font-size: 15px; color: var(--text-2); }
+.cmp-note { max-width: 860px; margin: 28px auto 0; text-align: center; font-size: 15.5px; color: var(--text-2); }
+.cmp-src { max-width: 860px; margin: 14px auto 0; text-align: center; font-size: 13px; color: var(--muted); }
+
 /* ---------- FAQ */
 .faq { display: grid; gap: 12px; }
 .faq details { padding: 0 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); transition: background 0.2s, border-color 0.2s; }
@@ -306,6 +327,12 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   .sidebar-frame { max-width: 330px; }
   .phone-mini .phone { margin: 0; }
   .free-grid { grid-template-columns: 1fr; max-width: 460px; }
+  .cmp-row { grid-template-columns: 1fr 1fr; }
+  .cmp-row > div:first-child { grid-column: 1 / -1; padding-bottom: 2px; }
+  .cmp-row > div + div { border-left: none; }
+  .cmp-row > div:last-child { border-left: 1px solid var(--line); }
+  .cmp-head > div:first-child { display: none; }
+  .cmp-when { grid-template-columns: 1fr; }
 }
 @media (max-width: 860px) {
   .menu-btn { display: grid; }
@@ -337,6 +364,15 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 }
 @media (max-width: 480px) {
   .strip-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .cmp-head { display: none; }
+  .cmp-row { grid-template-columns: 1fr; }
+  .cmp-row > div:last-child { border-left: none; }
+  .cmp-row > div { padding: 12px 16px; }
+  .cmp-row > div:first-child { padding-bottom: 0; }
+  .cmp-row > div[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .cmp-row > div:last-child[data-label]::before { color: var(--blue); }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
