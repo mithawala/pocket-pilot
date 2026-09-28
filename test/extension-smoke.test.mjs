@@ -205,6 +205,77 @@ test('updates: a VSIX install is offered a newer GitHub release and installs it 
   }
 });
 
+test('tunnel: closing or reloading VS Code keeps the tunnel and its local port; Stop ends it', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-keep-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const settings = { 'tunnel.mode': 'none', 'security.passkey': 'off', 'rendezvous.enabled': false, pwaUrl: '' };
+  const run = async (fn) => {
+    const mock = createVscodeMock(settings, {});
+    const uninstall = installMock(mock.api);
+    let service;
+    try {
+      delete require.cache[require.resolve('../extension/extension.js')];
+      ({ service } = await require('../extension/extension.js').activate(makeContext(storage)));
+      service.userData = path.join(storage, 'no-vscode');
+      const stops = [];
+      service.tunnel.stop = async (o) => {
+        stops.push(o);
+      };
+      // After the first run remote access is still on, so activating starts it again by itself.
+      await service.start({ interactive: false });
+      for (let i = 0; i < 200 && service.state !== 'running'; i++) await new Promise((r) => setTimeout(r, 25));
+      assert.equal(service.state, 'running', service.error || '');
+      return await fn(service, stops);
+    } finally {
+      await service?.dispose().catch(() => {});
+      uninstall();
+    }
+  };
+  const first = await run(async (service, stops) => {
+    const port = service.relay.port;
+    await service.dispose();
+    assert.deepEqual(stops, [{ keep: true }], 'a window that closes leaves the tunnel running');
+    return port;
+  });
+  await run(async (service, stops) => {
+    assert.equal(service.relay.port, first, 'the next start listens where the tunnel forwards');
+    await service.stop();
+    assert.deepEqual(stops, [{ keep: false }], 'Stop ends the tunnel');
+  });
+});
+
+test('tunnel (network): a VS Code reload keeps the Cloudflare address; Stop ends cloudflared', { skip: !process.env.PP_NETWORK_TESTS && 'set PP_NETWORK_TESTS=1 (opens a real Cloudflare quick tunnel)', timeout: 240000 }, async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-net-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const cloudflared = [path.join(os.homedir(), '.pocket-pilot', 'copilot', 'tunnel', 'bin', 'cloudflared.exe'), path.join(process.env.APPDATA || '', 'Code', 'User', 'globalStorage', 'mithawala.pocket-pilot', 'bin', 'cloudflared.exe')].find((p) => fs.existsSync(p));
+  const settings = { 'tunnel.mode': 'quick', 'tunnel.cloudflaredPath': cloudflared || '', 'security.passkey': 'off', 'rendezvous.enabled': false, pwaUrl: '' };
+  const session = async (fn) => {
+    const mock = createVscodeMock(settings, {});
+    const uninstall = installMock(mock.api);
+    let service;
+    try {
+      delete require.cache[require.resolve('../extension/extension.js')];
+      ({ service } = await require('../extension/extension.js').activate(makeContext(storage)));
+      service.userData = path.join(storage, 'no-vscode');
+      await service.start({ interactive: false });
+      for (let i = 0; i < 1200 && !(service.state === 'running' && service.publicUrl); i++) await new Promise((r) => setTimeout(r, 100));
+      assert.ok(service.publicUrl, service.error || 'no tunnel');
+      return await fn(service);
+    } finally {
+      await service?.dispose().catch(() => {});
+      uninstall();
+    }
+  };
+  const first = await session(async (s) => s.publicUrl);
+  const cf = JSON.parse(fs.readFileSync(path.join(storage, 'tunnel.json'), 'utf8'));
+  const { alive } = require('../extension/leader.js');
+  assert.ok(alive(cf.pid), 'cloudflared keeps running after the window closes');
+  await session(async (s) => {
+    assert.equal(s.publicUrl, first, 'same address after the reload');
+    await s.stop();
+  });
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(alive(cf.pid), false, 'Stop ended cloudflared');
+});
+
 test('settings: pairing links always open the hosted app, even with an old or unreachable app URL', async () => {
   const APP = 'https://mithawala.github.io/pocket-pilot/app/';
   const realFetch = globalThis.fetch;

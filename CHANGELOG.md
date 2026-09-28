@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- **The tunnel keeps its address when VS Code restarts.** `cloudflared` now keeps running when a window reloads, VS Code quits or another window takes over, and the next start listens on the same local port, so the address stays the same and paired devices reconnect within seconds. It changes only after a reboot, **New tunnel** or **Stop** (Stop ends it). The panel shows the tunnel as *Online ✓* instead of its address, which is only the PC's end of the connection: devices always open the app at `mithawala.github.io/pocket-pilot/app/`.
+- **One auto-reconnect gist for all your PCs.** Instead of a gist per PC, one secret gist (*Pocket Pilot · encrypted addresses of your PCs*) holds a small encrypted file per PC; each PC only writes its own file, so two PCs never overwrite each other. A PC's old gist is deleted once every paired device has learned the new place, and resetting a PC's identity removes its file. The test tools never publish to your GitHub account any more.
+- **Pairing links always open the hosted app.** An old *Pwa Url* setting pointing at the product page made the extension believe the app wasn't published and serve it through the tunnel instead (with the warning *"re-pair after VS Code restarts"*). The product page's address, and one without a trailing slash, now mean the app, and the hosted app is never replaced by the tunnel copy.
+
 ## 0.4.0
 
 - **GitHub Copilot app: closing or deleting a chat no longer matters.** Remote access used to live in the chat you ran `/pocket-pilot` in: when that chat closed, another chat took over with a *new* tunnel address, so phones without auto-reconnect lost the PC. Now the Cloudflare tunnel runs on its own and the chat that takes over listens on the same local port, so the address stays the same and devices reconnect by themselves within seconds (tested end to end: the chat is deleted, another chat takes over, the phone reconnects without pairing again). It also survives app restarts. `/pocket-pilot off` (or **Turn off** in the panel) ends the tunnel, even when no chat is open.

@@ -106,8 +106,20 @@ async function boot(log, cleanups) {
     const token = await run(['auth', 'token', '--user', pick.login]);
     return token ? token.trim().split(/\s+/)[0] || null : null;
   }
-  const rendezvous = new GistRendezvous({ getToken: githubToken, stateFile: FILES.rendezvous, hostId: identity.hostId, key: await identityLib.loadRendezvousKey(secrets), log });
   const store = new DeviceStore(FILES.devices);
+  const rendezvous = new GistRendezvous({ getToken: githubToken, stateFile: FILES.rendezvous, hostId: identity.hostId, key: await identityLib.loadRendezvousKey(secrets), legacyInUse: () => store.list().some((d) => !d.rdv2), log });
+  // Auto-reconnect can be turned off (the checks and tests do, so they never write to your GitHub account).
+  const rendezvousOn = () => settings().rendezvous !== false;
+  /** Where a connecting device finds this PC after an address change; a device told about the shared gist no longer needs the old one. */
+  function rendezvousFor(device) {
+    if (!rendezvousOn()) return null;
+    const info = rendezvous.info();
+    if (info && rendezvous.shared && device && !device.rdv2) {
+      store.update(device.id, { rdv2: true });
+      rendezvous.retireLegacy().catch(() => {});
+    }
+    return info;
+  }
   log('info', `Pocket Pilot hub ${VERSION} starting in pid ${process.pid}; host "${hostName}" ${identityLib.fingerprintText(identity.fingerprint)}`);
 
   // ---------------------------------------------------------------- agent host + relay
@@ -177,7 +189,7 @@ async function boot(log, cleanups) {
       const s = settings();
       return { requireApproval: s.requireApproval !== false, passkey: s.passkey, passkeyGraceHours: 12 };
     },
-    welcomeExtras: () => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvous.info(), pwaUrl: PWA_URL, hostKind: 'copilot' }),
+    welcomeExtras: (device) => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvousFor(device), pwaUrl: PWA_URL, hostKind: 'copilot' }),
     isReadAllowed,
     adjustSummary: (s) => (monitorRef.current ? monitorRef.current.adjustSummary(s) : s),
     saveUpload,
@@ -264,7 +276,7 @@ async function boot(log, cleanups) {
     state.lastPublicUrl = url;
     state.reachable = false;
     state.tunnelError = null;
-    if (!same) rendezvous.publish(url).then((ok) => ok && log('info', 'Auto-reconnect address updated')).catch(() => {});
+    if (!same && rendezvousOn()) rendezvous.publish(url).then((ok) => ok && log('info', 'Auto-reconnect address updated')).catch(() => {});
     newPairingCode().catch((err) => log('warn', `Pairing code failed: ${err.message}`));
     tunnel.waitReachable().then(() => {
       state.reachable = true;
@@ -299,7 +311,7 @@ async function boot(log, cleanups) {
       hostPid: process.pid,
       fingerprint: identityLib.fingerprintText(identity.fingerprint),
       tunnel: { url: state.publicUrl, reachable: state.reachable, state: tunnel.state, mode: settings().tunnel, error: state.tunnelError || tunnel.error || null },
-      rendezvous: !!rendezvous.info(),
+      rendezvous: rendezvousOn() && !!rendezvous.info(),
       sessions: host.sessionCount,
       pairing: state.pairing ? { link: state.pairing.link, expiresAt: state.pairing.expiresAt } : null,
       devices: store.list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: online.has(d.id), passkey: !!d.passkey, push: !!d.push, lastSeenAt: d.lastSeenAt })),
@@ -436,6 +448,7 @@ async function boot(log, cleanups) {
         store.remove(d.id);
         relay.revokeDevice(d.id);
         log('info', `Removed device "${d.name}"`);
+        rendezvous.retireLegacy().catch(() => {});
       }
       return send(200, { ok: !!d });
     }

@@ -28,7 +28,7 @@ const probe = new PersistentTunnel({ storageDir: path.join(os.homedir(), '.pocke
 const bin = probe.findBinary() || (await new PersistentTunnel({ storageDir: tunnelDir }).download((m) => log(m)));
 fs.mkdirSync(path.join(tunnelDir, 'bin'), { recursive: true });
 if (path.dirname(bin) !== path.join(tunnelDir, 'bin')) fs.copyFileSync(bin, path.join(tunnelDir, 'bin', path.basename(bin)));
-fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'quick', passkey: 'off', requireApproval: false } }));
+fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'quick', passkey: 'off', requireApproval: false, rendezvous: false } }));
 const env = { ...process.env, POCKET_PILOT_HOME: home };
 const hubScript = `import { startHub } from ${JSON.stringify(pathToFileURL(path.join(lib, 'hub.mjs')).href)}; await startHub();`;
 const startHubProcess = () => spawn(process.execPath, ['--input-type=module', '-e', hubScript], { env, stdio: 'ignore' });

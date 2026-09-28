@@ -47,7 +47,7 @@ const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-ws-'));
 fs.writeFileSync(path.join(ws, 'README.md'), '# e2e workspace\n');
 process.env.POCKET_PILOT_HOME = home;
 process.env.POCKET_PILOT_DEBUG = '1';
-fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'none', passkey: 'off', requireApproval: false } }));
+fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'none', passkey: 'off', requireApproval: false, rendezvous: false } }));
 
 // Your own Copilot settings can switch extensions off (Customize → Extensions) and list installed
 // plugins: run with a copy of the config (for the sign-in) and settings that leave Pocket Pilot on.

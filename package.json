@@ -2,7 +2,7 @@
   "name": "pocket-pilot",
   "displayName": "Pocket Pilot",
   "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone, tablet or another computer. Free, end-to-end encrypted, passkey-protected. No servers.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "mithawala",
   "author": {
     "name": "Asif Mithawala",
@@ -173,7 +173,7 @@
         "pocketPilot.rendezvous.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Keep a secret, end-to-end encrypted GitHub gist with the current tunnel URL so paired devices reconnect automatically after VS Code restarts."
+          "description": "Keep this PC's current tunnel address in one secret GitHub gist on your account (encrypted, one small file per PC), so paired devices find it again after the address changes."
         },
         "pocketPilot.notifications.inputNeeded": {
           "type": "boolean",

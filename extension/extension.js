@@ -10,7 +10,7 @@ const identityLib = require('./core/identity');
 const agentHost = require('./core/agentHost');
 const { cmpVersion } = agentHost;
 const { SessionMonitor } = require('./core/monitor');
-const { TunnelManager } = require('./core/tunnel');
+const { PersistentTunnel } = require('./core/tunnel');
 const { GistRendezvous } = require('./core/rendezvous');
 const { SharedState } = require('./shared');
 const push = require('./core/push');
@@ -159,7 +159,9 @@ class PocketPilotService {
     this.monitor.on('status', () => this.changed());
     this.monitor.on('effective', ({ uri, status }) => this.relay?.pushSummaryChange(uri, { status }));
     this.monitor.on('transition', (t) => this._notify(t).catch((err) => this.logLine('warn', `Notification failed: ${err.message}`)));
-    this.tunnel = new TunnelManager({ storageDir: this.storageDir, log: (l, m) => this.logLine(l, m), configuredPath: () => settings().cloudflaredPath });
+    // The quick tunnel keeps running when VS Code restarts or another window takes over, so its address
+    // (and every paired device's connection) survives; Stop and New tunnel end it.
+    this.tunnel = new PersistentTunnel({ storageDir: this.storageDir, log: (l, m) => this.logLine(l, m), configuredPath: () => settings().cloudflaredPath });
     this.tunnel.on('state', () => this.changed());
     this.tunnel.on('url', (url) => this._onPublicUrl(url));
 
@@ -189,6 +191,7 @@ class PocketPilotService {
       stateFile: path.join(this.storageDir, 'rendezvous.json'),
       hostId: this.identity.hostId,
       key: rdvKey,
+      legacyInUse: () => this.store.list().some((d) => !d.rdv2),
       log: (l, m) => this.logLine(l, m),
     });
     this.logLine('info', `Host "${this.identity.name}" fingerprint ${identityLib.fingerprintText(this.identity.fingerprint)}`);
@@ -257,7 +260,8 @@ class PocketPilotService {
     }
     // Before letting go of the lock: otherwise another window could see "enabled" with no leader and restart it.
     if (remember) this.shared.setEnabled(false);
-    await this._teardown();
+    // Handing over to another window keeps the tunnel (and its address) for that window.
+    await this._teardown({ keepTunnel: !!handOverTo });
     this.state = 'stopped';
     if (handOverTo) this.leader.handOver(handOverTo);
     else this.leader.release();
@@ -267,7 +271,8 @@ class PocketPilotService {
     this.changed();
   }
 
-  async _teardown() {
+  /** keepTunnel: leave cloudflared running for whichever window or VS Code session runs Pocket Pilot next. */
+  async _teardown({ keepTunnel = false } = {}) {
     clearInterval(this._leaderTimer);
     clearInterval(this._pwaTimer);
     clearTimeout(this._pairingTimer);
@@ -277,7 +282,7 @@ class PocketPilotService {
     this.relay = null;
     this.publicUrl = null;
     this.tunnelReachable = false;
-    await Promise.allSettled([relay?.close(), this.tunnel?.stop()]);
+    await Promise.allSettled([relay?.close(), this.tunnel?.stop({ keep: keepTunnel })]);
     this.monitor?.stop();
   }
 
@@ -285,7 +290,8 @@ class PocketPilotService {
     clearInterval(this._sharedTimer);
     for (const t of this._updateTimers || []) clearTimeout(t);
     this.store.unwatch();
-    await this._teardown();
+    // The window is closing or reloading, or VS Code quits: remote access resumes at the same address.
+    await this._teardown({ keepTunnel: true });
     this.leader.release();
   }
 
@@ -392,7 +398,7 @@ class PocketPilotService {
         const s = settings();
         return { requireApproval: s.requireApproval, passkey: s.passkey, passkeyGraceHours: s.passkeyGraceHours };
       },
-      welcomeExtras: () => ({ vapidPublicKey: this.vapid.publicKey, rendezvous: settings().rendezvous ? this.rendezvous.info() : null, pwaUrl: settings().pwaUrl || null }),
+      welcomeExtras: (device) => ({ vapidPublicKey: this.vapid.publicKey, rendezvous: this._rendezvousFor(device), pwaUrl: settings().pwaUrl || null }),
       isReadAllowed: (uri) => this._isReadAllowed(uri),
       adjustSummary: (s) => this.monitor.adjustSummary(s),
       saveUpload: (req) => this._saveUpload(req),
@@ -407,8 +413,41 @@ class PocketPilotService {
     });
     this.relay.on('pairing-token-used', () => setTimeout(() => this.newPairingCode(), 1500));
     this.relay.on('push-test', (id) => this._sendTestPush(id));
-    this.relay.on('device-removed', () => this.changed());
-    await this.relay.listen(settings().port || 0, '127.0.0.1');
+    this.relay.on('device-removed', () => {
+      this.rendezvous?.retireLegacy().catch(() => {});
+      this.changed();
+    });
+    // The same local port as last time: a still-running tunnel forwards there.
+    const fixed = settings().port;
+    const port = fixed || (settings().tunnelMode === 'quick' && (await this.tunnel.adoptablePort())) || this._lastRelayPort();
+    await this.relay.listen(port, '127.0.0.1').catch((err) => {
+      if (fixed) throw err;
+      return this.relay.listen(0, '127.0.0.1');
+    });
+    try {
+      fs.writeFileSync(path.join(this.storageDir, 'relay.json'), JSON.stringify({ port: this.relay.port }));
+    } catch {
+      /* best effort */
+    }
+  }
+
+  _lastRelayPort() {
+    try {
+      return Number(JSON.parse(fs.readFileSync(path.join(this.storageDir, 'relay.json'), 'utf8')).port) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Where a connecting device finds this PC after an address change; a device told about the shared gist no longer needs the old one. */
+  _rendezvousFor(device) {
+    if (!settings().rendezvous) return null;
+    const info = this.rendezvous.info();
+    if (info && this.rendezvous.shared && device && !device.rdv2) {
+      this.store.update(device.id, { rdv2: true });
+      this.rendezvous.retireLegacy().catch(() => {});
+    }
+    return info;
   }
 
   async _startTunnel(interactive) {
@@ -654,7 +693,8 @@ class PocketPilotService {
     const wasRunning = this.state === 'running';
     await this.stop({ remember: false });
     this.store.clear();
-    this.rendezvous?.forget();
+    // This PC's file in the auto-reconnect gist belongs to the old identity: no device can use it.
+    await this.rendezvous?.remove().catch(() => {});
     try {
       fs.rmSync(path.join(this.storageDir, 'rendezvous.json'), { force: true });
     } catch {

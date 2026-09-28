@@ -97,7 +97,8 @@
       const t = st.tunnel || {};
       const ah = st.agentHost || {};
       const c = ah.counts;
-      const tunnelVal = t.mode === 'none' ? 'Off (this PC only)' : t.url ? `<a href="#" data-a="openUrl" data-url="${esc(t.url)}">${esc(t.url.replace('https://', ''))}</a>${t.reachable ? ' <span class="ok">✓</span>' : ' <span class="muted">checking…</span>'}` : `<span class="muted">${esc(t.error || t.state || 'starting')}</span>`;
+      // The address is only the PC's end of the tunnel (devices open the app and find it themselves): status only.
+      const tunnelVal = t.mode === 'none' ? 'Off (this PC only)' : t.url ? `<span class="${t.reachable ? 'ok' : 'muted'}" title="${esc(t.url)}">${t.reachable ? 'Online ✓' : 'Connecting…'}</span>` : `<span class="muted">${esc(t.error || t.state || 'starting')}</span>`;
       const hostVal = ah.connected && c ? `${c.total} sessions${c.running ? ` · ${c.running} running` : ''}${c.inputNeeded ? ` · <b class="warn">${c.inputNeeded} waiting</b>` : ''}` : ah.found ? '<span class="muted">connecting…</span>' : '<span class="warn">not found — open a chat session</span>';
       const r = st.rendezvous || {};
       const rdvVal = !r.enabled ? '<span class="muted">off</span>' : r.status === 'ready' ? '<span class="ok">on ✓</span>' : `<button class="link" data-a="signInRendezvous">Enable (GitHub sign-in)</button>${r.error ? `<div class="error small">${esc(r.error)}</div>` : ''}`;
@@ -124,7 +125,7 @@
 
       body += `<div class="footer">
         <button class="secondary" data-a="stop">Stop</button>
-        <button class="secondary" data-a="restartTunnel" ${t.mode !== 'quick' ? 'disabled' : ''}>New tunnel</button>
+        <button class="secondary" data-a="restartTunnel" ${t.mode !== 'quick' ? 'disabled' : ''} title="Get a new tunnel address. Paired devices find it through auto-reconnect.">New tunnel</button>
         <button class="secondary" data-a="openLocal">Open app here</button>
       </div>`;
     }
