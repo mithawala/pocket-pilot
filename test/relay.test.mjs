@@ -53,12 +53,13 @@ function startFakeAgentHost() {
             state: { agents: [{ provider: 'copilotcli', displayName: 'Copilot', description: '', models: [], protectedResources: [{ resource: 'https://api.github.com', scopes_supported: ['read:user'] }] }] },
           }],
         });
+        // VS Code answers this for every client; the relay must not (the agent host's token is global).
+        c.send(JSON.stringify({ jsonrpc: '2.0', method: 'auth/required', params: { channel: 'ahp-root://', resource: 'https://api.github.com' } }));
       } else if (m.method === 'authenticate') {
         state.tokens.push(m.params);
         reply({});
       } else if (m.method === 'listSessions') {
-        // A request arriving before authentication finished would reveal a missing hold queue.
-        reply({ items: [{ resource: 'copilotcli:/s1', provider: 'copilotcli', title: 'Test session', status: 1, authed: state.tokens.length > 0 }] });
+        reply({ items: [{ resource: 'copilotcli:/s1', provider: 'copilotcli', title: 'Test session', status: 1 }] });
       } else if (m.method === 'dispatchAction') {
         c.send(JSON.stringify({ jsonrpc: '2.0', method: 'action', params: { channel: m.params.channel, action: m.params.action, serverSeq: 11, origin: { clientId: 'x', clientSeq: m.params.clientSeq } } }));
       } else if (m.id !== undefined) {
@@ -104,7 +105,7 @@ function softWebAuthn(origin) {
   };
 }
 
-async function setupRelay({ policy, approve = async () => true } = {}) {
+async function setupRelay({ policy, approve = async () => true, relayOptions = {} } = {}) {
   const fake = await startFakeAgentHost();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-relay-'));
   const store = new DeviceStore(path.join(dir, 'devices.json'));
@@ -115,12 +116,12 @@ async function setupRelay({ policy, approve = async () => true } = {}) {
     identity,
     store,
     getAgentEndpoint: () => fake.endpoint,
-    getAuthTokens: async (resources) => resources.map((r) => ({ resource: r.resource, token: 'gho_fake_token', scopes: r.scopes_supported })),
     approveDevice: async (info) => { approvals.push(info); return approve(info); },
     allowedOrigins: () => ['http://localhost:5173'],
     policy: () => pol,
     welcomeExtras: () => ({ vapidPublicKey: 'BVAPID', rendezvous: null, pwaUrl: 'http://localhost:5173/' }),
     isReadAllowed: (uri) => String(uri).startsWith('file:///allowed/'),
+    ...relayOptions,
   });
   const port = await relay.listen(0);
   const url = `http://127.0.0.1:${port}`;
@@ -144,7 +145,7 @@ function waitEvent(target, type, pred = () => true, timeoutMs = 10000) {
   });
 }
 
-test('pair, approve, passkey, relay AHP with injected auth and allowlist', async () => {
+test('pair, approve, passkey, relay AHP through the allowlist without touching the agent host sign-in', async () => {
   const env = await setupRelay();
   const wa = softWebAuthn('http://localhost:5173');
   let conn;
@@ -175,8 +176,7 @@ test('pair, approve, passkey, relay AHP with injected auth and allowlist', async
     assert.equal(init.protocolVersion, '0.9.0');
     const list = await client.request('listSessions', { channel: 'ahp-root://' });
     assert.equal(list.items[0].title, 'Test session');
-    assert.equal(list.items[0].authed, true, 'listSessions must be held until the relay authenticated');
-    assert.deepEqual(env.fake.state.tokens.map((t) => t.token), ['gho_fake_token']);
+    assert.equal(env.fake.state.tokens.length, 0, 'the relay must never sign in to the agent host (its token is shared with VS Code)');
 
     // Blocked methods never reach the agent host.
     await assert.rejects(client.request('resourceWrite', { channel: 'ahp-root://', uri: 'file:///etc/x', data: 'x' }), /not allowed/);
@@ -184,7 +184,7 @@ test('pair, approve, passkey, relay AHP with injected auth and allowlist', async
     await assert.rejects(client.request('resourceRead', { channel: 'ahp-root://', uri: 'file:///c:/secret.txt' }), /not allowed/);
     await client.request('resourceRead', { channel: 'ahp-root://', uri: 'file:///allowed/readme.md' });
     assert.ok(!env.fake.state.received.some((m) => m.method === 'resourceWrite'));
-    assert.equal(env.fake.state.received.filter((m) => m.method === 'authenticate').length, 1);
+    assert.equal(env.fake.state.received.filter((m) => m.method === 'authenticate').length, 0);
 
     // Raw frames: JSON-RPC batches, reserved ids and bare objects must never reach the agent host.
     transport.send(JSON.stringify([{ jsonrpc: '2.0', id: 900, method: 'resourceWrite', params: { channel: 'ahp-root://', uri: 'file:///x', data: 'x' } }]));
@@ -284,6 +284,39 @@ test('malformed request targets get a 400 instead of crashing the relay', async 
     const health = await fetch(`${env.url}/health`).then((r) => r.json());
     assert.equal(health.ok, true, 'still serving');
   } finally {
+    await env.cleanup();
+  }
+});
+
+test('the phone gets corrected session statuses, including changes pushed by the PC', async () => {
+  const { effectiveStatus } = require('../extension/core/monitor.js');
+  // A working main chat with an old failed sub-agent: the session is working, not failed.
+  const state = { defaultChat: 'a', chats: [{ resource: 'a', status: 8 }, { resource: 'b', status: 2, interactivity: 'read-only' }] };
+  assert.equal(effectiveStatus(32 | 2, state), 32 | 8);
+  assert.equal(effectiveStatus(2, { defaultChat: 'a', chats: [{ resource: 'a', status: 1 }, { resource: 'b', status: 16 }] }), 16, 'needs input anywhere still shows');
+  assert.equal(effectiveStatus(2, { defaultChat: 'a', chats: [{ resource: 'a', status: 2 }] }), 2, 'a failed main chat is a failed session');
+
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { adjustSummary: (s) => (s.resource === 'copilotcli:/s1' ? { ...s, status: 40 } : s) } });
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { transport } = await ready;
+    const client = new AhpClient(transport, { requestTimeoutMs: 10000 });
+    client.connect();
+    await client.initialize({ clientId: 'phone-status', protocolVersions: ['0.9.0'], initialSubscriptions: ['ahp-root://'] });
+    const list = await client.request('listSessions', { channel: 'ahp-root://' });
+    assert.equal(list.items[0].status, 40, 'listSessions results are corrected');
+    const events = client.events();
+    env.relay.pushSummaryChange('copilotcli:/s1', { status: 33 });
+    const ev = await events.next();
+    assert.equal(ev.value.event.type, 'sessionSummaryChanged');
+    assert.deepEqual(ev.value.event.params.changes, { status: 33 });
+    await client.shutdown().catch(() => {});
+  } finally {
+    conn?.stop();
     await env.cleanup();
   }
 });

@@ -135,11 +135,11 @@ async function boot(log, cleanups) {
     const safe = (name || 'upload').replace(/[^\w.\- ]+/g, '_').replace(/^\.+/, '').slice(0, 80) || 'upload';
     const file = path.join(folder, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${safe}`);
     fs.writeFileSync(file, data, { flag: 'wx' });
-    log('info', `Saved upload from phone: ${file} (${data.length} bytes)`);
+    log('info', `Saved upload from device: ${file} (${data.length} bytes)`);
     return { path: file, uri: pathToFileURL(file).href };
   }
 
-  /** A new phone wants in: ask on the pairing page and in the session that showed the QR code. */
+  /** A new device wants in: ask on the pairing page and in the session that showed the QR code. */
   function approveDevice(info) {
     const id = crypto.randomUUID();
     log('info', `Pairing request from "${info.name}" (${info.platform || '?'}${info.ip ? `, ${info.ip}` : ''})`);
@@ -152,25 +152,24 @@ async function boot(log, cleanups) {
         resolve(!!allow);
       };
       const timer = setTimeout(() => done(false), 3 * 60 * 1000);
-      approvals.set(id, { id, name: String(info.name || 'Phone').slice(0, 80), platform: info.platform, ip: info.ip, done });
+      approvals.set(id, { id, name: String(info.name || 'Device').slice(0, 80), platform: info.platform, ip: info.ip, done });
       const asker = state.lastPairRequester;
       if (asker && !asker.ch.closed && asker.canConfirm) {
         asker.rpc.request('confirm', {
           title: `Allow "${info.name}" to control your Copilot sessions?`,
-          message: `${[info.platform, info.ip && `from ${info.ip}`].filter(Boolean).join(' · ')}\n\nThe phone will be able to read your open sessions, chat with the agent and approve its tool calls. Only allow this if you just scanned the QR code yourself.`,
+          message: `${[info.platform, info.ip && `from ${info.ip}`].filter(Boolean).join(' · ')}\n\nThe device will be able to read your open sessions, chat with the agent and approve its tool calls. Only allow this if you just scanned the QR code (or opened the pairing link) yourself.`,
         }, 3 * 60 * 1000).then((v) => typeof v === 'boolean' && done(v)).catch(() => {});
       }
     });
   }
 
+  const monitorRef = { current: null };
   const relay = new RelayServer({
     identity,
     store,
     getAgentEndpoint: () => ENDPOINT,
     openAgentConnection: async () => host.openConnection(),
     agentHostLabel: 'The GitHub Copilot app',
-    getAuthTokens: async () => [],
-    getProtectedResources: () => [],
     approveDevice,
     allowedOrigins: () => [...new Set([new URL(PWA_URL).origin, `http://127.0.0.1:${relay.port}`, `http://localhost:${relay.port}`, ...String(process.env.POCKET_PILOT_ORIGINS || '').split(',').filter(Boolean)])],
     policy: () => {
@@ -179,6 +178,7 @@ async function boot(log, cleanups) {
     },
     welcomeExtras: () => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvous.info(), pwaUrl: PWA_URL, hostKind: 'copilot' }),
     isReadAllowed,
+    adjustSummary: (s) => (monitorRef.current ? monitorRef.current.adjustSummary(s) : s),
     saveUpload,
     tunnelRedirect: () => PWA_URL,
     log,
@@ -194,7 +194,9 @@ async function boot(log, cleanups) {
 
   // ---------------------------------------------------------------- notifications
   const monitor = new SessionMonitor({ getEndpoint: () => ENDPOINT, openConnection: async () => host.openConnection(), log });
+  monitorRef.current = monitor;
   monitor.on('transition', (t) => notify(t).catch((err) => log('warn', `Notification failed: ${err.message}`)));
+  monitor.on('effective', ({ uri, status }) => relay.pushSummaryChange(uri, { status }));
   monitor.start();
   cleanups.push(() => monitor.stop());
 

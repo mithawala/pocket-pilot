@@ -43,7 +43,12 @@ class Leader {
       } catch (err) {
         if (err.code !== 'EEXIST') throw err;
         const h = this.holder();
-        if (h && h.pid !== process.pid) return { ok: false, holder: h };
+        if (h && h.pid === process.pid) {
+          // Handed over to this window by the previous leader (see handOver).
+          this.held = true;
+          return { ok: true };
+        }
+        if (h) return { ok: false, holder: h };
         try {
           fs.unlinkSync(this.file);
         } catch {
@@ -66,15 +71,48 @@ class Leader {
     }
   }
 
-  requestTakeover() {
-    fs.writeFileSync(this.takeoverFile, JSON.stringify({ pid: process.pid, at: Date.now() }));
+  /**
+   * Passes the lock straight to the window that asked to take over, so no other window can grab it
+   * in the gap between this window letting go and that one starting.
+   */
+  handOver(to) {
+    if (!this.held) return;
+    this.held = false;
+    const tmp = `${this.file}.${process.pid}.tmp`;
+    try {
+      const h = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      if (h.pid !== process.pid) return;
+      fs.writeFileSync(tmp, JSON.stringify({ pid: to.pid, since: Date.now(), label: to.label || 'another window' }));
+      for (let i = 0; ; i++) {
+        try {
+          fs.renameSync(tmp, this.file);
+          return;
+        } catch (err) {
+          // Windows refuses to replace a file another window is reading at that instant.
+          if (i >= 20) throw err;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+        }
+      }
+    } catch {
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
+      this.held = true;
+      this.release();
+    }
   }
 
-  /** For the current leader: returns the pid of a window that asked to take over, if any. */
+  requestTakeover() {
+    fs.writeFileSync(this.takeoverFile, JSON.stringify({ pid: process.pid, label: this.label, at: Date.now() }));
+  }
+
+  /** For the current leader: the window ({pid, label}) that asked to take over, if any. */
   pendingTakeover() {
     try {
       const t = JSON.parse(fs.readFileSync(this.takeoverFile, 'utf8'));
-      if (t.pid !== process.pid && alive(t.pid) && Date.now() - t.at < 60000) return t.pid;
+      if (t.pid !== process.pid && alive(t.pid) && Date.now() - t.at < 60000) return { pid: t.pid, label: t.label };
     } catch {
       /* none */
     }

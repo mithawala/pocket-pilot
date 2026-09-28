@@ -107,7 +107,7 @@ class GistRendezvous {
       }
       if (!r) {
         r = await this._api('POST', `${API}/gists`, token, {
-          description: 'Pocket Pilot rendezvous (end-to-end encrypted; lets your paired phone find this PC)',
+          description: 'Pocket Pilot rendezvous (end-to-end encrypted; lets your paired devices find this PC)',
           public: false,
           files,
         });

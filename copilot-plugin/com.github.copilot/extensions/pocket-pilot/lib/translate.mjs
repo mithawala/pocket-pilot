@@ -257,8 +257,8 @@ export class SessionTranslator {
         return;
       case 'session.model_change':
         if (d.newModel) {
-          this.model = { id: d.newModel, ...(d.reasoningEffort ? { config: { thinkingLevel: d.reasoningEffort } } : {}) };
-          this.o.onModel?.(this.model);
+          this.model = { id: d.newModel };
+          this.o.onModel?.({ id: d.newModel, reasoningEffort: d.reasoningEffort || undefined, contextTier: d.contextTier || undefined, autoTier: d.autoTier || undefined });
         }
         return;
       case 'session.start':
@@ -303,7 +303,12 @@ export class SessionTranslator {
       this.phoneTurn = null;
       return;
     }
-    if (this.turn && (system || d.delivery === 'immediate')) return;
+    if (this.turn && d.delivery === 'steering') {
+      // Guidance injected into the running turn ("Steer with Message"): it stays part of this turn.
+      if (!system && String(content).trim()) this._emit({ type: 'chat/responsePart', turnId: this.turn.id, part: { kind: 'systemNotification', content: `Steering: ${oneLine(content, 300)}` } });
+      return;
+    }
+    if (this.turn && system) return;
     if (this.turn) this._endTurn(ts, this.turn.aborted ? 'cancelled' : 'complete');
     this._startTurn(`u-${d.messageId || e.id || ++this.seq}`, ts, content);
     this.turn.bound = true;

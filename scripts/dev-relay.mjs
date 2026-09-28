@@ -43,11 +43,6 @@ const relay = new RelayServer({
   identity,
   store,
   getAgentEndpoint: () => agentHost.selectEndpoint(userData),
-  getAuthTokens: async (resources) => {
-    const token = process.env.PP_GITHUB_TOKEN;
-    return token ? resources.map((r) => ({ resource: r.resource, token, scopes: r.scopes_supported })) : [];
-  },
-  getProtectedResources: () => monitor.protectedResources,
   approveDevice: async (info) => {
     log('info', `Pairing request from "${info.name}" (${info.platform}) -> ${approve}`);
     return approve === 'auto';

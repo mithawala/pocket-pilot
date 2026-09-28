@@ -156,7 +156,7 @@ async function main() {
     await sleep(300);
     await demo(`#/s/${encodeURIComponent('copilotcli:/demo-auth')}`);
     await phone.shot('approval.webp');
-    await phone.eval(click('.composer .pick', 'Claude Opus 5.5'));
+    await phone.eval(click('.composer .pick.opts'));
     await sleep(800);
     await phone.shot('models.webp');
     await demo(`#/s/${encodeURIComponent('copilotcli:/demo-flaky')}`);

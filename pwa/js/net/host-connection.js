@@ -5,7 +5,7 @@ import { b64u, unb64u } from '../core/bytes.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';
 
 export class PairingError extends Error {
   constructor(code, message, { untrusted = false, peerCode = '' } = {}) {
@@ -253,7 +253,7 @@ export class HostConnection extends EventTarget {
         } else if (m.t === 'welcome') {
           welcome = m;
           break;
-        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This phone was removed on your PC.');
+        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This device was removed on your PC.');
         else if (m.t === 'error') throw new PairingError(m.code, m.message);
       }
       this.welcome = welcome;
@@ -303,7 +303,7 @@ export class HostConnection extends EventTarget {
   _onControl(m) {
     if (m.t === 'revoked') {
       this.stopped = true;
-      this._setState('unpaired', 'This phone was removed on your PC.');
+      this._setState('unpaired', 'This device was removed on your PC.');
     }
     if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong') {
       const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t;

@@ -5,7 +5,11 @@ Pocket Pilot is already packaged in a Marketplace-ready way. What remains is a o
 ## One-time setup
 
 1. Sign in at the [Marketplace publisher management page](https://marketplace.visualstudio.com/manage) with the Microsoft account that should own the extension.
-2. Click **Create publisher** and use the ID **`mithawala`** (it must match `"publisher"` in [`package.json`](../package.json); the ID can't be changed later). The display name can be anything, for example "Asif Mithawala".
+2. Click **Create publisher** and fill in:
+   - **Name:** `Asif Mithawala` — the publisher name the Marketplace and VS Code show next to the extension.
+   - **ID:** `mithawala` — it must match `"publisher"` in [`package.json`](../package.json) and becomes part of the extension ID (`mithawala.pocket-pilot`). IDs can't contain spaces and can't be changed later.
+
+   Until the extension is on the Marketplace, VS Code shows the ID (`mithawala`) as the publisher of a VSIX install, because the display name comes from the Marketplace. Once it's published, the Marketplace and VS Code show **Asif Mithawala**.
 
 ## Publish or update
 
@@ -27,6 +31,13 @@ Command-line publishing is optional: `npx @vscode/vsce publish --packagePath poc
 - **Trademarks:** keep "Copilot" and GitHub or Microsoft logos out of the extension name and icon. Mentioning that it works with GitHub Copilot in the description is fine.
 - **Personal project:** if you work for a company whose products the extension relates to, check its policy on publishing personal or open-source projects first.
 - **Other editors (optional):** to reach VS Code forks such as VSCodium or Cursor, publish the same `.vsix` to [Open VSX](https://open-vsx.org) with `npx ovsx publish`.
+
+## Updates after publishing
+
+- **Marketplace installs** update automatically: VS Code checks the Marketplace in the background (the extension page shows **Auto Update**, on by default).
+- **VSIX installs** are recorded by VS Code as `"source": "vsix", "pinned": true` and are never auto-updated, not even once the extension is on the Marketplace. Until then, Pocket Pilot itself checks the GitHub releases (at startup and every 12 hours) and offers a one-click **Update**, which downloads `pocket-pilot.vsix` from the latest release and installs it. Marketplace installs skip this check. After publishing, users who installed the VSIX can switch once to the Marketplace build (*Install* on its Marketplace page) to get automatic updates.
+- **The Copilot app plugin** updates with `copilot plugin update pocket-pilot@pocket-pilot` (the CLI only updates first-party plugins by itself); `/pocket-pilot` tells users when a newer version is on `main`.
+- **The phone app** updates itself: every release changes the service worker's content hash.
 
 ## The GitHub Copilot app plugin
 

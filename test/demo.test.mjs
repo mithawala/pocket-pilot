@@ -57,7 +57,7 @@ test('demo: answering the agent\'s question completes the turn with the chosen o
 
 test('ui helpers: code languages and the composer model label', async () => {
   const { canonicalLanguage, rawLanguage } = await import('../pwa/js/lib/highlight.js');
-  const { modelChip } = await import('../pwa/js/ui/model-picker.js');
+  const { modelChip, optionsChip } = await import('../pwa/js/ui/model-picker.js');
   assert.equal(rawLanguage({ className: 'language-TS' }), 'ts');
   assert.equal(canonicalLanguage('ts'), 'typescript');
   assert.equal(canonicalLanguage('ps1'), 'powershell');
@@ -66,8 +66,69 @@ test('ui helpers: code languages and the composer model label', async () => {
   const { store } = createDemo();
   try {
     const models = store.models('copilotcli');
-    assert.deepEqual(modelChip(models, { id: 'claude-opus-5.5', config: { thinkingLevel: 'xhigh', contextSize: 200000 } }), { name: 'Claude Opus 5.5', tag: 'Extra High' });
+    assert.deepEqual(modelChip(models, { id: 'claude-opus-5.5', config: { thinkingLevel: 'xhigh', contextSize: 200000 } }), { name: 'Claude Opus 5.5', tag: 'Extra High 200K' });
+    assert.equal(optionsChip(models, { id: 'claude-opus-5.5' }), 'High 1M', 'the model defaults when no option was chosen, like VS Code');
+    assert.equal(optionsChip(models, { id: 'gpt-5-mini', config: { thinkingLevel: 'low' } }), 'Low');
     assert.deepEqual(modelChip(models, null), { name: 'Default model', tag: '' });
+  } finally {
+    store.dispose();
+  }
+});
+
+test('demo: the model choice is the chat draft shared with the PC', async () => {
+  const { store } = createDemo();
+  try {
+    const chat = store.chatFor('copilotcli:/demo-flaky');
+    assert.equal(store.modelFor(chat).id, 'claude-opus-5.5', 'without a draft: the last turn\'s model');
+    store.setModel(chat, { id: 'gpt-5.6-sol', config: { thinkingLevel: 'high', contextSize: 272000 } });
+    assert.equal(store.chatState.get(chat).draft.model.id, 'gpt-5.6-sol');
+    assert.equal(store.modelFor(chat).id, 'gpt-5.6-sol');
+    // A change made on the PC (another client's draft) wins.
+    store._apply({ channel: chat, action: { type: 'chat/draftChanged', draft: { text: 'typing on the PC', origin: { kind: 'user' }, model: { id: 'claude-sonnet-5' } } }, serverSeq: 999999, origin: { clientId: 'vscode', clientSeq: 1 } });
+    assert.equal(store.modelFor(chat).id, 'claude-sonnet-5');
+    // Picking on the phone keeps what the PC is typing.
+    store.setModel(chat, { id: 'gpt-5-mini', config: { thinkingLevel: 'low' } });
+    assert.equal(store.chatState.get(chat).draft.text, 'typing on the PC');
+    assert.equal(store.chatState.get(chat).draft.model.id, 'gpt-5-mini');
+  } finally {
+    store.dispose();
+  }
+});
+
+test('demo: steering reaches the running agent; stop and send restarts with the message', async () => {
+  const { store } = createDemo();
+  try {
+    const uri = 'copilotcli:/demo-dark';
+    const chat = store.chatFor(uri);
+    store.steer(uri, { text: 'Use CSS variables' });
+    await until(() => !store.chatState.get(chat).steeringMessage && JSON.stringify(store.chatState.get(chat).activeTurn?.responseParts || []).includes('Use CSS variables'));
+    const sent = [];
+    const dispatch = store._dispatch.bind(store);
+    store._dispatch = (channel, action) => {
+      sent.push(action);
+      return dispatch(channel, action);
+    };
+    assert.equal(await store.stopAndSend(uri, { text: 'Actually, just add a comment' }), 'sent');
+    const cs = await until(() => {
+      const c = store.chatState.get(chat);
+      return !c.activeTurn && c.turns.some((t) => t.message.text === 'Actually, just add a comment') && c;
+    });
+    assert.equal(cs.turns.find((t) => t.id === 'demo-dark-t1').state, 'cancelled', 'the running turn was stopped');
+    assert.equal(cs.queuedMessages?.length || 0, 0);
+    // Like VS Code: stop, then a new turn — never the queue (VS Code's host doesn't drain it after a stop).
+    assert.deepEqual(sent.map((a) => a.type), ['chat/turnCancelled', 'chat/turnStarted']);
+    assert.equal(sent[1].message.text, 'Actually, just add a comment');
+
+    // If the PC never confirms the stop, the message still isn't lost: it waits in the queue.
+    store.sendMessage(uri, { text: 'Another run' });
+    await until(() => store.chatState.get(chat).activeTurn);
+    sent.length = 0;
+    store._dispatch = (channel, action) => {
+      sent.push(action);
+      return action.type === 'chat/turnCancelled' ? undefined : dispatch(channel, action);
+    };
+    assert.equal(await store.stopAndSend(uri, { text: 'Queued instead' }, { timeoutMs: 50 }), 'queued');
+    assert.deepEqual(sent.map((a) => a.type), ['chat/turnCancelled', 'chat/pendingMessageSet']);
   } finally {
     store.dispose();
   }
@@ -95,6 +156,19 @@ test('sessions: folder grouping follows the project; folders that need you or ar
   assert.equal(projectOf({ provider: 'copilotcli', workingDirectories: ['file:///c%3A/code/My%20App'] }).name, 'My App');
   assert.equal(projectOf({ provider: 'copilotcli', project: { uri: 'file:///c%3A/code/app', displayName: 'app (main)' }, workingDirectories: [] }).name, 'app (main)');
   assert.deepEqual(projectOf({ provider: 'claude' }), { key: 'provider:claude', uri: '', name: 'Claude' });
+});
+
+test('ui modules all parse (catches syntax errors in components the other tests do not render)', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'pwa', 'js');
+  for (const sub of ['ui', 'lib', 'model', 'net', 'demo', 'core']) {
+    for (const f of fs.readdirSync(path.join(dir, sub)).filter((x) => x.endsWith('.js'))) {
+      assert.doesNotThrow(() => execFileSync(process.execPath, ['--check', path.join(dir, sub, f)], { stdio: 'pipe' }), `${sub}/${f}`);
+    }
+  }
 });
 
 test('demo: new sessions keep the chosen model options and mode', async () => {

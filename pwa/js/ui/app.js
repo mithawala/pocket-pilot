@@ -162,7 +162,7 @@ export class AppController extends EventTarget {
   }
 
   async repair(host) {
-    if (!confirm(`${host.hostName} no longer recognises this phone. Forget it and pair again?`)) return;
+    if (!confirm(`${host.hostName} no longer recognises this device. Forget it and pair again?`)) return;
     await db.deleteHost(host.hostId);
     this.hosts = this.hosts.filter((h) => h.hostId !== host.hostId);
     this.currentId = this.hosts[0]?.hostId || null;
@@ -216,7 +216,7 @@ export class AppController extends EventTarget {
 
   testPush() {
     this.active?.conn.testPush();
-    toast('Test notification sent — lock your phone or switch apps to see it.');
+    toast('Test notification sent — lock your screen or switch apps to see it.');
   }
 
   async setTheme(t) {

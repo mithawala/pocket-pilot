@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { CopilotAgentHost, toAhpModels } from '../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/agent-host.mjs';
+import { CopilotAgentHost, toAhpModels, toRuntime, toSelection } from '../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/agent-host.mjs';
 import { SessionTranslator, schemaQuestions, toolLabels } from '../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/translate.mjs';
 import { rootReducer, sessionReducer, chatReducer, SUPPORTED_PROTOCOL_VERSIONS } from '../pwa/vendor/ahp/types/index.js';
 import { HostStore } from '../pwa/js/model/host-store.js';
@@ -82,6 +82,26 @@ test('translator: history becomes one completed AHP turn with markdown and a too
   assert.equal(tc.pastTenseMessage.markdown, 'Ran `Get-ChildItem`');
   assert.equal(tc.content[0].text, 'a.txt\nb.txt');
   assert.equal(turn.responseParts[2].content, 'There are **two** files.');
+});
+
+const isSteer = (e) => e.type === 'user.message' && e.data?.delivery === 'steering';
+
+test('translator: a steering message joins the running turn instead of starting a new one', () => {
+  const actions = [];
+  const t = new SessionTranslator({ emit: (a) => actions.push(a) });
+  t.replay([
+    ev('user.message', { content: 'Run the tests', messageId: 'm1', delivery: 'idle' }),
+    ev('assistant.message', { messageId: 'a1', content: 'Running them now.' }),
+    ev('user.message', { content: 'Only the unit tests, please', messageId: 'm2', delivery: 'steering' }),
+    ev('assistant.message', { messageId: 'a2', content: 'Okay, unit tests only.' }),
+    ev('session.idle', {}),
+  ]);
+  let chat = { resource: 'c', title: '', status: 1, modifiedAt: '', turns: [] };
+  for (const a of actions) chat = chatReducer(chat, a);
+  assert.equal(chat.turns.length, 1);
+  assert.deepEqual(chat.turns[0].responseParts.map((p) => p.kind), ['markdown', 'systemNotification', 'markdown']);
+  assert.equal(chat.turns[0].responseParts[1].content, 'Steering: Only the unit tests, please');
+  assert.ok(isSteer(ev('user.message', { delivery: 'steering' })));
 });
 
 test('translator: helpers for labels, forms and phone answers', () => {
@@ -255,6 +275,79 @@ test('copilot host: queued phone messages keep their attachments', async () => {
     store.dispose();
     host.closeAll();
   }
+});
+
+// Model entries as the Copilot runtime's session.rpc.model.list() returns them (raw CAPI shape).
+const RAW_MODELS = [
+  { id: 'auto', name: 'Auto', capabilities: {}, billing: { discountPercent: 10 } },
+  {
+    id: 'claude-opus-5.5', name: 'Claude Opus 5.5', vendor: 'Anthropic', policy: { state: 'enabled' },
+    capabilities: { supports: { reasoning_effort: ['low', 'medium', 'high', 'xhigh', 'max'], vision: true }, limits: { max_context_window_tokens: 1000000 } },
+    billing: { token_prices: { default: { input_price: 400, max_prompt_tokens: 200000 }, long_context: { input_price: 400, max_prompt_tokens: 1000000 } } },
+  },
+  {
+    id: 'gpt-5.4', name: 'GPT-5.4', vendor: 'OpenAI', policy: { state: 'enabled' },
+    capabilities: { supports: { reasoning_effort: ['none', 'low', 'medium', 'high', 'xhigh'] }, limits: { max_context_window_tokens: 1050000 } },
+    billing: { token_prices: { default: { input_price: 250, max_prompt_tokens: 272000 }, long_context: { input_price: 500, max_prompt_tokens: 922000 } } },
+  },
+];
+
+test('copilot models: the same thinking level and context size options as VS Code', () => {
+  const models = toAhpModels(RAW_MODELS);
+  const props = (id) => models.find((m) => m.id === id).configSchema.properties;
+  assert.equal(props('auto').tier.default, 'balance');
+  assert.deepEqual(props('claude-opus-5.5').thinkingLevel.enumLabels, ['Low', 'Medium', 'High', 'Extra High', 'Max']);
+  assert.equal(props('claude-opus-5.5').thinkingLevel.default, 'high');
+  assert.deepEqual(props('claude-opus-5.5').contextSize.enum, [200000, 1000000]);
+  assert.deepEqual(props('claude-opus-5.5').contextSize.enumLabels, ['200K', '1M']);
+  assert.equal(props('claude-opus-5.5').contextSize.default, 1000000, 'long context costs the same: default');
+  assert.equal(props('gpt-5.4').thinkingLevel.default, 'medium');
+  assert.equal(props('gpt-5.4').contextSize.default, 272000, 'long context costs more: not the default');
+  assert.deepEqual(props('gpt-5.4').contextSize.enumLabels, ['272K', '1M']);
+  assert.deepEqual(toRuntime(models, { id: 'gpt-5.4', config: { thinkingLevel: 'high', contextSize: 922000 } }), { id: 'gpt-5.4', reasoningEffort: 'high', contextTier: 'long_context' });
+  assert.deepEqual(toRuntime(models, { id: 'auto', config: { tier: 'intelligence' } }), { id: 'auto', autoTier: 'intelligence' });
+  assert.deepEqual(toSelection(models, { id: 'claude-opus-5.5', reasoningEffort: 'max', contextTier: 'default' }), { id: 'claude-opus-5.5', config: { thinkingLevel: 'max', contextSize: 200000 } });
+});
+
+test('copilot host: the model choice syncs both ways with the runtime', async () => {
+  const host = makeHost();
+  const bridge = fakeBridge();
+  host.setModels(RAW_MODELS);
+  host.attach({ sessionId: 's6', cwd: CWD, title: 'Models', history: [], model: { id: 'gpt-5.4', reasoningEffort: 'medium' }, bridge });
+  const store = new HostStore(fakeConnection(agentHost.transportFor(host.openConnection())), { unsubscribeDelayMs: 10 });
+  try {
+    await until(() => store.sessionsLoaded);
+    const uri = 'copilotcli:/s6';
+    store.watchSession(uri);
+    const chat = await until(() => store.chatFor(uri) && store.chatState.get(store.chatFor(uri)) && store.chatFor(uri));
+    // PC -> phone: the runtime's current model is the chat's draft.
+    assert.deepEqual(store.modelFor(chat), { id: 'gpt-5.4', config: { thinkingLevel: 'medium' } });
+    // Phone -> PC: picking a model switches the runtime (the app's picker follows).
+    store.setModel(chat, { id: 'claude-opus-5.5', config: { thinkingLevel: 'max', contextSize: 1000000 } });
+    const call = await until(() => bridge.calls.find((c) => c.op === 'model'));
+    assert.deepEqual(call.params.model, { id: 'claude-opus-5.5', reasoningEffort: 'max', contextTier: 'long_context' });
+    await until(() => store.chatState.get(chat).draft?.model?.id === 'claude-opus-5.5');
+    // PC -> phone: a switch made in the app shows on the phone.
+    host.event('s6', ev('session.model_change', { newModel: 'gpt-5.4', reasoningEffort: 'high', contextTier: 'long_context' }));
+    await until(() => store.modelFor(chat)?.id === 'gpt-5.4');
+    assert.deepEqual(store.modelFor(chat).config, { thinkingLevel: 'high', contextSize: 922000 });
+    // Messages carry the synced model, as setModel arguments for the runtime.
+    store.sendMessage(uri, { text: 'hi', model: store.modelFor(chat) });
+    const send = await until(() => bridge.calls.find((c) => c.op === 'send'));
+    assert.deepEqual(send.params.model, { id: 'gpt-5.4', reasoningEffort: 'high', contextTier: 'long_context' });
+  } finally {
+    store.dispose();
+    host.closeAll();
+  }
+});
+
+test('copilot host: a session attached before the model list keeps its thinking level and context size', () => {
+  const host = makeHost();
+  const entry = host.attach({ sessionId: 's6b', cwd: CWD, title: 'Early', history: [], model: { id: 'gpt-5.4', reasoningEffort: 'xhigh', contextTier: 'long_context' }, bridge: fakeBridge() });
+  assert.deepEqual(entry.chat.draft.model, { id: 'gpt-5.4' }, 'nothing to derive the settings from yet');
+  host.setModels(RAW_MODELS);
+  assert.deepEqual(entry.chat.draft.model, { id: 'gpt-5.4', config: { thinkingLevel: 'xhigh', contextSize: 922000 } });
+  host.closeAll();
 });
 
 test('copilot host: reconnect replays missed actions; detach removes the session', async () => {

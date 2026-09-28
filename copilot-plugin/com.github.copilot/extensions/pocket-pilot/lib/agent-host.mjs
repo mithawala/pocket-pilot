@@ -43,38 +43,84 @@ class RpcError extends Error {
   }
 }
 
-/** Copilot SDK model list -> AHP models (with the reasoning-effort picker VS Code shows). */
+const EFFORT_LABELS = { none: 'None', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
+const sizeLabel = (n) => (n >= 900000 ? `${Math.round(n / 1e6)}M` : `${Math.round(n / 1000)}K`);
+const AUTO_TIER = {
+  type: 'string', title: 'Optimize for', description: 'Biases which models Auto routes this session to.',
+  enum: ['efficiency', 'balance', 'intelligence'], enumLabels: ['Efficiency', 'Balance', 'Intelligence'],
+  enumDescriptions: ['Cheaper models for everyday tasks', 'Balances capability and cost', 'Most capable models, higher cost'], default: 'balance',
+};
+
+/**
+ * Copilot runtime model list (raw CAPI entries or SDK `Model`s) -> AHP models with the same options
+ * VS Code offers: thinking level from the model's reasoning efforts, context size from its pricing
+ * tiers (the long tier is the default when it costs the same), and Auto's "Optimize for".
+ */
 export function toAhpModels(list) {
   const out = [];
   for (const m of Array.isArray(list) ? list : []) {
     if (!m || typeof m.id !== 'string') continue;
-    const efforts = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((e) => typeof e === 'string') : [];
-    const policy = m.policy?.state;
+    const supports = m.capabilities?.supports || {};
     const limits = m.capabilities?.limits || {};
+    const efforts = (Array.isArray(m.supportedReasoningEfforts) && m.supportedReasoningEfforts.length ? m.supportedReasoningEfforts : Array.isArray(supports.reasoning_effort) ? supports.reasoning_effort : []).filter((e) => typeof e === 'string');
+    const prices = m.billing?.token_prices || {};
+    const short = prices.default?.max_prompt_tokens;
+    const long = prices.long_context?.max_prompt_tokens;
+    const properties = {};
+    if (m.id === 'auto') properties.tier = AUTO_TIER;
+    if (efforts.length) {
+      const preferred = m.defaultReasoningEffort || (m.vendor === 'Anthropic' ? 'high' : 'medium');
+      properties.thinkingLevel = {
+        type: 'string', title: 'Thinking Level', description: 'How much reasoning effort the model uses.',
+        enum: efforts, enumLabels: efforts.map((e) => EFFORT_LABELS[e] || e[0].toUpperCase() + e.slice(1)),
+        default: efforts.includes(preferred) ? preferred : efforts[Math.min(1, efforts.length - 1)],
+      };
+    }
+    if (Number.isFinite(short) && Number.isFinite(long) && long > short) {
+      properties.contextSize = {
+        type: 'number', title: 'Context Size', description: 'How much of the conversation the model sees.',
+        enum: [short, long], enumLabels: [sizeLabel(short), sizeLabel(long)],
+        default: prices.long_context.input_price === prices.default.input_price ? long : short,
+      };
+    }
+    const policy = m.policy?.state;
     out.push({
       id: m.id,
       provider: PROVIDER,
       name: String(m.name || m.id),
       ...(limits.max_context_window_tokens ? { maxContextWindow: limits.max_context_window_tokens } : {}),
       ...(limits.max_output_tokens ? { maxOutputTokens: limits.max_output_tokens } : {}),
-      supportsVision: !!(m.capabilities?.supports?.vision || limits.vision),
+      supportsVision: !!(supports.vision || limits.vision),
       ...(policy ? { policyState: policy === 'enabled' ? 'enabled' : policy === 'disabled' ? 'disabled' : 'unconfigured' } : {}),
-      ...(efforts.length ? {
-        configSchema: {
-          type: 'object',
-          properties: {
-            thinkingLevel: {
-              type: 'string', title: 'Thinking Level', description: 'How much reasoning effort the model uses.',
-              enum: efforts, enumLabels: efforts.map((e) => (e === 'xhigh' ? 'Extra High' : e[0].toUpperCase() + e.slice(1))),
-              ...(m.defaultReasoningEffort ? { default: m.defaultReasoningEffort } : {}),
-            },
-          },
-        },
-      } : {}),
+      ...(Object.keys(properties).length ? { configSchema: { type: 'object', properties } } : {}),
       ...(m.billing?.multiplier !== undefined ? { _meta: { multiplier: m.billing.multiplier } } : {}),
     });
   }
   return out;
+}
+
+/** The runtime's model state ({ id, reasoningEffort, contextTier, autoTier }) as an AHP model selection. */
+export function toSelection(models, raw) {
+  if (!raw?.id) return null;
+  const props = models.find((m) => m.id === raw.id)?.configSchema?.properties || {};
+  const config = {};
+  if (props.thinkingLevel && raw.reasoningEffort && props.thinkingLevel.enum.includes(raw.reasoningEffort)) config.thinkingLevel = raw.reasoningEffort;
+  if (props.contextSize && raw.contextTier) config.contextSize = raw.contextTier === 'long_context' ? props.contextSize.enum[1] : props.contextSize.enum[0];
+  if (props.tier && raw.autoTier && props.tier.enum.includes(raw.autoTier)) config.tier = raw.autoTier;
+  return { id: raw.id, ...(Object.keys(config).length ? { config } : {}) };
+}
+
+/** An AHP model selection as the runtime's setModel arguments. */
+export function toRuntime(models, sel) {
+  if (!sel?.id) return null;
+  const props = models.find((m) => m.id === sel.id)?.configSchema?.properties || {};
+  const c = sel.config || {};
+  return {
+    id: sel.id,
+    ...(props.thinkingLevel && props.thinkingLevel.enum.includes(c.thinkingLevel) ? { reasoningEffort: c.thinkingLevel } : {}),
+    ...(props.contextSize && props.contextSize.enum.includes(c.contextSize) ? { contextTier: c.contextSize === props.contextSize.enum[1] ? 'long_context' : 'default' } : {}),
+    ...(props.tier && props.tier.enum.includes(c.tier) ? { autoTier: c.tier } : {}),
+  };
 }
 
 export function isInside(child, parent) {
@@ -146,6 +192,24 @@ export class CopilotAgentHost extends EventEmitter {
     if (!models.length) return;
     const agents = [{ ...this.root.agents[0], models }];
     this._dispatch(ROOT, { type: 'root/agentsChanged', agents });
+    // Sessions attached before the list arrived only knew the bare model id: fill in its settings now.
+    for (const entry of this.sessions.values()) if (entry.rawModel) this._modelChanged(entry, entry.rawModel);
+  }
+
+  get models() {
+    return this.root.agents[0]?.models || [];
+  }
+
+  /** The runtime switched model (from the app, the CLI or a phone): every client's picker follows. */
+  _modelChanged(entry, raw) {
+    const model = toSelection(this.models, raw);
+    if (!model) return;
+    entry.rawModel = raw;
+    entry.translator.model = model;
+    if (JSON.stringify(entry.chat.draft?.model) === JSON.stringify(model)) return;
+    const draft = { ...(entry.chat.draft || { text: '', origin: { kind: 'user' } }), model };
+    if (entry.replaying) entry.chat = { ...entry.chat, draft };
+    else this._dispatch(entry.chatUri, { type: 'chat/draftChanged', draft });
   }
 
   /**
@@ -200,7 +264,7 @@ export class CopilotAgentHost extends EventEmitter {
       onActivity: (text) => this._setActivity(entry, text),
       onTitle: (title) => this._setTitle(entry, title),
       onConfig: (values) => this._dispatch(uri, { type: 'session/configChanged', config: values }),
-      onModel: (model) => this._dispatch(chatUri, { type: 'chat/draftChanged', draft: { text: '', origin: { kind: 'user' }, model } }),
+      onModel: (raw) => this._modelChanged(entry, raw),
     });
     this.sessions.set(uri, entry);
     this.byChat.set(chatUri, entry);
@@ -211,8 +275,8 @@ export class CopilotAgentHost extends EventEmitter {
     } catch (err) {
       this.log('warn', `History of ${info.sessionId} could not be fully rebuilt: ${err.message}`);
     }
+    if (info.model?.id) this._modelChanged(entry, info.model);
     entry.replaying = false;
-    if (info.model) entry.translator.model = info.model;
     const last = entry.chat.turns[entry.chat.turns.length - 1];
     entry.summary.modifiedAt = entry.chat.modifiedAt || last?.startedAt || entry.summary.createdAt;
     this._syncStatus(entry, { notify: false });
@@ -510,7 +574,7 @@ export class CopilotAgentHost extends EventEmitter {
           t.beginPhoneTurn({ turnId: action.turnId, text, startedAt: action.startedAt });
           this._summary(entry, { modifiedAt: new Date().toISOString() });
           try {
-            await run('send', { prompt: text, model: action.message.model, attachments: action.message.attachments });
+            await run('send', { prompt: text, model: toRuntime(this.models, action.message.model), attachments: action.message.attachments });
           } catch (err) {
             if (t.activeTurnId === action.turnId) {
               t.turn = null;
@@ -524,7 +588,7 @@ export class CopilotAgentHost extends EventEmitter {
           const text = String(action.message?.text ?? '').trim();
           if (!text) return fail('Type a message first');
           if (action.kind === 'steering') {
-            await run('send', { prompt: text, mode: 'immediate' });
+            await run('send', { prompt: text, mode: 'immediate', attachments: action.message.attachments });
             this._dispatch(entry.chatUri, action, origin);
             this._dispatch(entry.chatUri, { type: 'chat/pendingMessageRemoved', kind: 'steering', id: action.id });
             return;
@@ -554,9 +618,19 @@ export class CopilotAgentHost extends EventEmitter {
           return;
         }
         case 'chat/inputAnswerChanged':
-        case 'chat/draftChanged':
           this._dispatch(entry.chatUri, action, origin);
           return;
+        case 'chat/draftChanged': {
+          // A new model or model option chosen on a phone switches the runtime (the app's picker follows).
+          const next = action.draft?.model;
+          const cur = entry.chat.draft?.model;
+          if (next?.id && JSON.stringify(toRuntime(this.models, next)) !== JSON.stringify(toRuntime(this.models, cur))) {
+            await run('model', { model: toRuntime(this.models, next) });
+            entry.translator.model = next;
+          }
+          this._dispatch(entry.chatUri, action, origin);
+          return;
+        }
         case 'chat/inputCompleted': {
           const req = t.pendingRequest(action.requestId);
           if (!req) return fail('This question is no longer open');
@@ -627,7 +701,7 @@ export class CopilotAgentHost extends EventEmitter {
     this._dispatch(entry.chatUri, { type: 'chat/pendingMessageRemoved', kind: 'queued', id: q.id });
     this._dispatch(entry.chatUri, { type: 'chat/turnStarted', turnId, startedAt, message: { text: q.text, origin: { kind: 'user' }, ...(q.model ? { model: q.model } : {}), ...(q.attachments?.length ? { attachments: q.attachments } : {}) }, queuedMessageId: q.id });
     t.beginPhoneTurn({ turnId, text: q.text, startedAt });
-    entry.bridge.request('send', { prompt: q.text, model: q.model, attachments: q.attachments }).catch((err) => {
+    entry.bridge.request('send', { prompt: q.text, model: toRuntime(this.models, q.model), attachments: q.attachments }).catch((err) => {
       if (t.activeTurnId === turnId) {
         t.turn = null;
         t.phoneTurn = null;

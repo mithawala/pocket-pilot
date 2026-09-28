@@ -93,6 +93,11 @@ class SidebarProvider {
         return run('pocketPilot.openSettings');
       case 'logs':
         return run('pocketPilot.showLogs');
+      case 'installUpdate':
+        return run('pocketPilot.installUpdate');
+      case 'updateNotes':
+        if (/^https:\/\/github\.com\//.test(String(this.service.update?.notes))) return vscode.env.openExternal(vscode.Uri.parse(this.service.update.notes));
+        return undefined;
       case 'openUrl':
         if (/^https:\/\//.test(String(msg.url))) return vscode.env.openExternal(vscode.Uri.parse(msg.url));
         return undefined;

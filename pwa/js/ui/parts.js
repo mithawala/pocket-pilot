@@ -290,7 +290,7 @@ function answerText(part) {
   return bits.length ? `Answered · ${bits.join(' · ')}` : `Answered: ${mdPlain(req.message, 90)}`;
 }
 
-function Parts({ parts, turnId, active, ctx }) {
+function Parts({ parts, turnId, active, ctx, retry }) {
   const grouped = groupParts(parts);
   const lastIdx = grouped.length - 1;
   return grouped.map((p, i) => {
@@ -315,7 +315,8 @@ function Parts({ parts, turnId, active, ctx }) {
       case 'error':
         return html`<div class="errpart" key=${`e${i}`}>
           <b>Error:</b> ${p.error?.message || 'Something went wrong'}
-          ${p.resumable && !active && html`<div style="margin-top:8px"><button class="btn sm" onClick=${() => ctx.store.resumeTurn(ctx.chat, turnId)}>Retry</button></div>`}
+          ${p.resumable && !active && html`<div class="retry"><button class="btn sm" onClick=${() => ctx.store.resumeTurn(ctx.chat, turnId)}>Retry</button></div>`}
+          ${!p.resumable && !active && retry && html`<div class="retry"><button class="btn sm" onClick=${retry}><${Icon} name="refresh" size="15" /> Try again</button></div>`}
         </div>`;
       case 'systemNotification':
         return html`<div class="sysnote" key=${`s${i}`}>${mdPlain(p.content, 200)}</div>`;
@@ -338,14 +339,14 @@ function UserMessage({ message, pending }) {
 }
 
 function RespHead({ provider }) {
-  return html`<div class="resp-head"><span class=${`av ${provider === 'claude' ? 'claude' : ''}`}><${Icon} name="sparkle" /></span><span>${providerLabel(provider)}</span></div>`;
+  return html`<div class="resp-head"><img class=${`av ${provider === 'claude' ? 'claude' : ''}`} src="./icons/bot.svg" alt="" /><span>${providerLabel(provider)}</span></div>`;
 }
 
 export class Turn extends Component {
   shouldComponentUpdate(next) {
-    return next.turn !== this.props.turn || next.active !== this.props.active || next.activity !== this.props.activity;
+    return next.turn !== this.props.turn || next.active !== this.props.active || next.activity !== this.props.activity || next.isLast !== this.props.isLast;
   }
-  render({ turn, active, activity, ctx }) {
+  render({ turn, active, activity, ctx, isLast }) {
     const parts = turn.responseParts || [];
     const last = parts[parts.length - 1];
     const waiting = active && (!last || (last.kind !== 'markdown' && !(last.kind === 'toolCall' && ['running', 'streaming'].includes(last.toolCall.status)) && last.kind !== 'reasoning'));
@@ -353,7 +354,7 @@ export class Turn extends Component {
     return html`<div class="turn">
       <${UserMessage} message=${turn.message} />
       <${RespHead} provider=${ctx.provider} />
-      <${Parts} parts=${parts} turnId=${turn.id} active=${active} ctx=${ctx} />
+      <${Parts} parts=${parts} turnId=${turn.id} active=${active} ctx=${ctx} retry=${isLast && turn.state === 'error' ? ctx.retry?.(turn) : null} />
       ${active && waiting && html`<div class="activity-line"><${Spinner} /><span class="shimmer">${activity || 'Working…'}</span></div>`}
       ${!active && html`<div class="turn-foot">
         ${turn.state === 'cancelled' && html`<span>Stopped</span>`}

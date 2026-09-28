@@ -53,6 +53,18 @@ for (const page of ['index.html', '404.html']) {
 }
 fs.writeFileSync(path.join(out, 'img', 'app-qr.svg'), qrSvg(`${SITE_URL}app/`));
 
+// Browsers keep favicons for a long time: version the icon links by content so a new icon shows up.
+function versionIcons(file) {
+  if (!fs.existsSync(file)) return;
+  const html = fs.readFileSync(file, 'utf8').replace(/href="(\.\/[^"?]*?(?:icon\.svg|favicon\.png|apple-touch-icon\.png))"/g, (m, url) => {
+    const src = path.join(path.dirname(file), url);
+    if (!fs.existsSync(src)) return m;
+    return `href="${url}?v=${crypto.createHash('sha256').update(fs.readFileSync(src)).digest('hex').slice(0, 8)}"`;
+  });
+  fs.writeFileSync(file, html);
+}
+for (const f of ['index.html', '404.html', 'app/index.html']) versionIcons(path.join(out, f));
+
 // Content-based cache version: every release changes sw.js, so installed apps update themselves.
 const appDir = path.join(out, 'app');
 const hash = crypto.createHash('sha256');

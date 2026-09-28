@@ -182,6 +182,31 @@ store.setConfig(uri, { mode: 'interactive' });
 await until(async () => (await session.rpc.mode.get().catch(() => null)) === 'interactive', 'interactive mode again', 20000);
 step('mode switched from the phone: interactive -> plan -> interactive');
 
+// 5. The model choice syncs both ways: the phone switches the runtime, and a switch on the PC shows on the phone.
+store.setModel(chat, { id: 'gpt-5.4-mini', config: { thinkingLevel: 'low' } });
+await until(async () => {
+  const cur = await session.rpc.model.getCurrent().catch(() => null);
+  return cur?.modelId === 'gpt-5.4-mini' && cur.reasoningEffort === 'low';
+}, 'the phone\'s model in the runtime', 30000);
+await session.setModel('gpt-5-mini', { reasoningEffort: 'high' });
+await until(() => store.modelFor(chat)?.id === 'gpt-5-mini' && store.modelFor(chat).config?.thinkingLevel === 'high', 'the PC\'s model on the phone', 30000);
+step('model synced: phone -> runtime (GPT-5.4 mini · Low) and runtime -> phone (GPT-5 mini · High)');
+
+// 6. Steering from the phone reaches the running agent.
+store.sendMessage(uri, { text: 'Use the shell tool to run: Start-Sleep -Seconds 8 ; then reply with one short sentence.', model: store.modelFor(chat) });
+await until(() => store.chatState.get(chat).activeTurn?.responseParts.some((p) => p.kind === 'toolCall'), 'the long command to start', 120000);
+const pendingSleep = await until(() => store.chatState.get(chat).activeTurn?.responseParts.find((p) => p.kind === 'toolCall' && p.toolCall.status === 'pending-confirmation'), 'the sleep approval', 60000);
+store.confirmTool(chat, store.chatState.get(chat).activeTurn.id, pendingSleep.toolCall.toolCallId, true, 'approve-once');
+store.steer(uri, { text: 'When you are done, end your reply with the word steered.' });
+const steered = await until(() => {
+  const c = store.chatState.get(chat);
+  const last = c.turns[c.turns.length - 1];
+  return !c.activeTurn && /Start-Sleep/.test(last?.message.text || '') ? last : null;
+}, 'the steered turn to finish', 180000);
+const steeredText = steered.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ');
+if (!/steer/i.test(steeredText)) fail(`the steering message did not reach the agent: ${steeredText.slice(0, 200)}`);
+step(`steering reached the running agent: ${steeredText.replace(/\s+/g, ' ').slice(0, 90)}`);
+
 // 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
 const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
 await new Promise((r) => setTimeout(r, 1500));

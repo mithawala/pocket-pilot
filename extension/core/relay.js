@@ -68,7 +68,7 @@ class FrameQueue {
       if (timeoutMs > 0) {
         const t = setTimeout(() => {
           this.waiters = this.waiters.filter((x) => x !== w);
-          reject(new RelayError('timeout', 'Timed out waiting for the phone'));
+          reject(new RelayError('timeout', 'Timed out waiting for the device'));
         }, timeoutMs);
         w.resolve = (v) => { clearTimeout(t); resolve(v); };
         w.reject = (e) => { clearTimeout(t); reject(e); };
@@ -105,23 +105,15 @@ function withTimeout(promise, ms, fallback) {
   ]);
 }
 
-function collectProtectedResources(initResult) {
-  const snapshots = initResult?.snapshots || (initResult?.type === 'snapshot' ? initResult.snapshots : null);
-  const root = snapshots?.find((s) => s.resource === 'ahp-root://')?.state;
-  if (!root?.agents) return null;
-  const seen = new Map();
-  for (const a of root.agents) for (const r of a.protectedResources || []) if (!seen.has(r.resource)) seen.set(r.resource, r);
-  return [...seen.values()];
-}
-
 class RelayServer extends EventEmitter {
   /**
+   * The relay never signs in to the agent host: VS Code (or the Copilot app) keeps it authenticated, and
+   * the agent host's tokens are global, so pushing another token would switch accounts for every client.
+   *
    * @param {object} o
    * @param {object} o.identity         host identity from identity.loadHostIdentity
    * @param {import('./store').DeviceStore} o.store
    * @param {() => object|null} o.getAgentEndpoint
-   * @param {(resources: object[]) => Promise<{resource:string, token:string, scopes?:string[]}[]>} o.getAuthTokens
-   * @param {() => object[]} [o.getProtectedResources]
    * @param {(info: object) => Promise<boolean>} o.approveDevice
    * @param {() => string[]} o.allowedOrigins
    * @param {() => {requireApproval:boolean, passkey:'required'|'optional'|'off', passkeyGraceHours:number}} o.policy
@@ -214,6 +206,12 @@ class RelayServer extends EventEmitter {
 
   broadcastControl(msg, filter = () => true) {
     for (const c of this.connections) if (c.state === 'ready' && filter(c)) c.sendControl(msg).catch(() => {});
+  }
+
+  /** Tells every connected phone that a session's summary changed (e.g. its corrected status). */
+  pushSummaryChange(session, changes) {
+    const text = JSON.stringify({ jsonrpc: '2.0', method: 'root/sessionSummaryChanged', params: { channel: 'ahp-root://', session, changes } });
+    for (const c of this.connections) if (c.state === 'ready' && c.ahp && !c.revoked) c._sendAhp(text);
   }
 
   allowedOrigins() {
@@ -362,11 +360,7 @@ class DeviceConnection extends EventEmitter {
     this.lastPong = Date.now();
     this.frames = new FrameQueue();
     this.ahp = null;
-    this.ownRequests = new Map();
-    this.ownSeq = 0;
-    this.holdQueue = null;
-    this.pendingInitIds = new Set();
-    this.lastProtectedResources = null;
+    this.listIds = new Set();
     conn.on('message', (data, isBinary) => {
       this.lastPong = Date.now();
       this.frames.push({ data, isBinary });
@@ -459,7 +453,7 @@ class DeviceConnection extends EventEmitter {
     this.visible = !!auth.visible;
     if (hello.mode === 'resume' && !device) {
       this.relay._recordFailure(this.meta.ip);
-      await this.sendControl({ t: 'error', code: 'unknown-device', message: 'This phone is not paired with this PC anymore. Scan a new QR code on your PC.' });
+      await this.sendControl({ t: 'error', code: 'unknown-device', message: 'This device is not paired with this PC anymore. Scan a new QR code on your PC.' });
       throw new RelayError('unknown-device', 'Unknown device', { quiet: true, closeCode: 4401 });
     }
     if (hello.mode === 'pair') device = await this._pair(hello, auth);
@@ -485,7 +479,7 @@ class DeviceConnection extends EventEmitter {
   async _pair(hello, auth) {
     const { o } = this.relay;
     const policy = o.policy();
-    const name = sanitizeText(auth.device?.name, 60) || 'Phone';
+    const name = sanitizeText(auth.device?.name, 60) || 'Device';
     const platform = sanitizeText(auth.device?.platform, 40);
     const id = deviceIdFor(hello.devicePublicKey);
     if (policy.requireApproval) {
@@ -673,10 +667,9 @@ class DeviceConnection extends EventEmitter {
         this._sendAhp(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: 'Reading files outside your session folders is not allowed' } }));
         return;
       }
-      if (isRequest && (msg.method === 'initialize' || msg.method === 'reconnect')) this.pendingInitIds.add(msg.id);
+      if (isRequest && msg.method === 'listSessions') this.listIds.add(msg.id);
     }
-    if (this.holdQueue) this.holdQueue.push(text);
-    else this.ahp.send(text);
+    this.ahp.send(text);
   }
 
   _fromHost(text) {
@@ -687,67 +680,36 @@ class DeviceConnection extends EventEmitter {
       return;
     }
     if (msg.id !== undefined && msg.method === undefined) {
-      if (typeof msg.id === 'string' && msg.id.startsWith('pp:')) {
-        const p = this.ownRequests.get(msg.id);
-        if (p) {
-          this.ownRequests.delete(msg.id);
-          if (msg.error) p.reject(Object.assign(new Error(msg.error.message), { code: msg.error.code }));
-          else p.resolve(msg.result);
-        }
-        return;
-      }
-      if (this.pendingInitIds.delete(msg.id)) {
-        this._sendAhp(text);
-        if (msg.result) this._authenticate(collectProtectedResources(msg.result));
-        return;
-      }
+      if (this.listIds.delete(msg.id)) text = this._adjustSummaries(msg, text);
     } else if (msg.method === 'auth/required') {
-      this._authenticate(null);
+      // VS Code answers this itself (and may ask you to sign in on the PC); the phone has nothing to add.
       return;
+    } else if (msg.method === 'root/sessionAdded' || msg.method === 'root/sessionSummaryChanged') {
+      text = this._adjustSummaries(msg, text);
     }
     this._sendAhp(text);
   }
 
-  _ownRequest(method, params, timeoutMs = 15000) {
-    const id = `pp:${++this.ownSeq}`;
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => {
-        this.ownRequests.delete(id);
-        reject(new Error(`${method} timed out`));
-      }, timeoutMs);
-      this.ownRequests.set(id, {
-        resolve: (v) => { clearTimeout(t); resolve(v); },
-        reject: (e) => { clearTimeout(t); reject(e); },
-      });
-      this.ahp.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
-    });
-  }
-
-  /** Pushes the PC's GitHub tokens to the agent host for this connection. Tokens never reach the phone. */
-  _authenticate(resources) {
-    if (resources) this.lastProtectedResources = resources;
-    const list = resources || this.lastProtectedResources || (this.relay.o.getProtectedResources ? this.relay.o.getProtectedResources() : []) || [];
-    if (!this.holdQueue) this.holdQueue = [];
-    const run = async () => {
-      let tokens = [];
-      try {
-        tokens = await withTimeout(Promise.resolve(this.relay.o.getAuthTokens(list)), 15000, []);
-      } catch (err) {
-        this.log('warn', `Could not get GitHub tokens: ${err.message}`);
-      }
-      for (const t of tokens || []) {
-        try {
-          await this._ownRequest('authenticate', { channel: 'ahp-root://', resource: t.resource, token: t.token, ...(t.scopes ? { scopes: t.scopes } : {}) });
-        } catch (err) {
-          this.log('warn', `authenticate(${t.resource}) failed: ${err.message}`);
-        }
-      }
+  /** Corrects session statuses the host over-reports as errors (see SessionMonitor.statusFor). */
+  _adjustSummaries(msg, text) {
+    const adjust = this.relay.o.adjustSummary;
+    if (!adjust) return text;
+    let changed = false;
+    const fix = (s) => {
+      const a = adjust(s);
+      if (a !== s) changed = true;
+      return a;
     };
-    run().finally(() => {
-      const q = this.holdQueue || [];
-      this.holdQueue = null;
-      for (const m of q) if (this.ahp) this.ahp.send(m);
-    });
+    if (Array.isArray(msg.result?.items)) msg.result.items = msg.result.items.map(fix);
+    else if (msg.params?.summary) msg.params.summary = fix(msg.params.summary);
+    else if (typeof msg.params?.changes?.status === 'number' && msg.params.session) {
+      const status = adjust({ resource: msg.params.session, status: msg.params.changes.status }).status;
+      if (status !== msg.params.changes.status) {
+        msg.params.changes = { ...msg.params.changes, status };
+        changed = true;
+      }
+    }
+    return changed ? JSON.stringify(msg) : text;
   }
 
   // ---------------------------------------------------------- control messages from the phone
@@ -806,7 +768,7 @@ class DeviceConnection extends EventEmitter {
 
   _fail(err) {
     if (this.state === 'closed') return;
-    if (!err.quiet && err.code !== 'closed') this.log('warn', `Phone connection from ${this.meta.ip} failed: ${err.message}`);
+    if (!err.quiet && err.code !== 'closed') this.log('warn', `Device connection from ${this.meta.ip} failed: ${err.message}`);
     const code = err.closeCode || (err.code === 'bad-mac' ? 4401 : 4400);
     this.close(code, String(err.code || 'error').slice(0, 60));
   }
@@ -823,8 +785,6 @@ class DeviceConnection extends EventEmitter {
     }
     if (this.ahp) this.ahp.close();
     this.ahp = null;
-    for (const p of this.ownRequests.values()) p.reject(new Error('closed'));
-    this.ownRequests.clear();
     if (wasReady) this.relay.emit('device-disconnected', this.device);
     this.emit('closed');
   }
@@ -843,4 +803,4 @@ class DeviceConnection extends EventEmitter {
   }
 }
 
-module.exports = { RelayServer, RelayError, ALLOWED_REQUESTS, ALLOWED_NOTIFICATIONS, collectProtectedResources };
+module.exports = { RelayServer, RelayError, ALLOWED_REQUESTS, ALLOWED_NOTIFICATIONS };

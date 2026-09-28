@@ -17,7 +17,7 @@ The GitHub Copilot app uses the same plugins; restart it after installing.
 ## Use
 
 Type `/pocket-pilot` in a chat (or ask "pair my phone"), confirm, and scan the QR code on the page
-that opens. `/pocket-pilot status` shows the tunnel and paired phones; `/pocket-pilot off` closes the
-tunnel. Remove phones on the pairing page.
+that opens (on another computer, open the copied link instead). `/pocket-pilot status` shows the
+tunnel and paired devices; `/pocket-pilot off` closes the tunnel. Remove devices on the pairing page.
 
 More: https://mithawala.github.io/pocket-pilot/ · Source: https://github.com/mithawala/pocket-pilot

@@ -65,29 +65,33 @@
     } else if (st.state === 'standby') {
       body += `<section class="card">
         <p class="lead">Pocket Pilot is running in another VS Code window${st.standby?.label ? ` (<b>${esc(st.standby.label)}</b>)` : ''}.</p>
-        <p class="muted">Only one window hosts the tunnel. Your phone sees the sessions of every window either way.</p>
+        <p class="muted">Only one window hosts the tunnel. Your devices see the sessions of every window either way.</p>
         <button class="secondary" data-a="takeOver">Move it to this window</button>
       </section>`;
     } else {
+      if (st.mirror) {
+        body += `<div class="mirror"><span>Hosted by the <b>${esc(st.mirror.label)}</b> window — your devices see every window's sessions.</span><button class="link" data-a="takeOver">Move here</button></div>`;
+      }
       const devices = st.devices || [];
       const qrOpen = showQr || devices.length === 0;
       if (qrOpen) {
         if (st.pairing) {
           body += `<section class="card qr-card">
-            <h2>Pair a phone</h2>
+            <h2>Pair a device</h2>
             <div class="qr">${st.pairing.svg}</div>
-            <p class="scan">Scan with your phone's camera</p>
+            <p class="scan">Scan with your phone or tablet camera</p>
             <p class="muted small">Single use · expires in <b id="cd">${countdown(st.pairing.expiresAt)}</b></p>
             <div class="btns"><button class="secondary" data-a="newCode">New code</button><button class="secondary" data-a="copyLink">Copy link</button></div>
+            <p class="muted small">Another computer? Open the copied link there.</p>
             <p class="muted small fp">PC fingerprint <code>${esc(st.fingerprint)}</code></p>
-            ${st.settings?.pwaFallback ? `<p class="warn small">The phone app isn't published at ${esc(st.settings.pwaUrl)} yet — this code uses the copy served through the tunnel (re-pair after VS Code restarts).</p>` : ''}
+            ${st.settings?.pwaFallback ? `<p class="warn small">The Pocket Pilot app isn't published at ${esc(st.settings.pwaUrl)} yet — this code uses the copy served through the tunnel (re-pair after VS Code restarts).</p>` : ''}
             ${devices.length ? '<button class="link" data-a="hideQr">Hide</button>' : ''}
           </section>`;
         } else {
           body += `<section class="card center"><div class="spinner"></div><p>Waiting for the tunnel…</p></section>`;
         }
       } else {
-        body += `<button class="primary wide" data-a="showQr">＋ Pair another phone</button>`;
+        body += `<button class="primary wide" data-a="showQr">＋ Pair another device</button>`;
       }
 
       const t = st.tunnel || {};
@@ -105,15 +109,15 @@
         ${row('🛡️', 'Security', `${sec.passkey === 'off' ? 'Keys + E2E' : sec.passkey === 'required' ? 'Passkey required' : 'Passkey optional'}${sec.requireApproval ? ' · approval' : ''}`)}
       </section>`;
 
-      body += `<section class="card"><h2>Paired phones <span class="count">${devices.length}</span></h2>`;
-      if (!devices.length) body += '<p class="muted">No phones yet — scan the QR code above.</p>';
+      body += `<section class="card"><h2>Paired devices <span class="count">${devices.length}</span></h2>`;
+      if (!devices.length) body += '<p class="muted">No devices yet — scan the QR code above.</p>';
       for (const d of devices) {
         const status = d.online ? (d.visible ? '<span class="badge on">● Online</span>' : '<span class="badge away">● Background</span>') : `<span class="muted small">seen ${ago(d.lastSeenAt)}</span>`;
         body += `<div class="device">
-          <div class="dicon">${/ios|iphone|ipad|mac/i.test(d.platform || '') ? '' : '📱'}</div>
-          <div class="dmain"><div class="dname">${esc(d.name)}</div><div class="dmeta">${esc(d.platform || 'Phone')} ${status}</div>
+          <div class="dicon">${/mac|windows|linux|cros/i.test(d.platform || '') ? '💻' : '📱'}</div>
+          <div class="dmain"><div class="dname">${esc(d.name)}</div><div class="dmeta">${esc(d.platform || 'Device')} ${status}</div>
           <div class="dtags">${d.passkey ? '<span title="Passkey (biometric) protected">🔐 passkey</span>' : '<span class="muted" title="No passkey">🔓 no passkey</span>'}${d.push ? '<span title="Push notifications enabled">🔔 push</span>' : ''}</div></div>
-          <button class="icon" title="Remove this phone" data-a="removeDevice" data-id="${esc(d.id)}">✕</button>
+          <button class="icon" title="Remove this device" data-a="removeDevice" data-id="${esc(d.id)}">✕</button>
         </div>`;
       }
       body += '</section>';
@@ -125,7 +129,8 @@
       </div>`;
     }
     body += `<div class="links"><button class="link" data-a="settings">Settings</button> · <button class="link" data-a="logs">Logs</button></div>`;
-    root.innerHTML = header + body;
+    const update = st.update ? `<div class="update"><span>Pocket Pilot <b>${esc(st.update.version)}</b> is available.</span><button class="primary" data-a="installUpdate">Update</button><button class="link" data-a="updateNotes">What's new</button></div>` : '';
+    root.innerHTML = header + update + body;
   }
 
   root.addEventListener('click', (e) => {

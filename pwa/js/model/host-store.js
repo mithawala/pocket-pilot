@@ -32,6 +32,7 @@ export class HostStore extends EventTarget {
     this.kinds = new Map();
     this.unsubTimers = new Map();
     this.localTurns = new Map();
+    this.draftModels = new Map();
     this.errors = [];
     this.ahpConnected = false;
     this.ahpReason = '';
@@ -177,6 +178,7 @@ export class HostStore extends EventTarget {
 
   _apply(env) {
     if (env.serverSeq > this.lastSeq) this.lastSeq = env.serverSeq;
+    if (env.action?.type === 'chat/draftChanged' && this.draftModels.delete(env.channel)) this._emit('chat', env.channel);
     if (env.rejectionReason) {
       if (env.origin?.clientId === this.clientId) this._error(`The PC rejected that action: ${env.rejectionReason}`);
       return;
@@ -320,6 +322,29 @@ export class HostStore extends EventTarget {
     this.client.dispatch(channel, action);
   }
 
+  /**
+   * The model (with its options) the chat's next message uses. It is the chat's shared draft — the
+   * same selection VS Code's model picker shows — so both sides always agree.
+   */
+  modelFor(chat) {
+    const pending = this.draftModels.get(chat);
+    if (pending && Date.now() - pending.at < 15000) return pending.model;
+    const cs = this.chatState.get(chat);
+    if (cs?.draft?.model) return cs.draft.model;
+    const last = [...(cs?.turns || [])].reverse().find((t) => t.message?.model)?.message.model;
+    return cs?.activeTurn?.message?.model || last || null;
+  }
+
+  /** Picks the model and its options for the chat on every client (VS Code's picker follows). */
+  setModel(chat, model) {
+    const cs = this.chatState.get(chat);
+    if (!cs) throw new Error('This session is still loading');
+    const draft = { ...(cs.draft || { text: '', origin: { kind: 'user' } }), model };
+    this.draftModels.set(chat, { model, at: Date.now() });
+    this._dispatch(chat, { type: 'chat/draftChanged', draft });
+    this._emit('chat', chat);
+  }
+
   sendMessage(sessionUri, { text, attachments, model }) {
     const chat = this.chatFor(sessionUri);
     if (!chat) throw new Error('This session is still loading');
@@ -338,9 +363,58 @@ export class HostStore extends EventTarget {
     return 'sent';
   }
 
-  steer(sessionUri, text) {
+  /** Adds guidance to the running turn (VS Code's "Steer with Message"). */
+  steer(sessionUri, { text, attachments }) {
     const chat = this.chatFor(sessionUri);
-    this._dispatch(chat, { type: 'chat/pendingMessageSet', kind: 'steering', id: uuid(), message: { text, origin: { kind: 'user' } } });
+    if (!chat) throw new Error('This session is still loading');
+    const message = { text, origin: { kind: 'user' } };
+    if (attachments?.length) message.attachments = attachments;
+    this._dispatch(chat, { type: 'chat/pendingMessageSet', kind: 'steering', id: uuid(), message });
+  }
+
+  /**
+   * Stops the running turn, then sends the message as a new turn — what VS Code's "Stop and Send" does.
+   * (Not through the queue: VS Code's agent host only drains it after a turn that finished normally.)
+   */
+  stopAndSend(sessionUri, { text, attachments, model }, { timeoutMs = 15000 } = {}) {
+    const chat = this.chatFor(sessionUri);
+    if (!chat) throw new Error('This session is still loading');
+    const turn = this.chatState.get(chat)?.activeTurn;
+    const send = () => this.sendMessage(sessionUri, { text, attachments, model });
+    if (!turn) return Promise.resolve(send());
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      let done = false;
+      const stopped = () => this.chatState.get(chat)?.activeTurn?.id !== turn.id;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        this.removeEventListener('change', onChange);
+        try {
+          resolve(send());
+        } catch (err) {
+          reject(err);
+        }
+      };
+      // Deferred: the host may confirm the stop while it is still handling it.
+      const onChange = (e) => {
+        if (e.detail.uri === chat && stopped()) queueMicrotask(finish);
+      };
+      this.addEventListener('change', onChange);
+      // The PC never confirmed the stop (e.g. the connection dropped): the message goes to the queue.
+      timer = setTimeout(finish, timeoutMs);
+      try {
+        this.cancelTurn(chat);
+      } catch (err) {
+        done = true;
+        clearTimeout(timer);
+        this.removeEventListener('change', onChange);
+        reject(err);
+        return;
+      }
+      if (stopped()) queueMicrotask(finish);
+    });
   }
 
   removePending(chat, kind, id) {

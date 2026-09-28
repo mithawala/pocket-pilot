@@ -6,6 +6,7 @@ import { joinSession } from '@github/copilot-sdk/extension';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { FILES, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
 import { renderQrText } from './lib/qr.mjs';
 
@@ -110,6 +111,32 @@ const settingsFile = () => readJson(FILES.state, {}) || {};
 const isEnabled = () => !!settingsFile().enabled;
 function setEnabled(enabled) {
   writeJson(FILES.state, { ...settingsFile(), enabled, changedAt: new Date().toISOString() });
+}
+
+const VERSION = readJson(fileURLToPath(new URL('./version.json', import.meta.url)), {})?.version || '0.0.0';
+const newer = (a, b) => {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+};
+
+/** The Copilot CLI only updates first-party plugins by itself: tell the user when this one is behind. */
+async function updateNote() {
+  let latest = settingsFile().update;
+  if (!latest || Date.now() - latest.checkedAt > 12 * 3600 * 1000) {
+    try {
+      const res = await fetch('https://raw.githubusercontent.com/mithawala/pocket-pilot/main/.github/plugin/marketplace.json', { signal: AbortSignal.timeout(5000) });
+      const version = (await res.json()).plugins?.find((p) => p.name === 'pocket-pilot')?.version;
+      latest = { checkedAt: Date.now(), version };
+      writeJson(FILES.state, { ...settingsFile(), update: latest });
+    } catch {
+      return '';
+    }
+  }
+  return latest?.version && newer(latest.version, VERSION)
+    ? `Update available: Pocket Pilot ${latest.version} (you have ${VERSION}). Run \`copilot plugin update pocket-pilot@pocket-pilot\`, then restart the app.`
+    : '';
 }
 const debug = process.env.POCKET_PILOT_DEBUG
   ? (m) => {
@@ -216,7 +243,7 @@ function markReal() {
 }
 
 async function sessionInfo() {
-  const [events, processing, snap, name, perm, models, metrics] = await Promise.all([
+  const [events, processing, snap, name, perm, models, metrics, current] = await Promise.all([
     session.getEvents().catch(() => []),
     session.rpc.metadata.isProcessing().then((r) => !!r?.processing).catch(() => false),
     session.rpc.metadata.snapshot().catch(() => null),
@@ -224,6 +251,7 @@ async function sessionInfo() {
     session.rpc.permissions.getMode().then((r) => r?.mode).catch(() => null),
     session.rpc.model.list().then((r) => r?.list || []).catch(() => []),
     session.rpc.usage.getMetrics().catch(() => null),
+    session.rpc.model.getCurrent().catch(() => null),
   ]);
   const firstUser = events.find((e) => e.type === 'user.message' && !e.agentId)?.data?.content;
   const title = name || snap?.summary || snap?.initialName || (firstUser ? String(firstUser).replace(/\s+/g, ' ').slice(0, 80) : null) || 'New session';
@@ -236,7 +264,12 @@ async function sessionInfo() {
     createdAt: snap?.startTime,
     mode: snap?.currentMode || 'interactive',
     autoApprove: perm === 'allow-all' ? 'autoApprove' : perm === 'assisted' ? 'assisted' : 'default',
-    model: snap?.selectedModel ? { id: snap.selectedModel } : undefined,
+    model: (current?.modelId || snap?.selectedModel) ? {
+      id: current?.modelId || snap.selectedModel,
+      reasoningEffort: current?.reasoningEffort || undefined,
+      contextTier: current?.contextTier || undefined,
+      autoTier: current?.autoTier || undefined,
+    } : undefined,
     changes: changesOf(metrics),
     processing,
     history: slimHistory(events),
@@ -256,6 +289,8 @@ async function attach() {
   const tail = await session.rpc.eventLog.tail().catch(() => null);
   try {
     const { models, ...info } = await sessionInfo();
+    // The model list first, so the session's model is attached with its thinking level and context size.
+    if (models.length) rpc.notify('models', { list: models });
     await rpc.request('attach', info, 120000);
     const seen = new Set();
     for (const e of info.history) {
@@ -276,7 +311,6 @@ async function attach() {
     attached = true;
     for (const e of late) remember(e.id);
     if (late.length) rpc.notify('events', { list: late.map(slim) });
-    if (models.length) rpc.notify('models', { list: models });
     if (tail?.cursor) uiEvents(tail.cursor, ++uiLoop);
   } finally {
     buffered = null;
@@ -349,12 +383,20 @@ function forward(e) {
 
 // ------------------------------------------------------------------ commands from the phone (via the hub)
 
-async function switchModel(model) {
-  if (!model?.id) return;
+/** Applies a model selection ({ id, reasoningEffort, contextTier, autoTier }) unless it is already active. */
+async function switchModel(m) {
+  if (!m?.id) return;
   const cur = await session.rpc.model.getCurrent().catch(() => null);
-  const effort = model.config?.thinkingLevel;
-  if (cur?.modelId === model.id && (!effort || cur?.reasoningEffort === effort)) return;
-  await session.setModel(model.id, effort ? { reasoningEffort: effort } : undefined);
+  const same = cur?.modelId === m.id
+    && (m.reasoningEffort === undefined || cur.reasoningEffort === m.reasoningEffort)
+    && (m.contextTier === undefined || (cur.contextTier || 'default') === m.contextTier)
+    && (m.autoTier === undefined || cur.autoTier === m.autoTier);
+  if (same) return;
+  const opts = {};
+  if (m.reasoningEffort) opts.reasoningEffort = m.reasoningEffort;
+  if (m.contextTier) opts.contextTier = m.contextTier;
+  if (m.id === 'auto' && m.autoTier) opts.autoTier = m.autoTier;
+  await session.setModel(m.id, Object.keys(opts).length ? opts : undefined);
 }
 
 function toPrompt(prompt, attachments) {
@@ -387,6 +429,9 @@ async function runCommand({ op, params = {} }) {
     case 'abort':
       await session.abort();
       return true;
+    case 'model':
+      await switchModel(params.model);
+      return true;
     case 'mode':
       await session.rpc.mode.set({ mode: params.mode });
       return true;
@@ -412,9 +457,9 @@ function statusText(s) {
   const lines = [
     `Pocket Pilot ${s.version} — ${s.hostName} (${s.fingerprint})`,
     `Tunnel: ${s.tunnel.mode === 'none' ? 'off (local network only)' : s.tunnel.url ? `online${s.tunnel.reachable ? '' : ' (checking reachability)'}` : s.tunnel.error ? `error: ${s.tunnel.error}` : 'starting…'}`,
-    `Open sessions on the phone: ${s.sessions}`,
+    `Open sessions on your devices: ${s.sessions}`,
     `Auto-reconnect after restarts: ${s.rendezvous ? 'on (encrypted GitHub gist)' : 'off (sign in with the GitHub CLI: gh auth login)'}`,
-    `Paired phones: ${s.devices.length ? s.devices.map((d) => `${d.name}${d.online ? ' (connected)' : ''}`).join(', ') : 'none yet'}`,
+    `Paired devices: ${s.devices.length ? s.devices.map((d) => `${d.name}${d.online ? ' (connected)' : ''}`).join(', ') : 'none yet'}`,
   ];
   return lines.join('\n');
 }
@@ -422,7 +467,7 @@ function statusText(s) {
 async function enable({ ask }) {
   real = true;
   if (!isEnabled() && ask && session.capabilities?.ui?.elicitation) {
-    const ok = await session.ui.confirm('Turn on Pocket Pilot remote access?\n\nYour phone will be able to see and control the GitHub Copilot sessions open on this PC. Pocket Pilot downloads the official Cloudflare tunnel (cloudflared, about 55 MB) once and connects your phone end-to-end encrypted — Cloudflare only relays ciphertext. You approve every phone that pairs. If the GitHub CLI is signed in, the changing tunnel address is kept in a secret, encrypted gist so your phone reconnects on its own.');
+    const ok = await session.ui.confirm('Turn on Pocket Pilot remote access?\n\nYour phone (or another device you pair) will be able to see and control the GitHub Copilot sessions open on this PC. Pocket Pilot downloads the official Cloudflare tunnel (cloudflared, about 55 MB) once and connects your devices end-to-end encrypted — Cloudflare only relays ciphertext. You approve every device that pairs. If the GitHub CLI is signed in, the changing tunnel address is kept in a secret, encrypted gist so your devices reconnect on their own.');
     if (!ok) return false;
   }
   setEnabled(true);
@@ -456,13 +501,14 @@ async function onCommand(ctx) {
   try {
     if (arg === 'status') {
       const s = await hubRequest('status').catch(() => null);
-      await session.log(s ? statusText(s) : 'Pocket Pilot is off. Run /pocket-pilot to pair your phone.');
+      const note = await updateNote();
+      await session.log([s ? statusText(s) : 'Pocket Pilot is off. Run /pocket-pilot to pair a device.', note].filter(Boolean).join('\n'));
       return;
     }
     if (arg === 'off' || arg === 'stop') {
       setEnabled(false);
       await hubRequest('stop').catch(() => {});
-      await session.log('Pocket Pilot is off: the tunnel is closed and phones cannot connect until you run /pocket-pilot again.');
+      await session.log('Pocket Pilot is off: the tunnel is closed and your devices cannot connect until you run /pocket-pilot again.');
       return;
     }
     if (arg && arg !== 'pair' && arg !== 'on') {
@@ -471,7 +517,9 @@ async function onCommand(ctx) {
     }
     const s = await pair();
     if (!s) return;
-    await session.log(`Pocket Pilot: scan this code with your phone (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on your phone within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
+    await session.log(`Pocket Pilot: scan this code with your phone or tablet (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on the device you want to pair within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
+    const note = await updateNote();
+    if (note) await session.log(`Pocket Pilot: ${note}`, { level: 'warning' });
   } catch (err) {
     await session.log(`Pocket Pilot: ${err.message}`, { level: 'error' });
   }
@@ -479,17 +527,18 @@ async function onCommand(ctx) {
 
 const tool = {
   name: 'pocket_pilot',
-  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone. Call with action "pair" when the user asks to connect, pair or use their phone (it opens a pairing QR code on this PC for the user to scan), or "status" to report whether remote access is on and which phones are paired.',
+  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone, tablet or another computer. Call with action "pair" when the user asks to connect, pair or use their phone or another device (it opens a pairing QR code on this PC for the user to scan), or "status" to report whether remote access is on and which devices are paired.',
   parameters: { type: 'object', properties: { action: { type: 'string', enum: ['pair', 'status'], description: 'pair = show the pairing QR code on this PC; status = report remote-access status' } }, required: ['action'] },
   handler: async (args) => {
     if (args?.action === 'status') {
       const s = await hubRequest('status').catch(() => null);
-      return s ? statusText(s) : 'Pocket Pilot remote access is off. The user can turn it on with the /pocket-pilot command.';
+      const note = await updateNote();
+      return [s ? statusText(s) : 'Pocket Pilot remote access is off. The user can turn it on with the /pocket-pilot command.', note].filter(Boolean).join('\n');
     }
     const s = await pair();
     if (!s) return 'The user declined to turn on Pocket Pilot remote access.';
     // Never hand the pairing link to the model: it only needs to know where the user should look.
-    return 'Opened the Pocket Pilot pairing page with a QR code in the browser on this PC. Tell the user to scan it with their phone camera and then allow the phone on that page. The code is single-use and expires in 10 minutes.';
+    return 'Opened the Pocket Pilot pairing page with a QR code in the browser on this PC. Tell the user to scan it with their phone or tablet camera and then allow the device on that page. The code is single-use and expires in 10 minutes.';
   },
 };
 
@@ -506,7 +555,7 @@ if (process.env.POCKET_PILOT_DISABLE) {
 } else {
   session = await joinSession({
     tools: [tool],
-    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: pair your phone to control this session remotely (pair | status | off)', handler: onCommand }],
+    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: pair your phone or another device to control this session remotely (pair | status | off)', handler: onCommand }],
   });
   session.on((e) => forward(e));
   checkReal().then((isReal) => {

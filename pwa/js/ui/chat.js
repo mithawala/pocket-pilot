@@ -81,7 +81,21 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
   const chatState = chat ? store.chatState.get(chat) : null;
   const provider = session?.provider || sessionState?.provider;
   const models = store.models(provider);
-  const ctx = { store, chat, provider, modelName: (id) => models.find((m) => m.id === id)?.name || id };
+  const lastTurnId = chatState?.turns?.[chatState.turns.length - 1]?.id;
+  const ctx = {
+    store,
+    chat,
+    provider,
+    modelName: (id) => models.find((m) => m.id === id)?.name || id,
+    // A failed last turn can be sent again as it was, with the model now selected.
+    retry: (turn) => () => {
+      try {
+        store.sendMessage(uri, { text: turn.message.text, attachments: turn.message.attachments, model: store.modelFor(chat) || undefined });
+      } catch (err) {
+        toast(err.message, 'err');
+      }
+    },
+  };
 
   useEffect(() => {
     if (session && !has(session.status, S.IsRead) && document.visibilityState === 'visible') {
@@ -181,7 +195,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
           ${!chatState && html`<div class="chat-empty"><${Spinner} lg /><p>Loading conversation…</p></div>`}
           ${chatState?.turnsNextCursor && hidden === 0 && html`<button class="btn sm load-older" onClick=${() => store.loadOlder(chat).catch((e) => toast(e.message, 'err'))}>Load older messages</button>`}
           ${hidden > 0 && html`<button class="btn sm load-older" onClick=${() => setShown(shown + PAGE)}>Show ${Math.min(PAGE, hidden)} earlier turns</button>`}
-          ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} ctx=${ctx} />`)}
+          ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} isLast=${!active && t.id === lastTurnId} ctx=${ctx} />`)}
           ${active && html`<${Turn} key=${active.id} turn=${active} active=${true} activity=${chatState.activity || session?.activity} ctx=${ctx} />`}
           ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} />`)}
           ${empty && html`<div class="chat-empty">

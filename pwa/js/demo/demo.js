@@ -269,6 +269,17 @@ class DemoStore extends HostStore {
       return { ...cs, activeTurn: undefined, status: S.Idle, turns: [...cs.turns, { ...t, state: 'complete', duration: Date.now() - Date.parse(t.startedAt) }] };
     });
     this._setSummary(sessionUri, { status: S.Idle | S.IsRead, activity: undefined });
+    this._drainQueue(chat);
+  }
+
+  /** Like a real host: once the agent is idle, the next queued message starts a turn. */
+  _drainQueue(chat) {
+    const next = this.chatState.get(chat)?.queuedMessages?.[0];
+    if (!next || this.chatState.get(chat)?.activeTurn) return;
+    setTimeout(() => {
+      this._dispatch(chat, { type: 'chat/pendingMessageRemoved', kind: 'queued', id: next.id });
+      this._dispatch(chat, { type: 'chat/turnStarted', turnId: uuid(), startedAt: new Date().toISOString(), message: next.message, queuedMessageId: next.id });
+    }, 300);
   }
 
   async _react(channel, action) {
@@ -310,6 +321,14 @@ class DemoStore extends HostStore {
       this._finish(chat, sessionUri);
     } else if (action.type === 'chat/turnCancelled') {
       this._setSummary(sessionUri, { status: S.Idle | S.IsRead, activity: undefined });
+      this._drainQueue(chat);
+    } else if (action.type === 'chat/pendingMessageSet' && action.kind === 'steering') {
+      // The running agent picks the guidance up, like VS Code's "Steer with Message".
+      await wait(900);
+      this._dispatch(chat, { type: 'chat/pendingMessageRemoved', kind: 'steering', id: action.id });
+      if (this.chatState.get(chat)?.activeTurn) await this._stream(chat, `Got it — adjusting course: *${action.message.text.replace(/[*_`]/g, '')}*`);
+    } else if (action.type === 'chat/pendingMessageSet' && action.kind === 'queued' && !this.chatState.get(chat)?.activeTurn) {
+      this._drainQueue(chat);
     }
   }
 

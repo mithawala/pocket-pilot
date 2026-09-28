@@ -16,6 +16,7 @@ const { RelayServer } = require(path.join(root, 'extension/core/relay.js'));
 const { DeviceStore, MemorySecrets } = require(path.join(root, 'extension/core/store.js'));
 const { loadHostIdentity } = require(path.join(root, 'extension/core/identity.js'));
 const agentHost = require(path.join(root, 'extension/core/agentHost.js'));
+const { SessionMonitor } = require(path.join(root, 'extension/core/monitor.js'));
 
 const watchdog = setTimeout(() => { console.error('live-check: timed out'); process.exit(2); }, 60000);
 const userData = process.env.VSCODE_USER_DATA || path.join(process.env.APPDATA || path.join(os.homedir(), '.config'), 'Code');
@@ -28,14 +29,19 @@ console.log('agent host:', agentHost.describeEndpoint(endpoint).replace(/pipe\\[
 
 const identity = await loadHostIdentity(new MemorySecrets(), os.hostname());
 const store = new DeviceStore(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-live-')), 'devices.json'));
+// The same session monitor the extension runs: it corrects statuses the host over-reports as errors.
+const monitor = new SessionMonitor({ getEndpoint: () => endpoint });
+monitor.start();
+for (let i = 0; i < 100 && !monitor.connected; i++) await new Promise((r) => setTimeout(r, 100));
+for (let i = 0; i < 50 && [...monitor.tracked.values()].some((t) => !t.state); i++) await new Promise((r) => setTimeout(r, 100));
 const relay = new RelayServer({
   identity, store,
   getAgentEndpoint: () => endpoint,
-  getAuthTokens: async () => [],
   approveDevice: async () => true,
   allowedOrigins: () => [],
   policy: () => ({ requireApproval: false, passkey: 'off', passkeyGraceHours: 12 }),
   welcomeExtras: () => ({}),
+  adjustSummary: (s) => monitor.adjustSummary(s),
   log: (l, m) => console.log(`[relay:${l}]`, m),
 });
 const port = await relay.listen(0);
@@ -54,8 +60,11 @@ const init = await client.initialize({ clientId: `pocket-pilot-live-${Date.now()
 const rootState = init.snapshots.find((s) => s.resource === 'ahp-root://')?.state;
 console.log('negotiated protocol', init.protocolVersion, '| agents:', (rootState?.agents || []).map((a) => `${a.displayName} (${a.models.length} models)`).join(', '));
 const { items } = await client.request('listSessions', { channel: 'ahp-root://' });
-console.log(`sessions through the encrypted relay: ${items.length}`);
-for (const s of items) console.log(`  ${String(s.status).padStart(3)}  ${s.title}`);
+console.log(`sessions through the encrypted relay: ${items.length} (status as the phone sees it; host's raw status in brackets when corrected)`);
+for (const s of items) {
+  const raw = monitor.sessions.get(s.resource)?.status;
+  console.log(`  ${String(s.status).padStart(3)}${raw !== undefined && raw !== s.status ? ` [${raw}]` : ''}  ${s.title}`);
+}
 const filter = process.argv[2];
 const target = filter ? items.find((s) => s.title.toLowerCase().includes(filter.toLowerCase()) || s.resource.includes(filter)) : items[0];
 if (target) {
@@ -75,6 +84,7 @@ if (target) {
 await client.shutdown();
 conn.stop();
 await relay.close();
+monitor.stop();
 clearTimeout(watchdog);
 console.log('live-check OK');
 process.exit(0);

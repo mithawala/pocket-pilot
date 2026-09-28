@@ -40,7 +40,8 @@ function createVscodeMock(settings, answers) {
       StatusBarAlignment: { Left: 1, Right: 2 },
       ProgressLocation: { Notification: 15, Window: 10 },
       window: {
-        state: { focused: false, active: false },
+        state: { focused: true, active: true },
+        onDidChangeWindowState: () => ({ dispose() {} }),
         createOutputChannel: () => log,
         registerWebviewViewProvider: () => ({ dispose() {} }),
         registerUriHandler: () => ({ dispose() {} }),
@@ -65,7 +66,8 @@ function createVscodeMock(settings, answers) {
         onDidChangeConfiguration: () => ({ dispose() {} }),
       },
       authentication: {
-        getSession: async (provider, scopes, opts) => { calls.sessions.push({ provider, scopes, opts }); return { accessToken: 'gho_smoke_test_token', scopes }; },
+        // Never hand out a token: the live agent host would adopt it for every VS Code session.
+        getSession: async (provider, scopes, opts) => { calls.sessions.push({ provider, scopes, opts }); return undefined; },
       },
       env: { clipboard: { writeText: async () => {} }, openExternal: async () => true },
     },
@@ -92,6 +94,8 @@ function makeContext(storage) {
     subscriptions: [],
     globalStorageUri: { fsPath: storage },
     extensionUri: { fsPath: root },
+    extensionPath: root,
+    extension: { packageJSON: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) },
     secrets: { get: async (k) => secrets.get(k), store: async (k, v) => { secrets.set(k, v); }, delete: async (k) => { secrets.delete(k); } },
     globalState: { get: (k, d) => (state.has(k) ? state.get(k) : d), update: async (k, v) => { state.set(k, v); } },
   };
@@ -117,7 +121,7 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
 
     await mock.api.commands.executeCommand('pocketPilot.start');
     assert.equal(service.state, 'running', service.error || '');
-    assert.ok(mock.calls.sessions.some((s) => s.opts?.createIfNone), 'asks for GitHub consent on first start');
+    assert.ok(!mock.calls.sessions.some((s) => s.opts?.createIfNone), 'starting remote access must not ask for a GitHub sign-in');
     assert.ok(mock.calls.context.some(([k, v]) => k === 'pocketPilot.running' && v === true));
     const vs = service.viewState();
     assert.ok(vs.pairing?.link.includes('#pair=1.'));
@@ -150,6 +154,7 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
     assert.ok(Array.isArray(items) && items.length > 0, 'real sessions visible through the extension relay');
     await new Promise((r) => setTimeout(r, 300));
     assert.equal(service.viewState().devices[0].online, true);
+    assert.ok(mock.calls.sessions.every((s) => s.scopes.join() === 'gist'), 'only the optional auto-reconnect gist may use GitHub; the agent host stays signed in by VS Code');
 
     await client.shutdown();
     conn.stop();
@@ -157,6 +162,45 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
     assert.equal(service.state, 'stopped');
   } finally {
     if (service) await service.dispose();
+    uninstall();
+  }
+});
+
+test('updates: a VSIX install is offered a newer GitHub release and installs it in one click', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-upd-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const mock = createVscodeMock({}, { info: (msg) => (/is available/.test(msg) ? 'Update' : undefined) });
+  const installed = [];
+  mock.commands.set('workbench.extensions.installExtension', (uri) => installed.push(uri.fsPath));
+  const uninstall = installMock(mock.api);
+  const realFetch = globalThis.fetch;
+  const fetched = [];
+  globalThis.fetch = async (url, init) => {
+    fetched.push(String(url));
+    if (String(url).endsWith('/releases/latest')) {
+      return new Response(JSON.stringify({
+        tag_name: 'v99.0.0',
+        html_url: 'https://github.com/mithawala/pocket-pilot/releases/tag/v99.0.0',
+        assets: [{ name: 'pocket-pilot.vsix', browser_download_url: 'https://github.com/mithawala/pocket-pilot/releases/download/v99.0.0/pocket-pilot.vsix' }],
+      }), { status: 200 });
+    }
+    if (String(url).endsWith('/pocket-pilot.vsix')) return new Response(Buffer.concat([Buffer.from('PK\u0003\u0004'), Buffer.alloc(4000)]), { status: 200 });
+    return realFetch(url, init);
+  };
+  let service;
+  try {
+    delete require.cache[require.resolve('../extension/extension.js')];
+    const ext = require('../extension/extension.js');
+    ({ service } = await ext.activate(makeContext(storage)));
+    await service.checkForUpdate({ quiet: false });
+    assert.equal(service.update.version, '99.0.0');
+    assert.equal(service.viewState().update.version, '99.0.0', 'the panel shows the update');
+    assert.equal(installed.length, 1, 'installed through VS Code');
+    assert.match(installed[0], /pocket-pilot-99\.0\.0\.vsix$/);
+    assert.ok(mock.calls.infos.some((m) => /99\.0\.0 is installed/.test(m)), 'asks to reload');
+    assert.ok(fetched.every((u) => u.startsWith('https://api.github.com/') || u.startsWith('https://github.com/')));
+  } finally {
+    globalThis.fetch = realFetch;
+    await service?.dispose();
     uninstall();
   }
 });

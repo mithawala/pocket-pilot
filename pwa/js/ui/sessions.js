@@ -2,7 +2,7 @@ import { html, useState, useEffect, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
 import { statusOf, ago, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
-import { ModelSheet, modelSummary } from './model-picker.js';
+import { ModelSheet, ModelOptionsSheet, modelChip, optionsChip, hasOptions } from './model-picker.js';
 
 function StatusIcon({ st, unread }) {
   if (st.key === 'running') return html`<span class="spinner" aria-label="Working"></span>`;
@@ -145,7 +145,7 @@ function NewSession({ store, open, onClose, onCreated }) {
       return null;
     }
   });
-  const [modelOpen, setModelOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(null);
   const [busy, setBusy] = useState(false);
   const models = store.models(provider).filter((m) => m.policyState !== 'disabled');
   const chosenModel = modelSel && models.some((m) => m.id === modelSel.id) ? modelSel : null;
@@ -186,7 +186,8 @@ function NewSession({ store, open, onClose, onCreated }) {
         <button class="btn sm" onClick=${() => setBrowse(true)}><${Icon} name="search" size="16" /> Browse…</button>
       </div>
       ${models.length > 0 && html`<div class="field"><label>Model</label>
-        <button class="list-item on" onClick=${() => setModelOpen(true)}><${Icon} name="cpu" /><span class="grow">${modelSummary(models, chosenModel)}</span><${Icon} name="right" /></button>
+        <button class="list-item on" onClick=${() => setModelOpen('model')}><${Icon} name="cpu" /><span class="grow">${modelChip(models, chosenModel).name}</span><${Icon} name="right" /></button>
+        ${hasOptions(models, chosenModel) && html`<button class="list-item" onClick=${() => setModelOpen('options')}><${Icon} name="brain" /><span class="grow">${optionsChip(models, chosenModel)}</span><span class="muted small">Thinking · context</span><${Icon} name="right" /></button>`}
       </div>`}
       <div class="field"><label>Mode</label>
         <div class="seg">${[['interactive', 'Interactive'], ['plan', 'Plan'], ['autopilot', 'Autopilot']].map(([v, l]) => html`<button class=${mode === v ? 'on' : ''} onClick=${() => setMode(v)}>${l}</button>`)}</div>
@@ -200,7 +201,8 @@ function NewSession({ store, open, onClose, onCreated }) {
       <button class="btn primary block" disabled=${busy || !folder} onClick=${create}>${busy ? html`<${Spinner} /> Starting…` : 'Start session'}</button>
     </div>
     ${browse && html`<${FolderBrowser} store=${store} start=${folder || store.defaultDirectory} onPick=${setFolder} onClose=${() => setBrowse(false)} />`}
-    <${ModelSheet} open=${modelOpen} onClose=${() => setModelOpen(false)} models=${models} value=${chosenModel} onChange=${setModelSel} />
+    <${ModelSheet} open=${modelOpen === 'model'} onClose=${() => setModelOpen(null)} models=${models} value=${chosenModel} onChange=${setModelSel} />
+    <${ModelOptionsSheet} open=${modelOpen === 'options'} onClose=${() => setModelOpen(null)} models=${models} value=${chosenModel} onChange=${setModelSel} />
   </${Sheet}>`;
 }
 
@@ -210,7 +212,7 @@ export function ConnectionBanner({ conn, store, onRepair }) {
   if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your PC.' : 'VS Code agent host is not available on your PC.')}</div>`;
   if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your PC…</div>`;
   if (st === 'passkey') return html`<div class="banner"><${Icon} name="lock" size="18" />Confirm it's you (Face ID / fingerprint)…</div>`;
-  if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This phone is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
+  if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This device is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
   if (st === 'locked') return html`<div class="banner err"><${Icon} name="lock" size="18" /><span>${conn.detail || 'Verification failed.'}</span><button onClick=${() => { conn.stopped = false; conn.poke(); }}>Retry</button></div>`;
   return html`<div class="banner warn"><${Spinner} /><span>PC offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
 }

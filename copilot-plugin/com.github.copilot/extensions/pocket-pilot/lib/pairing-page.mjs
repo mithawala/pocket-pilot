@@ -1,5 +1,5 @@
 // The local pairing page the /pocket-pilot command opens: QR code, link, approval prompts and paired
-// phones. Served by the hub on 127.0.0.1 only, behind a random key (never through the tunnel).
+// devices. Served by the hub on 127.0.0.1 only, behind a random key (never through the tunnel).
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -7,7 +7,7 @@ export function pairingPage({ key, hostName }) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Pocket Pilot · Pair your phone</title>
+<title>Pocket Pilot · Pair a device</title>
 <style>
 :root{--bg:#282c34;--bg2:#21252b;--line:#3a3f4b;--text:#abb2bf;--strong:#d7dae0;--muted:#7f848e;--accent:#61afef;--btn:#4d78cc;--ok:#98c379;--warn:#e5c07b;--err:#e06c75;color-scheme:dark}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;display:grid;place-items:center;padding:24px}
@@ -32,17 +32,17 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
     <div class="row"><button id="copy" disabled>Copy link</button><button id="renew" disabled>New code</button></div>
   </section>
   <section>
-    <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pair your phone</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
+    <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pair a device</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
     <div id="approvals"></div>
     <ol>
-      <li>Scan the code with your phone's camera (or open the link on it).</li>
+      <li>Scan the code with your phone or tablet camera (on another computer, open the copied link).</li>
       <li>Pocket Pilot opens in the browser — add it to your home screen.</li>
-      <li>Allow the phone here, then confirm with Face ID or your fingerprint.</li>
+      <li>Allow the device here, then confirm with Face ID, your fingerprint or Windows Hello.</li>
     </ol>
-    <p class="small muted">The code works once and expires after 10 minutes. Everything between the phone and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>
+    <p class="small muted">The code works once and expires after 10 minutes. Everything between your device and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>
     <h2>Status</h2>
     <div class="row" id="status"></div>
-    <h2>Paired phones</h2>
+    <h2>Paired devices</h2>
     <div id="devices" class="small muted">None yet.</div>
   </section>
 </main>
@@ -69,7 +69,7 @@ function render(s) {
     pill(s.sessions ? 'ok' : '', s.sessions + ' open session' + (s.sessions === 1 ? '' : 's')),
     pill(s.rendezvous ? 'ok' : '', s.rendezvous ? 'Auto-reconnect on' : 'Auto-reconnect off'),
   ].join(' ');
-  $('approvals').innerHTML = s.approvals.map((a) => '<div class="approve"><div><b>Allow “' + esc(a.name) + '”</b> to control your Copilot sessions?</div><div class="small muted">' + esc([a.platform, a.ip && 'from ' + a.ip].filter(Boolean).join(' · ')) + ' — only allow a phone you just paired yourself.</div><div class="row" style="margin-top:8px"><button class="primary" data-a="' + esc(a.id) + '" data-v="1">Allow</button><button data-a="' + esc(a.id) + '" data-v="0">Deny</button></div></div>').join('');
+  $('approvals').innerHTML = s.approvals.map((a) => '<div class="approve"><div><b>Allow “' + esc(a.name) + '”</b> to control your Copilot sessions?</div><div class="small muted">' + esc([a.platform, a.ip && 'from ' + a.ip].filter(Boolean).join(' · ')) + ' — only allow a device you just paired yourself.</div><div class="row" style="margin-top:8px"><button class="primary" data-a="' + esc(a.id) + '" data-v="1">Allow</button><button data-a="' + esc(a.id) + '" data-v="0">Deny</button></div></div>').join('');
   $('devices').innerHTML = s.devices.length ? s.devices.map((d) => '<div class="dev"><span><b style="color:var(--strong)">' + esc(d.name) + '</b> <span class="muted">' + esc(d.platform || '') + '</span></span><span>' + (d.online ? pill('ok', 'connected') : pill('', 'offline')) + (d.passkey ? ' ' + pill('ok', 'passkey') : '') + ' <button data-remove="' + esc(d.id) + '" data-name="' + esc(d.name) + '">Remove</button></span></div>').join('') : 'None yet.';
 }
 document.addEventListener('click', async (e) => {

@@ -34,11 +34,11 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     <ol class="steps">
       <li><div><b>Install Pocket Pilot on your PC</b><div class="muted small">The VS Code extension or the GitHub Copilot app plugin — see <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
       <li><div><b>Turn on remote access</b><div class="muted small">VS Code: “Start remote access” in the Pocket Pilot panel. Copilot app or CLI: type <b>/pocket-pilot</b> in a chat.</div></div></li>
-      <li><div><b>Scan the QR code</b><div class="muted small">${iosSafari ? 'From the Home Screen app (button above).' : 'With the button above or your phone’s camera.'}</div></div></li>
+      <li><div><b>Scan the QR code</b><div class="muted small">${iosSafari ? 'From the Home Screen app (button above).' : 'With the button above or your camera — on a computer, paste the pairing link below.'}</div></div></li>
     </ol>
     <div class="trust">
       <div><${Icon} name="lock" size="18" /> End-to-end encrypted — even the tunnel can’t read it</div>
-      <div><${Icon} name="shield" size="18" /> Only phones you approve on your PC, with Face ID / fingerprint</div>
+      <div><${Icon} name="shield" size="18" /> Only devices you approve on your PC, with Face ID / fingerprint</div>
       <div><${Icon} name="bolt" size="18" /> Free: no accounts, no servers, no tracking</div>
     </div>
     ${installPrompt}
@@ -105,7 +105,7 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
     </div>
     ${!phase && html`<div class="card stack">
       ${isIos() && !isStandalone() && html`<div class="ios-tip">You're pairing in Safari. For notifications, pair from the Home Screen app instead: <b>Share → Add to Home Screen</b>, open it and tap <b>Scan the QR code</b>. You can still pair Safari now.</div>`}
-      <div class="field"><label>Name this phone</label><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} maxlength="60" /></div>
+      <div class="field"><label>Name this device</label><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} maxlength="60" /></div>
       ${error && html`<div class="errpart">${error}</div>`}
       <button class="btn primary block" onClick=${start}><${Icon} name="lock" /> Pair securely</button>
       <button class="btn block" onClick=${onCancel}>Cancel</button>
