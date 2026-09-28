@@ -27,3 +27,7 @@ Command-line publishing is optional: `npx @vscode/vsce publish --packagePath poc
 - **Trademarks:** keep "Copilot" and GitHub or Microsoft logos out of the extension name and icon. Mentioning that it works with GitHub Copilot in the description is fine.
 - **Personal project:** if you work for a company whose products the extension relates to, check its policy on publishing personal or open-source projects first.
 - **Other editors (optional):** to reach VS Code forks such as VSCodium or Cursor, publish the same `.vsix` to [Open VSX](https://open-vsx.org) with `npx ovsx publish`.
+
+## The GitHub Copilot app plugin
+
+The plugin in [`copilot-plugin/`](../copilot-plugin/) needs no store: this repository is its plugin marketplace ([`.github/plugin/marketplace.json`](../.github/plugin/marketplace.json)), so `copilot plugin marketplace add mithawala/pocket-pilot` followed by `copilot plugin install pocket-pilot@pocket-pilot` installs whatever is on `main`. Run `node scripts/build-plugin.mjs` after changing `extension/core/`, the AHP files or the version, and commit the result (`publish.ps1` refuses to publish a stale plugin). To reach more people, open a pull request that lists the plugin in [github/awesome-copilot](https://github.com/github/awesome-copilot), the community marketplace the Copilot app and CLI include by default.

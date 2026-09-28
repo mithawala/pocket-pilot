@@ -263,6 +263,31 @@ test('required passkey blocks devices that cannot create one; unknown devices ar
   }
 });
 
+test('malformed request targets get a 400 instead of crashing the relay', async () => {
+  const env = await setupRelay();
+  const net = await import('node:net');
+  const raw = (lines) => new Promise((resolve) => {
+    const s = net.connect(Number(new URL(env.url).port), '127.0.0.1', () => s.write(lines));
+    let data = '';
+    s.on('data', (d) => {
+      data += d;
+    });
+    s.on('close', () => resolve(data));
+    s.on('error', () => resolve(data));
+    setTimeout(() => s.destroy(), 1500);
+  });
+  try {
+    const plain = await raw('GET //x:99999/ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n');
+    assert.match(plain, /^HTTP\/1\.1 400/);
+    const upgrade = await raw('GET //[ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n');
+    assert.match(upgrade, /^HTTP\/1\.1 400/);
+    const health = await fetch(`${env.url}/health`).then((r) => r.json());
+    assert.equal(health.ok, true, 'still serving');
+  } finally {
+    await env.cleanup();
+  }
+});
+
 test('connections from foreign origins are refused', async () => {
   const env = await setupRelay();
   try {

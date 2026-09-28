@@ -5,7 +5,7 @@ import { b64u, unb64u } from '../core/bytes.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 
 export class PairingError extends Error {
   constructor(code, message, { untrusted = false, peerCode = '' } = {}) {
@@ -19,7 +19,7 @@ export class PairingError extends Error {
 
 // Local wording for rejections the PC can only send in plaintext (before any keys exist).
 const PLAINTEXT_REASONS = {
-  'pairing-expired': 'This pairing code has expired or was already used. Show a new QR code in VS Code.',
+  'pairing-expired': 'This pairing code has expired or was already used. Show a new QR code on your PC.',
 };
 
 function untrustedError(peerCode) {
@@ -69,7 +69,7 @@ function createMessenger(sock, cipher, compress) {
  */
 export async function pairWithHost({ fragment, deviceName, platform, webauthn, WebSocketImpl, onStatus = () => {} }) {
   const p = sc.decodePairingFragment(fragment);
-  if (!p) throw new PairingError('bad-link', 'This pairing link is invalid. Scan the QR code in VS Code again.');
+  if (!p) throw new PairingError('bad-link', 'This pairing link is invalid. Scan the QR code on your PC again.');
   const deviceKeys = await sc.generateKeyPair(false);
   onStatus('connecting');
   const sock = await openSocket(wsUrl(p.url), { WebSocketImpl });
@@ -111,6 +111,7 @@ export async function pairWithHost({ fragment, deviceName, platform, webauthn, W
           vapidPublicKey: m.vapidPublicKey || null,
           pwaUrl: m.pwaUrl || null,
           passkey: !!m.passkey,
+          hostKind: m.hostKind || 'vscode',
           pairedAt: Date.now(),
         };
       } else if (m.t === 'error') throw new PairingError(m.code, m.message);
@@ -252,13 +253,13 @@ export class HostConnection extends EventTarget {
         } else if (m.t === 'welcome') {
           welcome = m;
           break;
-        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This phone was removed in VS Code.');
+        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This phone was removed on your PC.');
         else if (m.t === 'error') throw new PairingError(m.code, m.message);
       }
       this.welcome = welcome;
       this.failures = 0;
       this.attempt = 0;
-      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey });
+      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey, hostKind: welcome.hostKind || this.record.hostKind || 'vscode' });
       const transport = new SecureAhpTransport((text) => ch.messenger.send(text), () => sock.close(1000, 'client closed'));
       this.transport = transport;
       sock.onclose = (e) => this._onClosed(e);
@@ -302,7 +303,7 @@ export class HostConnection extends EventTarget {
   _onControl(m) {
     if (m.t === 'revoked') {
       this.stopped = true;
-      this._setState('unpaired', 'This phone was removed in VS Code.');
+      this._setState('unpaired', 'This phone was removed on your PC.');
     }
     if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong') {
       const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t;
@@ -324,7 +325,7 @@ export class HostConnection extends EventTarget {
     this._pending.clear();
     if (this.stopped) return;
     // A close code is not authenticated; genuine revocations arrive as an encrypted 'revoked' message.
-    this._retry(e.code === 4503 ? 'VS Code agent host is not available' : 'Connection lost');
+    this._retry(e.code === 4503 ? (this.record.hostKind === 'copilot' ? 'The GitHub Copilot app is not available' : 'VS Code agent host is not available') : 'Connection lost');
   }
 
   async _retry(reason) {

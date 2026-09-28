@@ -49,13 +49,24 @@ function folder(name) {
   return `file:///c%3A/Users/you/code/${name}`;
 }
 
+const CHANGES = {
+  auth: { additions: 214, deletions: 87, files: 12 },
+  dark: { additions: 96, deletions: 4, files: 3 },
+  flaky: { additions: 18, deletions: 9, files: 2 },
+  node: { additions: 41, deletions: 38, files: 6 },
+  notes: { additions: 132, deletions: 0, files: 1 },
+};
+
 function sessionsData() {
   const list = [];
   const add = (id, title, provider, dir, status, minutesAgo, activity, chat) => {
     const resource = `${provider}:/demo-${id}`;
     const chatUri = `ahp-chat://default/demo-${id}`;
     list.push({
-      summary: { resource, provider, title, status, createdAt: ago(minutesAgo + 30), modifiedAt: ago(minutesAgo), workingDirectories: [folder(dir)], activity },
+      summary: {
+        resource, provider, title, status, createdAt: ago(minutesAgo + 30), modifiedAt: ago(minutesAgo), workingDirectories: [folder(dir)], activity,
+        project: { uri: folder(dir), displayName: dir }, ...(CHANGES[id] ? { changes: CHANGES[id] } : {}),
+      },
       session: { provider, title, status, lifecycle: 'ready', chats: [{ resource: chatUri, title: '', status, modifiedAt: ago(minutesAgo) }], defaultChat: chatUri, workingDirectories: [folder(dir)], config: { ...CONFIG, values: { mode: 'interactive', autoApprove: 'default' } } },
       chat: { resource: chatUri, title: '', status, modifiedAt: ago(minutesAgo), turns: [], ...chat },
       chatUri,

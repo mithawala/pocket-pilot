@@ -28,7 +28,7 @@ export function extractFragment(text) {
 export function QrScanner({ onResult, onClose }) {
   const video = useRef(null);
   const [error, setError] = useState(null);
-  const [hint, setHint] = useState('Point your camera at the QR code in VS Code');
+  const [hint, setHint] = useState('Point your camera at the QR code on your PC');
   useEffect(() => {
     let stream;
     let stopped = false;

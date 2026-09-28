@@ -3,7 +3,7 @@ import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
 import { Turn, PendingTurn } from './parts.js';
 import { Composer } from './composer.js';
 import { ConnectionBanner } from './sessions.js';
-import { statusOf, folderName, providerLabel, filePath, S, has } from '../lib/format.js';
+import { statusOf, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 
 const PAGE = 25;
@@ -187,7 +187,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
           ${empty && html`<div class="chat-empty">
             <div class="big"><${Icon} name="sparkle" /></div>
             <h2>${providerLabel(provider)} is ready</h2>
-            <p>${folder ? html`Ask anything about <b>${folder}</b>. ` : ''}The agent works on your PC, and you can follow along here or in VS Code.</p>
+            <p>${folder ? html`Ask anything about <b>${folder}</b>. ` : ''}The agent works on your PC, and you can follow along here or in ${hostApp(conn?.record)}.</p>
           </div>`}
         </div>
       </div>

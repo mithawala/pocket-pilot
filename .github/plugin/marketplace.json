@@ -1,0 +1,18 @@
+{
+  "name": "pocket-pilot",
+  "owner": {
+    "name": "Asif Mithawala"
+  },
+  "metadata": {
+    "description": "Pocket Pilot: control your GitHub Copilot sessions from your phone.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "pocket-pilot",
+      "description": "Control your GitHub Copilot app and CLI sessions from your phone: same history, live replies, chat, approvals and questions — end-to-end encrypted, free, with passkeys and push notifications.",
+      "version": "0.2.0",
+      "source": "./copilot-plugin"
+    }
+  ]
+}

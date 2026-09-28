@@ -93,6 +93,9 @@ export class HostStore extends EventTarget {
             this._drop(uri);
           }
         } else {
+          // A snapshot restarts the sequence (the PC may be a new process with its own numbering).
+          const seqs = (r.snapshots || []).map((s) => s.fromSeq).filter((n) => typeof n === 'number');
+          if (seqs.length) this.lastSeq = Math.max(...seqs);
           for (const snap of r.snapshots || []) this._applySnapshot(snap);
         }
         done = true;

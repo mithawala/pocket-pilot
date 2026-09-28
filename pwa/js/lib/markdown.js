@@ -5,12 +5,14 @@ import DOMPurify from '../../vendor/dompurify/purify.es.js';
 marked.setOptions({ gfm: true, breaks: false });
 
 // DOMPurify drops file: URLs before afterSanitizeAttributes runs, so remember them on the way in.
+// (No DOM, e.g. in Node tests, means no hooks: this module is only imported there, never rendered.)
 const fileHrefs = new WeakMap();
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+const addHook = typeof DOMPurify.addHook === 'function' ? DOMPurify.addHook.bind(DOMPurify) : () => {};
+addHook('uponSanitizeAttribute', (node, data) => {
   if (node.tagName === 'A' && data.attrName === 'href' && /^file:/i.test(data.attrValue || '')) fileHrefs.set(node, data.attrValue);
 });
 
-DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const file = fileHrefs.get(node);
     const href = node.getAttribute('href') || '';

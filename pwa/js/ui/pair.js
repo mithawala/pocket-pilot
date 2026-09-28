@@ -27,13 +27,13 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     <div class="hero">
       <img class="logo" src="./icons/icon.svg" alt="" />
       <h2>Pocket Pilot</h2>
-      <p>Your VS Code agents, in your pocket. Chat, approve tool calls and get notified — wherever you are.</p>
+      <p>Your Copilot agents, in your pocket. Chat, approve tool calls and get notified — wherever you are. Works with VS Code and the GitHub Copilot app.</p>
     </div>
     ${iosSafari && html`<div class="ios-tip"><b>iPhone:</b> first tap <b>Share → Add to Home Screen</b>, then open Pocket Pilot from your Home Screen and scan the code there. The Home Screen app keeps its own storage and is the only place iOS shows notifications.</div>`}
     <button class="btn primary block" style="margin-top:14px" onClick=${onScan}><${Icon} name="phone" /> Scan the QR code</button>
     <ol class="steps">
-      <li><div><b>Install the extension</b><div class="muted small">Get Pocket Pilot for VS Code at <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
-      <li><div><b>Click “Start remote access”</b><div class="muted small">In the Pocket Pilot panel of the activity bar.</div></div></li>
+      <li><div><b>Install Pocket Pilot on your PC</b><div class="muted small">The VS Code extension or the GitHub Copilot app plugin — see <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
+      <li><div><b>Turn on remote access</b><div class="muted small">VS Code: “Start remote access” in the Pocket Pilot panel. Copilot app or CLI: type <b>/pocket-pilot</b> in a chat.</div></div></li>
       <li><div><b>Scan the QR code</b><div class="muted small">${iosSafari ? 'From the Home Screen app (button above).' : 'With the button above or your phone’s camera.'}</div></div></li>
     </ol>
     <div class="trust">
@@ -46,7 +46,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     <details class="card" style="margin-top:14px">
       <summary class="muted">I have a pairing link</summary>
       <div class="stack" style="margin-top:12px">
-        <input class="input" placeholder="Paste the link copied from VS Code" value=${link} onInput=${(e) => { setLink(e.target.value); setError(''); }} />
+        <input class="input" placeholder="Paste the pairing link from your PC" value=${link} onInput=${(e) => { setLink(e.target.value); setError(''); }} />
         ${error && html`<div class="errpart">${error}</div>`}
         <button class="btn primary" onClick=${submit} disabled=${!link}>Continue</button>
       </div>
@@ -100,7 +100,7 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
     <div class="hero" style="padding-top:12px">
       <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
       <h2 style="font-size:23px">Pair with ${info.name || 'your PC'}</h2>
-      <p>Check that this fingerprint matches the one under the QR code in VS Code:</p>
+      <p>Check that this fingerprint matches the one under the QR code on your PC:</p>
       <p style="margin-top:10px"><span class="fingerprint">${fingerprintText(info.hostFingerprint)}</span></p>
     </div>
     ${!phase && html`<div class="card stack">
@@ -113,7 +113,7 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
     ${phase && html`<div class="progress-steps">
       ${STEPS.map(([k, label], i) => html`<div class=${`ps ${i === idx ? 'active' : i < idx || phase === 'done' ? 'done' : ''}`}>
         ${i === idx && phase !== 'done' ? html`<${Spinner} />` : i < idx || phase === 'done' ? html`<${Icon} name="check" size="18" />` : html`<span class="dot"></span>`}
-        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” in the dialog that just appeared in VS Code.</div>`}${i === idx && k === 'passkey' && html`<div class="muted small">Confirm with Face ID, Touch ID or your fingerprint.</div>`}</div>
+        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your PC — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && html`<div class="muted small">Confirm with Face ID, Touch ID or your fingerprint.</div>`}</div>
       </div>`)}
     </div>`}
   </div>`;

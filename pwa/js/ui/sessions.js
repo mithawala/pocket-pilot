@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
-import { statusOf, ago, folderName, providerLabel, filePath, S, has } from '../lib/format.js';
+import { statusOf, ago, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
 import { ModelSheet, modelSummary } from './model-picker.js';
 
@@ -12,7 +12,21 @@ function StatusIcon({ st, unread }) {
   return html`<${Icon} name="chat" />`;
 }
 
-function SessionRow({ s, onOpen, selected }) {
+const compact = (n) => (n >= 10000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : String(n));
+
+/** VS Code-style `+adds −dels` for a session's file changes. */
+export function Changes({ c }) {
+  if (!c || (!c.additions && !c.deletions)) return null;
+  return html`<span class="chg" title=${`${c.additions || 0} added, ${c.deletions || 0} removed${c.files ? ` in ${c.files} file${c.files === 1 ? '' : 's'}` : ''}`}><span class="add">+${compact(c.additions || 0)}</span> <span class="del">−${compact(c.deletions || 0)}</span></span>`;
+}
+
+/** The folder (project) a session belongs to, as VS Code's Agents window groups them. */
+export function projectOf(s) {
+  const uri = s.project?.uri || s.workingDirectories?.[0] || '';
+  return { key: uri || `provider:${s.provider}`, uri, name: s.project?.displayName || folderName(uri) || providerLabel(s.provider) };
+}
+
+function SessionRow({ s, onOpen, selected, inFolder }) {
   const st = statusOf(s.status);
   const unread = !has(s.status, S.IsRead);
   const activity = s.activity ? mdPlain(s.activity, 100) : '';
@@ -20,14 +34,54 @@ function SessionRow({ s, onOpen, selected }) {
     : st.key === 'running' ? html`<span class="st-running">${activity || 'Working…'}</span>`
     : st.key === 'error' ? html`<span class="st-error">Error</span>`
     : null;
-  const where = folderName(s.workingDirectories?.[0]) || providerLabel(s.provider);
+  const changes = s.changes && (s.changes.additions || s.changes.deletions) ? html`<${Changes} c=${s.changes} />` : null;
+  const bits = [inFolder ? null : projectOf(s).name, detail || changes].filter(Boolean);
+  if (!bits.length) bits.push(providerLabel(s.provider));
   return html`<button class=${`srow is-${st.key} ${unread ? 'unread' : ''} ${selected ? 'on' : ''}`} aria-current=${selected ? 'true' : undefined} onClick=${() => onOpen(s.resource)}>
     <span class="si"><${StatusIcon} st=${st} unread=${unread} /></span>
     <span class="sb">
       <span class="l1"><span class="ttl">${s.title || 'Untitled session'}</span><span class="time">${ago(s.modifiedAt)}</span></span>
-      <span class="l2">${where}${detail && html` · ${detail}`}</span>
+      <span class="l2">${bits.map((b, i) => html`${i ? ' · ' : ''}${b}`)}</span>
     </span>
   </button>`;
+}
+
+/** Groups sessions by folder: folders that need you or are working first, then the most recently active; rows keep their status order. */
+export function folderGroups(sessions) {
+  const map = new Map();
+  for (const s of sessions) {
+    const p = projectOf(s);
+    let g = map.get(p.key);
+    if (!g) map.set(p.key, (g = { ...p, items: [], latest: '', needs: 0, running: 0 }));
+    g.items.push(s);
+    if (String(s.modifiedAt || '') > g.latest) g.latest = String(s.modifiedAt || '');
+    if (has(s.status, S.Input)) g.needs++;
+    else if (has(s.status, S.InProgress)) g.running++;
+  }
+  const rank = (g) => (g.needs ? 0 : g.running ? 1 : 2);
+  return [...map.values()].sort((a, b) => rank(a) - rank(b) || b.latest.localeCompare(a.latest) || a.name.localeCompare(b.name));
+}
+
+function readPref(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function FolderGroup({ g, closed, onToggle, onOpen, selected }) {
+  return html`<div class="fgroup">
+    <button class=${`fhead ${closed ? 'closed' : ''}`} aria-expanded=${!closed} onClick=${onToggle} title=${g.uri ? filePath(g.uri) : g.name}>
+      <span class="chev"><${Icon} name="down" /></span>
+      <span class="fic"><${Icon} name="folder" /></span>
+      <span class="fname">${g.name}</span>
+      ${g.needs > 0 && html`<span class="fbadge is-input" title=${`${g.needs} need${g.needs === 1 ? 's' : ''} input`}><${Icon} name="alert-circle" />${g.needs}</span>`}
+      ${g.running > 0 && html`<span class="fbadge is-running" title=${`${g.running} working`}><span class="spinner"></span>${g.running}</span>`}
+      <span class="fcount">${g.items.length}</span>
+    </button>
+    ${!closed && g.items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} inFolder=${true} />`)}
+  </div>`;
 }
 
 /** VS Code-style time buckets for finished sessions. */
@@ -153,7 +207,7 @@ function NewSession({ store, open, onClose, onCreated }) {
 export function ConnectionBanner({ conn, store, onRepair }) {
   const st = conn.state;
   if (st === 'online' && store.ahpConnected) return null;
-  if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || 'VS Code agent host is not available on your PC.'}</div>`;
+  if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your PC.' : 'VS Code agent host is not available on your PC.')}</div>`;
   if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your PC…</div>`;
   if (st === 'passkey') return html`<div class="banner"><${Icon} name="lock" size="18" />Confirm it's you (Face ID / fingerprint)…</div>`;
   if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This phone is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
@@ -164,14 +218,31 @@ export function ConnectionBanner({ conn, store, onRepair }) {
 export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
   useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root');
   const [q, setQ] = useState('');
+  const [groupBy, setGroupByState] = useState(() => (readPref('pp:groupBy', 'recent') === 'folder' ? 'folder' : 'recent'));
+  const [collapsed, setCollapsed] = useState(() => new Set(readPref('pp:collapsedFolders', [])));
+  const setGroupBy = (v) => {
+    setGroupByState(v);
+    localStorage.setItem('pp:groupBy', JSON.stringify(v));
+  };
+  const toggleFolder = (key) => {
+    const next = new Set(collapsed);
+    if (!next.delete(key)) next.add(key);
+    setCollapsed(next);
+    localStorage.setItem('pp:collapsedFolders', JSON.stringify([...next].slice(-200)));
+  };
   const list = store.sortedSessions();
-  const filtered = q ? list.filter((s) => `${s.title} ${folderName(s.workingDirectories?.[0])}`.toLowerCase().includes(q.toLowerCase())) : list;
-  const needs = filtered.filter((s) => has(s.status, S.Input));
-  const working = filtered.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress));
-  const rest = filtered.filter((s) => !has(s.status, S.Input) && !has(s.status, S.InProgress));
-  const groups = [['Needs input', needs], ['In progress', working]];
-  for (const name of ['Today', 'Yesterday', 'Previous 7 days', 'Older']) groups.push([name, rest.filter((s) => bucketOf(s.modifiedAt) === name)]);
+  const filtered = q ? list.filter((s) => `${s.title} ${projectOf(s).name} ${folderName(s.workingDirectories?.[0])}`.toLowerCase().includes(q.toLowerCase())) : list;
+  const groups = [];
+  if (groupBy === 'recent') {
+    const needs = filtered.filter((s) => has(s.status, S.Input));
+    const working = filtered.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress));
+    const rest = filtered.filter((s) => !has(s.status, S.Input) && !has(s.status, S.InProgress));
+    groups.push(['Needs input', needs], ['In progress', working]);
+    for (const name of ['Today', 'Yesterday', 'Previous 7 days', 'Older']) groups.push([name, rest.filter((s) => bucketOf(s.modifiedAt) === name)]);
+  }
+  const folders = groupBy === 'folder' ? folderGroups(filtered) : [];
   const online = conn.state === 'online';
+  const copilotHost = host?.hostKind === 'copilot';
   return html`<div class="screen">
     <div class="topbar">
       <img class="brand" src="./icons/icon.svg" alt="" />
@@ -187,19 +258,26 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
         <div class="list">
           ${pushPrompt && html`<div class="page" style="padding-bottom:0">${pushPrompt}</div>`}
           <div class="filter"><${Icon} name="search" /><input type="search" placeholder="Filter sessions" value=${q} onInput=${(e) => setQ(e.target.value)} aria-label="Filter sessions" /></div>
+          <div class="gtabs" role="tablist" aria-label="Group sessions">
+            <button role="tab" aria-selected=${groupBy === 'recent'} class=${groupBy === 'recent' ? 'on' : ''} onClick=${() => setGroupBy('recent')}><${Icon} name="clock" />Recent</button>
+            <button role="tab" aria-selected=${groupBy === 'folder'} class=${groupBy === 'folder' ? 'on' : ''} onClick=${() => setGroupBy('folder')}><${Icon} name="folder" />Folders</button>
+          </div>
           ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg /></div>`}
           ${groups.map(([title, items]) => items.length > 0 && html`<div key=${title}>
             <div class="group-title">${title}</div>
             ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}
           </div>`)}
-          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : 'No sessions yet. Start one below.'}</div>`}
+          ${folders.map((g) => html`<${FolderGroup} key=${g.key} g=${g} closed=${!q && collapsed.has(g.key)} onToggle=${() => toggleFolder(g.key)} onOpen=${onOpen} selected=${selected} />`)}
+          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? 'No open chats yet. Chats you use in the GitHub Copilot app or CLI on this PC show up here.' : 'No sessions yet. Start one below.'}</div>`}
         </div>
       </div>
     </div>
-    ${store.online && html`<div class="bottom-bar">
+    ${store.online && (copilotHost
+      ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your PC — they appear here after the first message.</span></div></div>`
+      : html`<div class="bottom-bar">
       <button class="newbar" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
-    </div>`}
-    ${store.online && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} />`}
+    </div>`)}
+    ${store.online && !copilotHost && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} />`}
   </div>`;
 }
 
@@ -209,12 +287,13 @@ export function DesktopHome({ store, host, onNew }) {
   const list = store.sortedSessions();
   const waiting = list.filter((s) => has(s.status, S.Input)).length;
   const running = list.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress)).length;
+  const copilotHost = host?.hostKind === 'copilot';
   return html`<div class="screen">
     <div class="scroll-wrap"><div class="scroll"><div class="chat"><div class="chat-empty">
       <div class="big"><${Icon} name="sparkle" /></div>
-      <h2>Open a session, or start a new one</h2>
-      <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${host.hostName}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in VS Code on your PC.</p>
-      ${store.online && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
+      <h2>${copilotHost ? 'Open a chat' : 'Open a session, or start a new one'}</h2>
+      <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${host.hostName}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in ${hostApp(host)} on your PC.</p>
+      ${store.online && !copilotHost && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
     </div></div></div></div>
   </div>`;
 }

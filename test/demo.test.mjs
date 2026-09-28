@@ -73,6 +73,30 @@ test('ui helpers: code languages and the composer model label', async () => {
   }
 });
 
+test('sessions: folder grouping follows the project; folders that need you or are working come first', async () => {
+  const { folderGroups, projectOf } = await import('../pwa/js/ui/sessions.js');
+  const { store } = createDemo();
+  try {
+    const groups = folderGroups(store.sortedSessions());
+    assert.deepEqual(groups.map((g) => g.name), ['acme-web', 'acme-api', 'infra']);
+    const web = groups[0];
+    assert.deepEqual(web.items.map((s) => s.resource), ['copilotcli:/demo-dates', 'copilotcli:/demo-dark', 'copilotcli:/demo-flaky', 'copilotcli:/demo-notes'], 'needs input, then working, then newest');
+    assert.equal(web.needs, 1);
+    assert.equal(web.running, 1);
+    assert.equal(groups[1].needs, 1);
+    assert.equal(store.sessions.get('copilotcli:/demo-flaky').changes.additions, 18);
+  } finally {
+    store.dispose();
+  }
+  const at = (m) => new Date(Date.UTC(2026, 0, 1, 0, m)).toISOString();
+  const s = (id, dir, status, m) => ({ resource: `copilotcli:/${id}`, provider: 'copilotcli', status, modifiedAt: at(m), workingDirectories: [`file:///c%3A/code/${dir}`] });
+  const order = folderGroups([s('a', 'old-but-busy', 8, 1), s('b', 'recent', 1, 50), s('c', 'waiting', 16, 2)]).map((g) => g.name);
+  assert.deepEqual(order, ['waiting', 'old-but-busy', 'recent']);
+  assert.equal(projectOf({ provider: 'copilotcli', workingDirectories: ['file:///c%3A/code/My%20App'] }).name, 'My App');
+  assert.equal(projectOf({ provider: 'copilotcli', project: { uri: 'file:///c%3A/code/app', displayName: 'app (main)' }, workingDirectories: [] }).name, 'app (main)');
+  assert.deepEqual(projectOf({ provider: 'claude' }), { key: 'provider:claude', uri: '', name: 'Claude' });
+});
+
 test('demo: new sessions keep the chosen model options and mode', async () => {
   const { store } = createDemo();
   try {

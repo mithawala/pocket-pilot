@@ -50,6 +50,11 @@ export function providerLabel(p) {
   return { copilotcli: 'Copilot', copilot: 'Copilot', claude: 'Claude', codex: 'Codex' }[p] || (p ? p[0].toUpperCase() + p.slice(1) : 'Agent');
 }
 
+/** Where a paired PC's sessions live: VS Code (the extension) or the GitHub Copilot app/CLI (the plugin). */
+export function hostApp(host) {
+  return host?.hostKind === 'copilot' ? 'the GitHub Copilot app' : 'VS Code';
+}
+
 export function deviceDescription() {
   const ua = navigator.userAgent;
   const os = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /mac os/i.test(ua) ? 'Mac' : /windows/i.test(ua) ? 'Windows' : /linux/i.test(ua) ? 'Linux' : 'Device';

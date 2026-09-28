@@ -26,6 +26,8 @@ try {
   $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
 
   Write-Host "Building site and VSIX (v$version)…"
+  & $Node scripts/build-plugin.mjs --check
+  if ($LASTEXITCODE -ne 0) { throw 'copilot-plugin is out of date: run node scripts/build-plugin.mjs and commit' }
   $env:PP_SITE_URL = $siteUrl
   & $Node scripts/build-site.mjs
   if ($LASTEXITCODE -ne 0) { throw 'build-site failed' }
@@ -70,7 +72,9 @@ try {
     gh release upload "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --clobber
   } else {
     $notes = @"
-Install: download **pocket-pilot.vsix**, then in VS Code run **Extensions → ··· → Install from VSIX…** (or ``code --install-extension pocket-pilot.vsix``).
+**VS Code:** download **pocket-pilot.vsix**, then run **Extensions → ··· → Install from VSIX…** (or ``code --install-extension pocket-pilot.vsix``).
+
+**GitHub Copilot app & CLI:** in a terminal run ``copilot plugin marketplace add $slug`` and ``copilot plugin install pocket-pilot@pocket-pilot`` (the GitHub Copilot app uses the same plugins; restart it). Then type ``/pocket-pilot`` in a chat.
 
 Phone app: $($siteUrl)app/ · Product page: $siteUrl
 "@

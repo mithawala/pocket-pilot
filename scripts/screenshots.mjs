@@ -149,6 +149,11 @@ async function main() {
     };
     await demo();
     await phone.shot('sessions.webp');
+    await phone.eval(click('.gtabs button', 'Folders'));
+    await sleep(700);
+    await phone.shot('folders.webp');
+    await phone.eval(click('.gtabs button', 'Recent'));
+    await sleep(300);
     await demo(`#/s/${encodeURIComponent('copilotcli:/demo-auth')}`);
     await phone.shot('approval.webp');
     await phone.eval(click('.composer .pick', 'Claude Opus 5.5'));

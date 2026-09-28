@@ -1,0 +1,516 @@
+// Pocket Pilot for the GitHub Copilot app and CLI — the per-session half. The runtime starts one of
+// these for every session; it attaches the session to the shared Pocket Pilot hub (starting the hub
+// when remote access is on) so your phone sees the same history, streams replies live, and can chat,
+// approve tools, answer questions, switch model or mode and stop the agent.
+import { joinSession } from '@github/copilot-sdk/extension';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFile, execFileSync } from 'node:child_process';
+import { FILES, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
+import { renderQrText } from './lib/qr.mjs';
+
+const MAX_TURNS = 60;
+const CLIP = 8000;
+const HISTORY_TYPES = new Set([
+  'session.start', 'user.message', 'assistant.turn_start', 'assistant.reasoning', 'assistant.message', 'assistant.usage',
+  'tool.execution_start', 'tool.execution_complete', 'permission.requested', 'permission.completed',
+  'user_input.requested', 'user_input.completed', 'elicitation.requested', 'elicitation.completed',
+  'exit_plan_mode.requested', 'exit_plan_mode.completed', 'session.idle', 'abort', 'session.error',
+  'session.title_changed', 'session.mode_changed', 'session.permissions_changed', 'session.model_change',
+]);
+const LIVE_TYPES = new Set([...HISTORY_TYPES, 'assistant.intent', 'assistant.message_delta', 'assistant.reasoning_delta', 'tool.execution_partial_result']);
+/** Requests for the user (and their answers) reach extensions only through the event log, not `session.on`. */
+const UI_TYPES = ['permission.requested', 'permission.completed', 'user_input.requested', 'user_input.completed', 'elicitation.requested', 'elicitation.completed', 'exit_plan_mode.requested', 'exit_plan_mode.completed'];
+
+/**
+ * VS Code's agent host (its `copilot-runtime`) loads Copilot plugins too, but it already serves its
+ * sessions to Pocket Pilot through the VS Code extension: stay out of the way there.
+ */
+function insideVsCode() {
+  const exe = process.execPath || '';
+  if (/[\\/]resources[\\/]app[\\/]/i.test(exe) || /^(code|code - insiders|cursor|windsurf|electron)(\.exe)?$/i.test(path.basename(exe))) return true;
+  const ppid = Number(process.env.COPILOT_EXTENSION_PARENT_PID) || process.ppid;
+  try {
+    const image = process.platform === 'win32'
+      ? (/^"([^"]+)"/m.exec(execFileSync('tasklist', ['/FI', `PID eq ${ppid}`, '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 5000 })) || [])[1] || ''
+      : execFileSync('ps', ['-o', 'comm=', '-p', String(ppid)], { encoding: 'utf8', timeout: 5000 }).trim();
+    return /copilot-runtime/i.test(path.basename(image));
+  } catch {
+    return false;
+  }
+}
+
+const clip = (s, n = CLIP) => (typeof s === 'string' && s.length > n ? `${s.slice(0, n)}\n… (truncated)` : s);
+
+/** Keeps what the phone renders; drops model internals (encrypted reasoning, telemetry, prompts). */
+function slim(e) {
+  const d = e.data || {};
+  let data = d;
+  switch (e.type) {
+    case 'user.message':
+      data = { content: d.content, messageId: d.messageId, source: d.source, delivery: d.delivery, isAutopilotContinuation: d.isAutopilotContinuation };
+      break;
+    case 'assistant.message':
+      data = {
+        messageId: d.messageId, content: d.content, parentToolCallId: d.parentToolCallId,
+        toolRequests: (d.toolRequests || []).map((t) => ({ toolCallId: t.toolCallId, name: t.name, arguments: t.arguments, toolTitle: t.toolTitle, intentionSummary: t.intentionSummary })),
+      };
+      break;
+    case 'assistant.reasoning':
+      data = { reasoningId: d.reasoningId, content: clip(d.content) };
+      break;
+    case 'assistant.usage':
+      data = { inputTokens: d.inputTokens, outputTokens: d.outputTokens };
+      break;
+    case 'tool.execution_start':
+      data = { toolCallId: d.toolCallId, toolName: d.toolName, arguments: d.arguments, parentToolCallId: d.parentToolCallId };
+      break;
+    case 'tool.execution_complete':
+      data = {
+        toolCallId: d.toolCallId, success: d.success, parentToolCallId: d.parentToolCallId,
+        result: d.result ? { content: clip(d.result.content), detailedContent: clip(d.result.detailedContent) } : undefined,
+        error: d.error ? { message: d.error.message, code: d.error.code } : undefined,
+      };
+      break;
+    case 'tool.execution_partial_result':
+      data = { toolCallId: d.toolCallId, partialOutput: typeof d.partialOutput === 'string' ? d.partialOutput.slice(-4000) : d.partialOutput };
+      break;
+    case 'permission.requested':
+      data = { requestId: d.requestId, resolvedByHook: d.resolvedByHook, permissionRequest: { ...d.permissionRequest, diff: clip(d.permissionRequest?.diff), newFileContents: undefined } };
+      break;
+    case 'session.start':
+      data = { selectedModel: d.selectedModel, model: d.model };
+      break;
+    default:
+  }
+  return { type: e.type, id: e.id, timestamp: e.timestamp, ...(e.agentId ? { agentId: e.agentId } : {}), ...(e.ephemeral ? { ephemeral: true } : {}), data };
+}
+
+/** The last MAX_TURNS turns of history, trimmed to what the phone needs. */
+function slimHistory(events) {
+  const list = events.filter((e) => HISTORY_TYPES.has(e.type));
+  const starts = [];
+  list.forEach((e, i) => {
+    if (e.type === 'user.message' && !e.agentId) starts.push(i);
+  });
+  const from = starts.length > MAX_TURNS ? starts[starts.length - MAX_TURNS] : 0;
+  const head = list.find((e) => e.type === 'session.start');
+  const keep = list.slice(from);
+  return (head && from > 0 ? [head, ...keep] : keep).map(slim);
+}
+
+function openExternal(url) {
+  const done = () => {};
+  if (process.platform === 'win32') execFile('rundll32', ['url.dll,FileProtocolHandler', url], { windowsHide: true }, done);
+  else if (process.platform === 'darwin') execFile('open', [url], done);
+  else execFile('xdg-open', [url], done);
+}
+
+const settingsFile = () => readJson(FILES.state, {}) || {};
+const isEnabled = () => !!settingsFile().enabled;
+function setEnabled(enabled) {
+  writeJson(FILES.state, { ...settingsFile(), enabled, changedAt: new Date().toISOString() });
+}
+const debug = process.env.POCKET_PILOT_DEBUG
+  ? (m) => {
+    try {
+      fs.appendFileSync(path.join(path.dirname(FILES.log), `extension-${process.pid}.log`), `${new Date().toISOString()} ${m}\n`);
+    } catch {
+      /* ignore */
+    }
+  }
+  : () => {};
+
+// ------------------------------------------------------------------ hub connection
+
+let session;
+let rpc = null;
+let connecting = null;
+let attached = false;
+let buffered = null;
+let hub = null;
+let hubError = null;
+
+/** Hosts the hub in this session's process unless another session already does. */
+async function hostHub() {
+  if (hub && !hub.stopped) return hub;
+  try {
+    const { startHub } = await import('./lib/hub.mjs');
+    hub = await startHub();
+    hubError = null;
+  } catch (err) {
+    hubError = err;
+    hub = null;
+  }
+  return hub;
+}
+
+async function connectHub({ start }) {
+  if (rpc && !rpc.ch.closed) return rpc;
+  if (connecting) return connecting;
+  connecting = (async () => {
+    const hello = { pid: process.pid, canConfirm: !!session.capabilities?.ui?.elicitation };
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const info = readJson(FILES.hub);
+      if (hubAlive(info)) {
+        try {
+          const ch = await connect(info.port, info.token, hello);
+          rpc = new Rpc(ch, { cmd: runCommand, confirm: ({ message, title }) => confirm(title, message) });
+          ch.on('close', () => {
+            rpc = null;
+            attached = false;
+            setTimeout(watchHub, 1000 + Math.random() * 1500);
+          });
+          await attach();
+          return rpc;
+        } catch {
+          /* the hub is starting or stopping; retry */
+        }
+      } else if (!start) {
+        return null;
+      } else {
+        await hostHub();
+        if (hubError) throw hubError;
+      }
+      await new Promise((r) => setTimeout(r, 300 + Math.random() * 300));
+    }
+    throw new Error('Could not reach the Pocket Pilot hub (see ~/.pocket-pilot/copilot/hub.log)');
+  })().finally(() => {
+    connecting = null;
+  });
+  return connecting;
+}
+
+let watchTimer = null;
+/** Attaches this session as soon as remote access is on (the hub may be started by another session). */
+function watchHub() {
+  clearTimeout(watchTimer);
+  watchTimer = setTimeout(async () => {
+    if (!rpc && real) {
+      const info = readJson(FILES.hub);
+      if (hubAlive(info)) await connectHub({ start: false }).catch(() => {});
+      else if (isEnabled()) await connectHub({ start: true }).catch(() => {});
+    }
+    watchHub();
+  }, 4000);
+  watchTimer.unref?.();
+}
+
+// The app also runs short-lived internal sessions (e.g. to discover extensions). Only sessions the user
+// actually talks to are shown on the phone, and only they may host the hub.
+let real = false;
+async function checkReal() {
+  try {
+    const r = await session.rpc.eventLog.read({ types: ['user.message'], max: 5, direction: 'backward' });
+    real = real || (r.events || []).some((e) => !e.agentId);
+  } catch {
+    /* unknown: wait for a message */
+  }
+  return real;
+}
+
+function markReal() {
+  if (real) return;
+  real = true;
+  if (isEnabled() && !rpc) connectHub({ start: true }).catch(() => watchHub());
+}
+
+async function sessionInfo() {
+  const [events, processing, snap, name, perm, models, metrics] = await Promise.all([
+    session.getEvents().catch(() => []),
+    session.rpc.metadata.isProcessing().then((r) => !!r?.processing).catch(() => false),
+    session.rpc.metadata.snapshot().catch(() => null),
+    session.rpc.name.get().then((r) => r?.name || null).catch(() => null),
+    session.rpc.permissions.getMode().then((r) => r?.mode).catch(() => null),
+    session.rpc.model.list().then((r) => r?.list || []).catch(() => []),
+    session.rpc.usage.getMetrics().catch(() => null),
+  ]);
+  const firstUser = events.find((e) => e.type === 'user.message' && !e.agentId)?.data?.content;
+  const title = name || snap?.summary || snap?.initialName || (firstUser ? String(firstUser).replace(/\s+/g, ' ').slice(0, 80) : null) || 'New session';
+  const cwd = snap?.workingDirectory || process.cwd();
+  return {
+    sessionId: session.sessionId,
+    cwd,
+    gitRoot: snap?.workspace?.git_root || undefined,
+    title,
+    createdAt: snap?.startTime,
+    mode: snap?.currentMode || 'interactive',
+    autoApprove: perm === 'allow-all' ? 'autoApprove' : perm === 'assisted' ? 'assisted' : 'default',
+    model: snap?.selectedModel ? { id: snap.selectedModel } : undefined,
+    changes: changesOf(metrics),
+    processing,
+    history: slimHistory(events),
+    models,
+  };
+}
+
+function changesOf(m) {
+  const c = m?.codeChanges;
+  return c && (c.linesAdded || c.linesRemoved) ? { additions: c.linesAdded, deletions: c.linesRemoved, files: c.filesModifiedCount } : undefined;
+}
+
+async function attach() {
+  if (!rpc) return;
+  // Live events that arrive while the history is being read are replayed after it, minus duplicates.
+  buffered = [];
+  const tail = await session.rpc.eventLog.tail().catch(() => null);
+  try {
+    const { models, ...info } = await sessionInfo();
+    await rpc.request('attach', info, 120000);
+    const seen = new Set();
+    for (const e of info.history) {
+      seen.add(e.id);
+      remember(e.id);
+      if (e.data?.messageId) seen.add(`m:${e.data.messageId}`);
+      if (e.data?.reasoningId) seen.add(`r:${e.data.reasoningId}`);
+    }
+    const late = [];
+    for (const e of buffered) {
+      if (seen.has(e.id) || (e.data?.messageId && seen.has(`m:${e.data.messageId}`)) || (e.data?.reasoningId && seen.has(`r:${e.data.reasoningId}`))) continue;
+      const stream = streamOf(e);
+      if (stream && partial.has(stream)) continue;
+      if (e.type === 'assistant.message') partial.delete(`m:${e.data?.messageId}`);
+      if (e.type === 'assistant.reasoning') partial.delete(`r:${e.data?.reasoningId}`);
+      late.push(e);
+    }
+    attached = true;
+    for (const e of late) remember(e.id);
+    if (late.length) rpc.notify('events', { list: late.map(slim) });
+    if (models.length) rpc.notify('models', { list: models });
+    if (tail?.cursor) uiEvents(tail.cursor, ++uiLoop);
+  } finally {
+    buffered = null;
+  }
+}
+
+const delivered = new Set();
+function remember(id) {
+  if (!id) return;
+  delivered.add(id);
+  if (delivered.size > 5000) delivered.delete(delivered.values().next().value);
+}
+
+/** Streams whose first chunks were never forwarded: the final message event carries their whole text. */
+const partial = new Set();
+function streamOf(e) {
+  if (e.type === 'assistant.message_delta') return `m:${e.data?.messageId}`;
+  if (e.type === 'assistant.reasoning_delta') return `r:${e.data?.reasoningId}`;
+  return '';
+}
+
+let uiLoop = 0;
+/** Long-polls the event log for permission prompts, questions and plan approvals. */
+async function uiEvents(cursor, loop) {
+  while (rpc && attached && loop === uiLoop) {
+    try {
+      const r = await session.rpc.eventLog.read({ cursor, waitMs: 20000, types: UI_TYPES, max: 100, includeEphemeral: true });
+      if (loop !== uiLoop) return;
+      if (r.cursorStatus && r.cursorStatus !== 'ok') {
+        cursor = (await session.rpc.eventLog.tail()).cursor;
+        continue;
+      }
+      cursor = r.cursor || cursor;
+      for (const e of r.events || []) forward(e);
+    } catch (err) {
+      debug(`event log read failed: ${err.message}`);
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+  }
+}
+
+function forward(e) {
+  debug(`event ${e.type}${e.data?.toolCallId ? ` ${e.data.toolCallId}` : ''}${e.data?.requestId ? ` req=${e.data.requestId}` : ''} ${buffered ? '(buffered)' : attached ? '' : '(not attached)'}`);
+  if (e.type === 'user.message' && !e.agentId) markReal();
+  if (!LIVE_TYPES.has(e.type)) return;
+  const stream = streamOf(e);
+  if (buffered) return void buffered.push(e);
+  if (!rpc || !attached) {
+    if (stream) {
+      partial.add(stream);
+      if (partial.size > 500) partial.delete(partial.values().next().value);
+    }
+    return;
+  }
+  if (stream && partial.has(stream)) return;
+  if (e.type === 'assistant.message') partial.delete(`m:${e.data?.messageId}`);
+  if (e.type === 'assistant.reasoning') partial.delete(`r:${e.data?.reasoningId}`);
+  if (e.id) {
+    if (delivered.has(e.id)) return;
+    remember(e.id);
+  }
+  rpc.notify('event', { e: slim(e) });
+  if (e.type === 'session.idle') {
+    session.rpc.usage.getMetrics().then((m) => {
+      const changes = changesOf(m);
+      if (changes && rpc) rpc.notify('update', { changes });
+    }).catch(() => {});
+  }
+}
+
+// ------------------------------------------------------------------ commands from the phone (via the hub)
+
+async function switchModel(model) {
+  if (!model?.id) return;
+  const cur = await session.rpc.model.getCurrent().catch(() => null);
+  const effort = model.config?.thinkingLevel;
+  if (cur?.modelId === model.id && (!effort || cur?.reasoningEffort === effort)) return;
+  await session.setModel(model.id, effort ? { reasoningEffort: effort } : undefined);
+}
+
+function toPrompt(prompt, attachments) {
+  const files = [];
+  const notes = [];
+  for (const a of attachments || []) {
+    const m = /saved on this machine at: (.+)$/m.exec(a?.modelRepresentation || '');
+    if (m && fs.existsSync(m[1].trim())) files.push({ type: 'file', path: m[1].trim(), displayName: a.label || path.basename(m[1].trim()) });
+    else if (a?.modelRepresentation) notes.push(a.modelRepresentation);
+  }
+  return { prompt: [prompt, ...notes].filter(Boolean).join('\n\n'), attachments: files };
+}
+
+async function runCommand({ op, params = {} }) {
+  switch (op) {
+    case 'send': {
+      await switchModel(params.model).catch(() => {});
+      const { prompt, attachments } = toPrompt(params.prompt, params.attachments);
+      await session.send({ prompt, ...(attachments.length ? { attachments } : {}), ...(params.mode ? { mode: params.mode } : {}) });
+      return true;
+    }
+    case 'permission':
+      return !!(await session.rpc.permissions.handlePendingPermissionRequest({ requestId: params.requestId, result: params.decision }))?.success;
+    case 'input':
+      return !!(await session.rpc.ui.handlePendingUserInput({ requestId: params.requestId, response: params.response }))?.success;
+    case 'elicitation':
+      return !!(await session.rpc.ui.handlePendingElicitation({ requestId: params.requestId, result: params.response }))?.success;
+    case 'plan':
+      return !!(await session.rpc.ui.handlePendingExitPlanMode({ requestId: params.requestId, response: params.response }))?.success;
+    case 'abort':
+      await session.abort();
+      return true;
+    case 'mode':
+      await session.rpc.mode.set({ mode: params.mode });
+      return true;
+    case 'approvals':
+      await session.rpc.permissions.setMode({ mode: params.mode });
+      return true;
+    case 'rename':
+      await session.rpc.name.set({ name: params.name });
+      return true;
+    default:
+      throw new Error(`Unknown command ${op}`);
+  }
+}
+
+async function confirm(title, message) {
+  if (!session.capabilities?.ui?.elicitation) return null;
+  return session.ui.confirm(`${title}\n\n${message}`);
+}
+
+// ------------------------------------------------------------------ /pocket-pilot and the tool
+
+function statusText(s) {
+  const lines = [
+    `Pocket Pilot ${s.version} — ${s.hostName} (${s.fingerprint})`,
+    `Tunnel: ${s.tunnel.mode === 'none' ? 'off (local network only)' : s.tunnel.url ? `online${s.tunnel.reachable ? '' : ' (checking reachability)'}` : s.tunnel.error ? `error: ${s.tunnel.error}` : 'starting…'}`,
+    `Open sessions on the phone: ${s.sessions}`,
+    `Auto-reconnect after restarts: ${s.rendezvous ? 'on (encrypted GitHub gist)' : 'off (sign in with the GitHub CLI: gh auth login)'}`,
+    `Paired phones: ${s.devices.length ? s.devices.map((d) => `${d.name}${d.online ? ' (connected)' : ''}`).join(', ') : 'none yet'}`,
+  ];
+  return lines.join('\n');
+}
+
+async function enable({ ask }) {
+  real = true;
+  if (!isEnabled() && ask && session.capabilities?.ui?.elicitation) {
+    const ok = await session.ui.confirm('Turn on Pocket Pilot remote access?\n\nYour phone will be able to see and control the GitHub Copilot sessions open on this PC. Pocket Pilot downloads the official Cloudflare tunnel (cloudflared, about 55 MB) once and connects your phone end-to-end encrypted — Cloudflare only relays ciphertext. You approve every phone that pairs. If the GitHub CLI is signed in, the changing tunnel address is kept in a secret, encrypted gist so your phone reconnects on its own.');
+    if (!ok) return false;
+  }
+  setEnabled(true);
+  await connectHub({ start: true });
+  return true;
+}
+
+async function pair({ openPage = true } = {}) {
+  if (!(await enable({ ask: true }))) return null;
+  await session.log('Pocket Pilot: starting the secure tunnel…', { ephemeral: true });
+  const s = await rpc.request('pair', {}, 180000);
+  if (openPage) openExternal(s.pageUrl);
+  return s;
+}
+
+/** A request to the hub, over this session's connection or a short control connection (no attach). */
+async function hubRequest(op, params = {}, timeoutMs = 60000) {
+  if (rpc && !rpc.ch.closed) return rpc.request(op, params, timeoutMs);
+  const info = readJson(FILES.hub);
+  if (!hubAlive(info)) return null;
+  const ch = await connect(info.port, info.token, { pid: process.pid });
+  try {
+    return await new Rpc(ch, {}).request(op, params, timeoutMs);
+  } finally {
+    ch.close();
+  }
+}
+
+async function onCommand(ctx) {
+  const arg = String(ctx?.args || '').trim().toLowerCase();
+  try {
+    if (arg === 'status') {
+      const s = await hubRequest('status').catch(() => null);
+      await session.log(s ? statusText(s) : 'Pocket Pilot is off. Run /pocket-pilot to pair your phone.');
+      return;
+    }
+    if (arg === 'off' || arg === 'stop') {
+      setEnabled(false);
+      await hubRequest('stop').catch(() => {});
+      await session.log('Pocket Pilot is off: the tunnel is closed and phones cannot connect until you run /pocket-pilot again.');
+      return;
+    }
+    if (arg && arg !== 'pair' && arg !== 'on') {
+      await session.log('Usage: /pocket-pilot [pair | status | off]');
+      return;
+    }
+    const s = await pair();
+    if (!s) return;
+    await session.log(`Pocket Pilot: scan this code with your phone (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on your phone within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
+  } catch (err) {
+    await session.log(`Pocket Pilot: ${err.message}`, { level: 'error' });
+  }
+}
+
+const tool = {
+  name: 'pocket_pilot',
+  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone. Call with action "pair" when the user asks to connect, pair or use their phone (it opens a pairing QR code on this PC for the user to scan), or "status" to report whether remote access is on and which phones are paired.',
+  parameters: { type: 'object', properties: { action: { type: 'string', enum: ['pair', 'status'], description: 'pair = show the pairing QR code on this PC; status = report remote-access status' } }, required: ['action'] },
+  handler: async (args) => {
+    if (args?.action === 'status') {
+      const s = await hubRequest('status').catch(() => null);
+      return s ? statusText(s) : 'Pocket Pilot remote access is off. The user can turn it on with the /pocket-pilot command.';
+    }
+    const s = await pair();
+    if (!s) return 'The user declined to turn on Pocket Pilot remote access.';
+    // Never hand the pairing link to the model: it only needs to know where the user should look.
+    return 'Opened the Pocket Pilot pairing page with a QR code in the browser on this PC. Tell the user to scan it with their phone camera and then allow the phone on that page. The code is single-use and expires in 10 minutes.';
+  },
+};
+
+// ------------------------------------------------------------------ start
+
+const VSCODE_NOTE = 'This session runs in VS Code. Pocket Pilot for VS Code handles it: install the "Pocket Pilot" extension (mithawala.pocket-pilot) and click "Start remote access" in its panel. The /pocket-pilot plugin command is for the GitHub Copilot app and CLI.';
+if (process.env.POCKET_PILOT_DISABLE) {
+  await joinSession({});
+} else if (insideVsCode()) {
+  const s = await joinSession({
+    tools: [{ ...tool, handler: async () => VSCODE_NOTE }],
+    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: remote control from your phone', handler: async () => s.log(VSCODE_NOTE) }],
+  });
+} else {
+  session = await joinSession({
+    tools: [tool],
+    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: pair your phone to control this session remotely (pair | status | off)', handler: onCommand }],
+  });
+  session.on((e) => forward(e));
+  checkReal().then((isReal) => {
+    if (isReal && isEnabled()) connectHub({ start: true }).catch(() => watchHub());
+    else watchHub();
+  });
+}

@@ -63,6 +63,7 @@
         <a href="#how">How it works</a>
         <a href="#security">Security</a>
         <a href="#start">Get started</a>
+        <a href="#copilot-app">Copilot app</a>
         <a href="#faq">FAQ</a>
         <a href="#compare">vs /remote</a>
       </nav>
@@ -81,14 +82,14 @@
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <a class="phone-callout" href="./app/"><svg class="ic"><use href="#i-phone" /></svg><span>On your phone? <b>Open the Pocket Pilot app</b></span><svg class="ic"><use href="#i-arrow" /></svg></a>
-          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · for VS Code</div>
-          <h1>Your VS Code agents, <span class="grad">in your pocket.</span></h1>
-          <p class="lead">See every GitHub Copilot and Claude agent session running in VS Code on your phone, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
+          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · VS Code &amp; the GitHub Copilot app</div>
+          <h1>Your coding agents, <span class="grad">in your pocket.</span></h1>
+          <p class="lead">See every GitHub Copilot and Claude agent session running in VS Code (or in the GitHub Copilot app) on your phone, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
           <div class="cta-row">
             <a class="btn btn-primary btn-lg" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download for VS Code</a>
             <a class="btn btn-ghost btn-lg" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Try the live demo</a>
           </div>
-          <p class="fineprint">Version %VERSION% · VS Code 1.133+ on Windows, macOS &amp; Linux · iPhone &amp; Android</p>
+          <p class="fineprint">Version %VERSION% · VS Code 1.133+, or the <a href="#copilot-app">GitHub Copilot app &amp; CLI plugin</a> · Windows, macOS &amp; Linux · iPhone &amp; Android</p>
         </div>
 
         <div class="hero-visual" aria-label="Pocket Pilot in VS Code and on a phone">
@@ -207,8 +208,24 @@
           <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/new-session.webp" alt="Starting a new agent session from the phone" width="390" height="844" loading="lazy" /></div></div></div>
         </div>
 
+        <div class="showcase" data-reveal>
+          <div class="show-copy">
+            <div class="badge"><svg class="ic"><use href="#i-folder" /></svg>Sessions</div>
+            <h3>Organized like VS Code.</h3>
+            <p>See what needs you first, or switch to <b>Folders</b> to browse sessions by project, with the lines each one added and removed, just like the Agents window in VS Code.</p>
+            <ul class="checks">
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Recent: needs you, working, then today, yesterday and older</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>Folders: collapsible project groups with status badges</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span><code>+added −removed</code> line counts on every session</span></li>
+            </ul>
+          </div>
+          <div class="show-media"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/folders.webp" alt="Sessions grouped by project folder with line counts" width="390" height="844" loading="lazy" /></div></div></div>
+        </div>
+
         <div class="grid-head" data-reveal><h3>And the details you'd expect</h3></div>
         <div class="feature-grid" data-reveal>
+          <div class="feature"><svg class="ic"><use href="#i-folder" /></svg><h4>Recent or by folder</h4><p>Sessions by time, or grouped under their project folder with <code>+added −removed</code> counts, like VS Code's Agents window.</p></div>
+          <div class="feature"><svg class="ic"><use href="#i-monitor" /></svg><h4>GitHub Copilot app too</h4><p>A <a href="#copilot-app">Copilot plugin</a> brings the same app to your chats in the GitHub Copilot app and the Copilot CLI.</p></div>
           <div class="feature"><svg class="ic"><use href="#i-bell" /></svg><h4>Push notifications</h4><p>Standard Web Push, sent straight from your PC. No Firebase, no push account.</p></div>
           <div class="feature"><svg class="ic"><use href="#i-devices" /></svg><h4>Multiple PCs</h4><p>Pair your desktop and your laptop, and switch between them in one tap.</p></div>
           <div class="feature"><svg class="ic"><use href="#i-refresh" /></svg><h4>Auto-reconnect</h4><p>If the tunnel URL changes, phones find your PC again through an encrypted secret gist.</p></div>
@@ -245,7 +262,7 @@
           <div class="node">
             <div class="node-ic pc"><svg class="ic"><use href="#i-monitor" /></svg></div>
             <h4>Your PC</h4>
-            <p>The Pocket Pilot extension relays to VS Code's agent host (Copilot &amp; Claude)</p>
+            <p>The Pocket Pilot extension relays to VS Code's agent host (Copilot &amp; Claude), or the plugin to the GitHub Copilot app</p>
           </div>
         </div>
 
@@ -339,6 +356,47 @@
       </div>
     </section>
 
+    <section id="copilot-app" class="section">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <div class="kicker">GitHub Copilot app &amp; CLI</div>
+          <h2>Not in VS Code?<br /><span class="grad">Bring the plugin.</span></h2>
+          <p>The Pocket Pilot plugin gives the same phone app to the chats you run in the GitHub Copilot desktop app and the Copilot CLI: the same history and live replies, approvals, questions, models and modes, notifications and end-to-end encryption.</p>
+        </div>
+
+        <ol class="steps">
+          <li class="step" data-reveal>
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>Install the plugin</h3>
+              <p>Run these in a terminal. The GitHub Copilot app uses the same plugins, so restart it afterwards.</p>
+              <div class="cmd"><code>copilot plugin marketplace add mithawala/pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin marketplace add mithawala/pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+              <div class="cmd"><code>copilot plugin install pocket-pilot@pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin install pocket-pilot@pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+            </div>
+          </li>
+          <li class="step" data-reveal>
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>Type <code>/pocket-pilot</code> in a chat</h3>
+              <p>Or just ask <i>“pair my phone”</i>. Confirm, and a page with the QR code opens in your browser; the CLI prints it too. The first time, <code>cloudflared</code> is downloaded once (about 55 MB, verified).</p>
+            </div>
+          </li>
+          <li class="step" data-reveal>
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>Scan, allow, done</h3>
+              <p>Scan the code with the Pocket Pilot app, click <b>Allow</b> on the page (or in the chat) and set up Face ID or your fingerprint. Every chat you use in the app or the CLI now shows up on your phone.</p>
+              <ul class="checks small">
+                <li><svg class="ic"><use href="#i-check" /></svg><span><code>/pocket-pilot status</code> shows the tunnel and your phones; <code>/pocket-pilot off</code> closes the tunnel</span></li>
+                <li><svg class="ic"><use href="#i-check" /></svg><span>A chat appears on the phone once it has a message. Start new chats on your PC.</span></li>
+                <li><svg class="ic"><use href="#i-check" /></svg><span>Pair VS Code and the app separately; the phone switches between them like between two PCs</span></li>
+              </ul>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
     <section id="security" class="section alt">
       <div class="wrap">
         <div class="section-head" data-reveal>
@@ -348,7 +406,7 @@
         </div>
         <div class="sec-grid" data-reveal>
           <div class="sec"><svg class="ic"><use href="#i-lock" /></svg><h4>End-to-end encrypted</h4><p>ECDH P-256 with forward secrecy and AES-256-GCM on every frame, with strict sequence numbers. Cloudflare, GitHub and your network only see ciphertext.</p></div>
-          <div class="sec"><svg class="ic"><use href="#i-shield" /></svg><h4>Paired phones only</h4><p>QR codes are single-use, expire after 10 minutes and must be approved in VS Code. The phone pins your PC's key fingerprint.</p></div>
+          <div class="sec"><svg class="ic"><use href="#i-shield" /></svg><h4>Paired phones only</h4><p>QR codes are single-use, expire after 10 minutes and must be approved on your PC. The phone pins your PC's key fingerprint.</p></div>
           <div class="sec"><svg class="ic"><use href="#i-face" /></svg><h4>Face ID &amp; fingerprint</h4><p>Each phone registers a passkey. The extension verifies the WebAuthn assertion itself and asks again after 12 hours, or at every connection if you prefer.</p></div>
           <div class="sec"><svg class="ic"><use href="#i-key" /></svg><h4>Keys that can't leave</h4><p>Phone keys are non-extractable WebCrypto keys. Your GitHub token and the agent host's token never leave your PC.</p></div>
           <div class="sec"><svg class="ic"><use href="#i-layers" /></svg><h4>Least privilege</h4><p>The relay forwards only an allow-list of agent protocol methods: no terminals and no file writes, and file reads stay inside your session folders.</p></div>
@@ -400,14 +458,15 @@
         </div>
         <div class="faq" data-reveal>
           <details><summary>How is this different from Copilot's built-in <code>/remote</code>?</summary><p>GitHub's remote control (<code>/remote on</code> or <code>copilot --remote</code>) streams a Copilot CLI session to GitHub.com and the GitHub Mobile app. It's official, covers the terminal, VS Code and JetBrains, and sits right next to your cloud agents and pull requests on GitHub. Pocket Pilot connects your phone straight to VS Code instead: every agent session shows up without switching it on (Claude sessions too), you can start new sessions on your PC from your phone, and the link is end-to-end encrypted, so no copy of the session is stored in a cloud. <a href="#compare">See the full comparison</a>.</p></details>
-          <details><summary>Which sessions show up?</summary><p>Every session hosted by VS Code's agent host, including GitHub Copilot (Copilot CLI) and Claude agent sessions, from every open VS Code window. Classic chat-panel conversations that don't run in the agent host aren't part of the protocol, so they don't show up.</p></details>
+          <details><summary>Which sessions show up?</summary><p>Every session hosted by VS Code's agent host, including GitHub Copilot (Copilot CLI) and Claude agent sessions, from every open VS Code window. Classic chat-panel conversations that don't run in the agent host aren't part of the protocol, so they don't show up. With the <a href="#copilot-app">plugin</a>, the chats you use in the GitHub Copilot app and the Copilot CLI show up too.</p></details>
+          <details><summary>Does it work with the GitHub Copilot app?</summary><p>Yes. Install the <a href="#copilot-app">Pocket Pilot plugin</a> and type <code>/pocket-pilot</code> in a chat. The plugin runs inside the app's own sessions and uses the same encrypted tunnel, pairing, passkeys and notifications as the VS Code extension. Approvals and questions can be answered on the PC or the phone; whichever answers first wins.</p></details>
           <details><summary>Is it really free?</summary><p>Yes. Cloudflare quick tunnels are free and need no account, the app is a static site on GitHub Pages, and notifications use your phone's built-in push service. Pocket Pilot has no servers and no paid tier.</p></details>
           <details><summary>Can Cloudflare, GitHub or anyone else read my code?</summary><p>Not along the way. Everything between your phone and your PC is end-to-end encrypted, so the tunnel only relays ciphertext, and nothing is stored in a cloud. Your prompts still go to the AI model exactly as they do in VS Code. The optional auto-reconnect gist only holds your PC's current address, encrypted with a key that only your paired phones have.</p></details>
-          <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code must be running and the PC awake. If the VS Code window hosting the tunnel closes, another open window takes over automatically.</p></details>
+          <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code (or the GitHub Copilot app / CLI) must be running and the PC awake. If the VS Code window or the chat hosting the tunnel closes, another one takes over automatically.</p></details>
           <details><summary>Does it work on iPhone?</summary><p>Yes. Add the app to your Home Screen from Safari to get notifications (iOS 16.4+) and a full-screen experience, then pair with the scanner built into the app.</p></details>
-          <details><summary>What if I lose my phone?</summary><p>Remove it in the Pocket Pilot panel and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the phone would also need your Face ID or fingerprint.</p></details>
+          <details><summary>What if I lose my phone?</summary><p>Remove it in the Pocket Pilot panel in VS Code (or on the <code>/pocket-pilot</code> page for the Copilot app) and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the phone would also need your Face ID or fingerprint.</p></details>
           <details><summary>My network blocks the tunnel. Now what?</summary><p>Quick tunnels need outbound port 7844. Set <code>pocketPilot.tunnel.mode</code> to <code>custom</code> and use a tunnel your network allows, such as a named Cloudflare tunnel, Dev Tunnels or Tailscale Funnel.</p></details>
-          <details><summary>How do I update?</summary><p>Download the latest <code>.vsix</code> and install it over the old one. The phone app updates itself.</p></details>
+          <details><summary>How do I update?</summary><p>Download the latest <code>.vsix</code> and install it over the old one; for the Copilot app, run <code>copilot plugin update pocket-pilot</code>. The phone app updates itself.</p></details>
           <details><summary>Is this an official Microsoft or GitHub product?</summary><p>No. Pocket Pilot is an independent open-source project built on the Agent Host Protocol that VS Code exposes locally.</p></details>
         </div>
       </div>
@@ -424,13 +483,13 @@
           <div class="cmp-row cmp-head" role="row"><div role="columnheader"><span class="sr">Topic</span></div><div role="columnheader">Copilot remote control</div><div role="columnheader">Pocket Pilot</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Made by</div><div role="cell" data-label="/remote">GitHub. Official and supported.</div><div role="cell" data-label="Pocket Pilot">An independent open-source project, in preview.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Where you use it</div><div role="cell" data-label="/remote">The GitHub Mobile app and github.com.</div><div role="cell" data-label="Pocket Pilot">An installable web app on iPhone and Android, with a desktop layout in any browser.</div></div>
-          <div class="cmp-row" role="row"><div role="rowheader">Which sessions</div><div role="cell" data-label="/remote">Copilot CLI sessions, started in the terminal, VS Code or JetBrains.</div><div role="cell" data-label="Pocket Pilot">Every session in VS Code's agent host, including Claude sessions.</div></div>
+          <div class="cmp-row" role="row"><div role="rowheader">Which sessions</div><div role="cell" data-label="/remote">Copilot CLI sessions, started in the terminal, VS Code or JetBrains.</div><div role="cell" data-label="Pocket Pilot">Every session in VS Code's agent host, including Claude sessions, and, with the plugin, the chats in the GitHub Copilot app and CLI.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Turning it on</div><div role="cell" data-label="/remote">Per session with <code>/remote on</code> or <code>copilot --remote</code> (the CLI can default to it). VS Code also needs the <code>github.copilot.chat.cli.remote.enabled</code> setting, and its docs list a workspace that maps to a GitHub repository.</div><div role="cell" data-label="Pocket Pilot">Pair your phone once. All sessions show up, including ones you start later.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Starting new work from your phone</div><div role="cell" data-label="/remote">Steers sessions already running on your machine. New work started from GitHub Mobile runs as a cloud agent on GitHub.</div><div role="cell" data-label="Pocket Pilot">Starts new sessions on your own PC: pick the folder, model, mode, approvals and an optional new worktree.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Inside a session</div><div role="cell" data-label="/remote">Live progress, steering and queued messages, approvals, questions, plan review, switching modes, stopping.</div><div role="cell" data-label="Pocket Pilot">The same, plus the model with its thinking level and context size, photo and file attachments, and previews of files the agent links to.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Notifications</div><div role="cell" data-label="/remote">Live activities (iOS) and live updates (Android) in GitHub Mobile.</div><div role="cell" data-label="Pocket Pilot">Web Push sent from your PC when an agent needs you, finishes or fails.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Where your session goes</div><div role="cell" data-label="/remote">Session events are sent to GitHub and synced to your GitHub account, where only you can see them.</div><div role="cell" data-label="Pocket Pilot">Straight from your phone to your PC, end-to-end encrypted. The tunnel only relays ciphertext and nothing is stored in a cloud.</div></div>
-          <div class="cmp-row" role="row"><div role="rowheader">Signing in</div><div role="cell" data-label="/remote">Your GitHub account.</div><div role="cell" data-label="Pocket Pilot">Pairing you approve in VS Code, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone.</div></div>
+          <div class="cmp-row" role="row"><div role="rowheader">Signing in</div><div role="cell" data-label="/remote">Your GitHub account.</div><div role="cell" data-label="Pocket Pilot">Pairing you approve on your PC, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Work accounts</div><div role="cell" data-label="/remote">For Copilot Business and Enterprise, an admin must set the "Store local sessions in the Cloud" policy to "View and control".</div><div role="cell" data-label="Pocket Pilot">Nothing to switch on at GitHub, but your company's policies still apply.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Network</div><div role="cell" data-label="/remote">Your machine connects out to GitHub.</div><div role="cell" data-label="Pocket Pilot">A Cloudflare quick tunnel (outbound port 7844), or a tunnel you choose.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Cost</div><div role="cell" data-label="/remote">Included with Copilot.</div><div role="cell" data-label="Pocket Pilot">Free and open source (MIT).</div></div>
@@ -440,7 +499,7 @@
             <h3>Choose <code>/remote</code> when…</h3>
             <ul class="checks">
               <li><svg class="ic"><use href="#i-check" /></svg><span>your organization provides it and you want the officially supported route</span></li>
-              <li><svg class="ic"><use href="#i-check" /></svg><span>you also run Copilot in the terminal or in JetBrains</span></li>
+              <li><svg class="ic"><use href="#i-check" /></svg><span>you also run Copilot in JetBrains</span></li>
               <li><svg class="ic"><use href="#i-check" /></svg><span>you want it all in GitHub Mobile, next to cloud agent sessions and pull requests you can review and merge</span></li>
               <li><svg class="ic"><use href="#i-check" /></svg><span>your network doesn't allow tunnels</span></li>
             </ul>

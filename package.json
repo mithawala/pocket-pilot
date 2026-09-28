@@ -2,7 +2,7 @@
   "name": "pocket-pilot",
   "displayName": "Pocket Pilot",
   "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone. Free, end-to-end encrypted, passkey-protected. No servers.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "mithawala",
   "license": "MIT",
   "preview": true,
