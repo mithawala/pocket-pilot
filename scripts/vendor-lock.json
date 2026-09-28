@@ -47,6 +47,118 @@
     "source": "jsqr@1.4.0/LICENSE",
     "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
   },
+  "pwa/vendor/hljs/core.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/core.min.js",
+    "sha256": "67a339aa68880a40c9803def9c8cebb2225dec76230382db86e349370dee70e9"
+  },
+  "pwa/vendor/hljs/languages/bash.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/bash.min.js",
+    "sha256": "7db1758fe6f04cd410760c29879812a3774edc54edcc91323511a24efc0b9e61"
+  },
+  "pwa/vendor/hljs/languages/c.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/c.min.js",
+    "sha256": "edada72825cceb7dec51cc785efcc3e6378970917e11e4c7dfab29d0079e08a5"
+  },
+  "pwa/vendor/hljs/languages/cpp.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/cpp.min.js",
+    "sha256": "aa67eeacdbbda9f40ca34c59147581aef1601f19b71a55966de4ccf4246e8c31"
+  },
+  "pwa/vendor/hljs/languages/csharp.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/csharp.min.js",
+    "sha256": "74bb1a32b37d581173fc9d880ab5be6c7e448bbb12552c3e2a3ac7fc3c57cf8f"
+  },
+  "pwa/vendor/hljs/languages/css.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/css.min.js",
+    "sha256": "2f4264d9a07a4f5446e51e2d93b0c0e031b4fd910e8e44984cd17f996a990b99"
+  },
+  "pwa/vendor/hljs/languages/diff.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/diff.min.js",
+    "sha256": "cbd7cf3b49bee36d6a0cf97789a7c5e68fbfd4231e86a81966f9b78c7bc127d0"
+  },
+  "pwa/vendor/hljs/languages/dockerfile.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/dockerfile.min.js",
+    "sha256": "5a83ccd455a2910e9018f591fc1d2856ff5151ffa9889fc000542e16b329b039"
+  },
+  "pwa/vendor/hljs/languages/go.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/go.min.js",
+    "sha256": "05658f281f7f12233cd891e879c8b9ebfd5998f5dc3f1e80632889ce61178534"
+  },
+  "pwa/vendor/hljs/languages/ini.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/ini.min.js",
+    "sha256": "b2330623daa8da0c4ef98891b97f393daa2e809721842c312f217e0339e255db"
+  },
+  "pwa/vendor/hljs/languages/java.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/java.min.js",
+    "sha256": "7987da1c2dcc1d83f7a5a670cdc622fdac834cb1c140ad503bf8d7ea9237ac36"
+  },
+  "pwa/vendor/hljs/languages/javascript.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/javascript.min.js",
+    "sha256": "c3dbd515a79e2c00ff4535aa5ad2fe539fb2587d047f9ab826107d0784da7bb6"
+  },
+  "pwa/vendor/hljs/languages/json.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/json.min.js",
+    "sha256": "8f2343ffbcc4fdea4b336a4241d54d223d52f99b67729d2d6d3556bbf66908ae"
+  },
+  "pwa/vendor/hljs/languages/kotlin.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/kotlin.min.js",
+    "sha256": "afce4ebc96165516de9ea9fc4c8b146efb556806bf093dc98ea73d3e9acdd3cf"
+  },
+  "pwa/vendor/hljs/languages/markdown.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/markdown.min.js",
+    "sha256": "73cb474b4687421a0949ded1ba8314ec74c26058688dc7f6154084240352cc79"
+  },
+  "pwa/vendor/hljs/languages/php.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/php.min.js",
+    "sha256": "d47d3e20ee16dd1a34bdc8bfa8a605801de7dac8bb33ee40e85cd28f2a6a7bf9"
+  },
+  "pwa/vendor/hljs/languages/plaintext.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/plaintext.min.js",
+    "sha256": "502691d72ae83a3ff7c3e71dc9d40f14d25250915c94481aadc932b5fb97c7b8"
+  },
+  "pwa/vendor/hljs/languages/powershell.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/powershell.min.js",
+    "sha256": "67c95a71dae92f010a15e959158aaf682cd850a008d466f1c5d40394cbe22f12"
+  },
+  "pwa/vendor/hljs/languages/python.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/python.min.js",
+    "sha256": "fd5d479dcc9d07b957cf07b1df76d3d8fb6ee6f6d1437238d9530a9be724c046"
+  },
+  "pwa/vendor/hljs/languages/ruby.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/ruby.min.js",
+    "sha256": "1b4c8f07774a13770cd4e0445fa47c555a41f29dad4d3ca9d1d7c3aad9e4ea79"
+  },
+  "pwa/vendor/hljs/languages/rust.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/rust.min.js",
+    "sha256": "fde151d2b246bef44c98da80e7cac3cbb05de794911305fe9a3adf6beff87659"
+  },
+  "pwa/vendor/hljs/languages/shell.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/shell.min.js",
+    "sha256": "9176dabac68529c73ab23303cb2e73392603f85438f58368fe80ded798a526b7"
+  },
+  "pwa/vendor/hljs/languages/sql.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/sql.min.js",
+    "sha256": "79bead5cf2bfa93d3982073d000a97802f394fe287736644bab30f40cb5c7380"
+  },
+  "pwa/vendor/hljs/languages/swift.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/swift.min.js",
+    "sha256": "9522716ca5b45f102b26c2ee8fc13b16d7707b2a10b650872207a17882a4109c"
+  },
+  "pwa/vendor/hljs/languages/typescript.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/typescript.min.js",
+    "sha256": "0e10ce9a81d42f8d43a54007ca7e31fe22ad801b2a2e1693d31736aa79fa5404"
+  },
+  "pwa/vendor/hljs/languages/xml.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/xml.min.js",
+    "sha256": "2e8c8ba1e7a200cd83dfbf9c746b8e00f7d7bad966dbfd83eca142cf2caa4dd7"
+  },
+  "pwa/vendor/hljs/languages/yaml.min.js": {
+    "source": "@highlightjs/cdn-assets@11.12.0/es/languages/yaml.min.js",
+    "sha256": "7010955f1f87aef1de085483d79d42817544aaf03c4f57a6fd4eb838f2cdf609"
+  },
+  "pwa/vendor/hljs/LICENSE": {
+    "source": "@highlightjs/cdn-assets@11.12.0/LICENSE",
+    "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490"
+  },
   "pwa/vendor/ahp/client/async-queue.js": {
     "source": "@microsoft/agent-host-protocol@0.9.0/dist/client/async-queue.js",
     "sha256": "8891de4f1de191d48a5831c1050b015345bd2b2de12a40636cc785425d363760"

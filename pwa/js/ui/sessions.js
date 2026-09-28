@@ -4,23 +4,42 @@ import { statusOf, ago, folderName, providerLabel, filePath, S, has } from '../l
 import { mdPlain } from '../lib/markdown.js';
 import { ModelSheet, modelSummary } from './model-picker.js';
 
+function StatusIcon({ st, unread }) {
+  if (st.key === 'running') return html`<span class="spinner" aria-label="Working"></span>`;
+  if (st.key === 'input') return html`<${Icon} name="alert-circle" />`;
+  if (st.key === 'error') return html`<${Icon} name="circle-x" />`;
+  if (unread) return html`<span class="udot" aria-label="Unread"></span>`;
+  return html`<${Icon} name="chat" />`;
+}
+
 function SessionRow({ s, onOpen }) {
   const st = statusOf(s.status);
   const unread = !has(s.status, S.IsRead);
-  const letter = providerLabel(s.provider)[0];
-  return html`<button class=${`session ${st.key}`} onClick=${() => onOpen(s.resource)}>
-    <div class=${`avatar ${s.provider === 'claude' ? 'claude' : ''}`}>${letter}</div>
-    <div class="grow">
-      <div class="title">${s.title || 'Untitled session'}</div>
-      <div class="meta">
-        ${st.key !== 'idle' && html`<${StatusPill} status=${st} />`}
-        <span>${folderName(s.workingDirectories?.[0]) || providerLabel(s.provider)}</span>
-        <span>· ${ago(s.modifiedAt)}</span>
-      </div>
-      ${s.activity && st.key !== 'idle' && html`<div class="activity">${mdPlain(s.activity, 120)}</div>`}
-    </div>
-    ${unread && st.key === 'idle' && html`<span class="unread" aria-label="Unread"></span>`}
+  const activity = s.activity ? mdPlain(s.activity, 100) : '';
+  const detail = st.key === 'input' ? html`<span class="st-input">${activity || 'Needs input'}</span>`
+    : st.key === 'running' ? html`<span class="st-running">${activity || 'Working…'}</span>`
+    : st.key === 'error' ? html`<span class="st-error">Error</span>`
+    : null;
+  const where = folderName(s.workingDirectories?.[0]) || providerLabel(s.provider);
+  return html`<button class=${`srow is-${st.key} ${unread ? 'unread' : ''}`} onClick=${() => onOpen(s.resource)}>
+    <span class="si"><${StatusIcon} st=${st} unread=${unread} /></span>
+    <span class="sb">
+      <span class="l1"><span class="ttl">${s.title || 'Untitled session'}</span><span class="time">${ago(s.modifiedAt)}</span></span>
+      <span class="l2">${where}${detail && html` · ${detail}`}</span>
+    </span>
   </button>`;
+}
+
+/** VS Code-style time buckets for finished sessions. */
+function bucketOf(ts) {
+  const t = typeof ts === 'string' ? Date.parse(ts) : ts;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = 86400000;
+  if (!t || t >= today.getTime()) return 'Today';
+  if (t >= today.getTime() - day) return 'Yesterday';
+  if (t >= today.getTime() - 6 * day) return 'Previous 7 days';
+  return 'Older';
 }
 
 function FolderBrowser({ store, start, onPick, onClose }) {
@@ -103,14 +122,14 @@ function NewSession({ store, open, onClose, onCreated }) {
   return html`<${Sheet} open=${open} onClose=${onClose} title="New session">
     <div class="stack">
       ${agents.length > 1 && html`<div class="seg">${agents.map((a) => html`<button class=${provider === a.provider ? 'on' : ''} onClick=${() => { setProvider(a.provider); setModelSel(null); }}>${a.displayName}</button>`)}</div>`}
+      <div class="field"><label>What should the agent do?</label>
+        <textarea class="input" rows="3" placeholder="e.g. Fix the failing tests and explain what was wrong" value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
+      </div>
       <div class="field"><label>Folder on your PC</label>
         ${allFolders.slice(0, 5).map((f) => html`<button class=${`list-item ${f === folder ? 'on' : ''}`} key=${f} onClick=${() => setFolder(f)}>
           <${Icon} name="folder" /><div class="grow"><div>${folderName(f)}</div><div class="muted tiny">${filePath(f)}</div></div>${f === folder && html`<span class="check"><${Icon} name="check" /></span>`}
         </button>`)}
         <button class="btn sm" onClick=${() => setBrowse(true)}><${Icon} name="search" size="16" /> Browse…</button>
-      </div>
-      <div class="field"><label>What should the agent do?</label>
-        <textarea class="input" rows="4" placeholder="e.g. Fix the failing tests and explain what was wrong" value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
       </div>
       ${models.length > 0 && html`<div class="field"><label>Model</label>
         <button class="list-item on" onClick=${() => setModelOpen(true)}><${Icon} name="cpu" /><span class="grow">${modelSummary(models, chosenModel)}</span><${Icon} name="right" /></button>
@@ -151,27 +170,36 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
   const needs = filtered.filter((s) => has(s.status, S.Input));
   const working = filtered.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress));
   const rest = filtered.filter((s) => !has(s.status, S.Input) && !has(s.status, S.InProgress));
-  const section = (title, items) => items.length > 0 && html`<div><div class="section-title">${title}</div>${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} />`)}</div>`;
+  const groups = [['Needs input', needs], ['In progress', working]];
+  for (const name of ['Today', 'Yesterday', 'Previous 7 days', 'Older']) groups.push([name, rest.filter((s) => bucketOf(s.modifiedAt) === name)]);
+  const online = conn.state === 'online';
   return html`<div class="screen">
     <div class="topbar">
       <img class="brand" src="./icons/icon.svg" alt="" />
-      <button class="grow" style="text-align:left" onClick=${onSwitchHost} aria-label="Switch PC">
-        <h1>${host.hostName}</h1>
-        <div class="sub"><span class=${`dot ${conn.state === 'online' ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`} style="display:inline-block;margin-right:6px"></span>${conn.state === 'online' ? `${list.length} sessions` : conn.state}</div>
+      <button class="titles" onClick=${onSwitchHost} aria-label="Switch PC">
+        <h1 class="host"><span>${host.hostName}</span><${Icon} name="down" /></h1>
+        <div class="sub"><span class=${`dot ${online ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`}></span>${online ? `${list.length} session${list.length === 1 ? '' : 's'}` : conn.state}</div>
       </button>
       <button class="icon-btn" onClick=${onSettings} aria-label="Settings"><${Icon} name="gear" /></button>
     </div>
     <${ConnectionBanner} conn=${conn} store=${store} onRepair=${() => app.repair(host)} />
-    <div class="page">
-      ${pushPrompt}
-      <div class="search"><${Icon} name="search" /><input class="input" type="search" placeholder="Search sessions" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
-      ${!store.sessionsLoaded && conn.state === 'online' && html`<div class="empty"><${Spinner} lg /></div>`}
-      ${section('Needs you', needs)}
-      ${section('Working', working)}
-      ${section(needs.length || working.length ? 'Recent' : 'Sessions', rest)}
-      ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : 'No sessions yet. Start one with the button below.'}</div>`}
+    <div class="scroll-wrap">
+      <div class="scroll">
+        <div class="list">
+          ${pushPrompt && html`<div class="page" style="padding-bottom:0">${pushPrompt}</div>`}
+          <div class="filter"><${Icon} name="search" /><input type="search" placeholder="Filter sessions" value=${q} onInput=${(e) => setQ(e.target.value)} aria-label="Filter sessions" /></div>
+          ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg /></div>`}
+          ${groups.map(([title, items]) => items.length > 0 && html`<div key=${title}>
+            <div class="group-title">${title}</div>
+            ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} />`)}
+          </div>`)}
+          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : 'No sessions yet. Start one below.'}</div>`}
+        </div>
+      </div>
     </div>
-    ${store.online && html`<button class="fab" onClick=${() => setNewOpen(true)}><${Icon} name="plus" /> New</button>`}
+    ${store.online && html`<div class="bottom-bar">
+      <button class="newbar" onClick=${() => setNewOpen(true)}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
+    </div>`}
     ${store.online && html`<${NewSession} store=${store} open=${newOpen} onClose=${() => setNewOpen(false)} onCreated=${onOpen} />`}
   </div>`;
 }

@@ -23,7 +23,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     if (!decodePairingFragment(frag)) return setError('That does not look like a Pocket Pilot pairing link.');
     onLink(frag);
   };
-  return html`<div class="page">
+  return html`<div class="page safe">
     <div class="hero">
       <img class="logo" src="./icons/icon.svg" alt="" />
       <h2>Pocket Pilot</h2>
@@ -68,7 +68,7 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
   const [phase, setPhase] = useState(null);
   const [error, setError] = useState(null);
   if (!info) {
-    return html`<div class="page"><div class="card stack"><b>Invalid pairing link</b><p class="muted">Show a new QR code in VS Code and scan it again.</p><button class="btn" onClick=${onCancel}>Back</button></div></div>`;
+    return html`<div class="page safe"><div class="card stack"><b>Invalid pairing link</b><p class="muted">Show a new QR code in VS Code and scan it again.</p><button class="btn" onClick=${onCancel}>Back</button></div></div>`;
   }
   const start = async () => {
     setError(null);
@@ -96,7 +96,7 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
     }
   };
   const idx = STEPS.findIndex(([k]) => k === phase);
-  return html`<div class="page">
+  return html`<div class="page safe">
     <div class="hero" style="padding-top:12px">
       <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
       <h2 style="font-size:23px">Pair with ${info.name || 'your PC'}</h2>

@@ -61,17 +61,17 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
   return html`<div class="screen">
     <div class="topbar">
       <button class="icon-btn" onClick=${onBack} aria-label="Back"><${Icon} name="back" /></button>
-      <h1 class="grow">Settings</h1>
+      <div class="titles"><h1>Settings</h1></div>
     </div>
-    <div class="page">
+    <div class="scroll-wrap"><div class="scroll"><div class="page">
       <div class="section-title">Your PCs</div>
       <div class="set-group">
         ${hosts.map((h) => html`<div class="set-row" key=${h.hostId}>
-          <div class="ic"><${Icon} name="cpu" /></div>
+          <div class="ic"><${Icon} name="monitor" /></div>
           <div class="grow">
             <div><b>${h.hostName}</b>${current?.hostId === h.hostId ? html` <span class="muted small">· current</span>` : ''}</div>
             <div class="kv">Fingerprint <${HostFingerprint} host=${h} /></div>
-            <div class="kv">${h.passkey ? '🔐 Passkey protected' : '🔓 No passkey'} · ${h.rendezvous ? '🔁 Auto-reconnect' : 'Manual reconnect'}</div>
+            <div class="kv">${h.passkey ? 'Passkey protected' : 'No passkey'} · ${h.rendezvous ? 'Auto-reconnect' : 'Manual reconnect'}</div>
           </div>
           <div class="stack" style="gap:6px">
             ${current?.hostId !== h.hostId && html`<button class="btn sm" onClick=${() => app.selectHost(h.hostId)}>Use</button>`}
@@ -84,11 +84,11 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
       <div class="section-title">Notifications</div>
       <div class="card">${current ? html`<${NotificationSetup} app=${app} host=${current} />` : html`<span class="muted">Pair a PC first.</span>`}</div>
 
-      <div class="section-title">Appearance</div>
-      <div class="seg">${[['system', 'System'], ['dark', 'Dark'], ['light', 'Light']].map(([v, l]) => html`<button class=${theme === v ? 'on' : ''} onClick=${() => setT(v)}>${l}</button>`)}</div>
+      <div class="section-title">Theme</div>
+      <div class="seg">${[['dark', 'One Dark'], ['light', 'One Light'], ['system', 'System']].map(([v, l]) => html`<button class=${theme === v ? 'on' : ''} onClick=${() => setT(v)}>${l}</button>`)}</div>
 
       <div class="section-title">Security</div>
-      <div class="card stack small">
+      <div class="card stack small sec-list">
         <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this phone and your PC (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
         <div class="row"><${Icon} name="key" /><span>This phone’s private key never leaves it and cannot be exported. Your GitHub token never leaves your PC.</span></div>
         <div class="row"><${Icon} name="shield" /><span>Remove this phone anytime in VS Code (Pocket Pilot panel) — it is disconnected immediately.</span></div>
@@ -97,9 +97,9 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
       <div class="section-title">About</div>
       <div class="set-group">
         <div class="set-row"><div class="ic"><${Icon} name="info" /></div><div class="grow">Pocket Pilot ${APP_VERSION}</div></div>
-        <a class="set-row" href="https://github.com/mithawala/pocket-pilot" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none"><div class="ic"><${Icon} name="globe" /></div><div class="grow">Source code & docs</div><${Icon} name="right" /></a>
+        <a class="set-row" href="https://github.com/mithawala/pocket-pilot" target="_blank" rel="noopener noreferrer"><div class="ic"><${Icon} name="globe" /></div><div class="grow">Source code & docs</div><${Icon} name="right" /></a>
         ${app.installEvent && html`<button class="set-row" onClick=${() => app.install()}><div class="ic"><${Icon} name="phone" /></div><div class="grow">Install app</div><${Icon} name="right" /></button>`}
       </div>
-    </div>
+    </div></div></div>
   </div>`;
 }

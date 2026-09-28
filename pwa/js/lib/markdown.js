@@ -49,6 +49,23 @@ export function renderMarkdown(src) {
   return htmlOut;
 }
 
+/** One line of markdown (links, `code`, emphasis) without block wrappers — for tool progress rows. */
+export function renderInline(src) {
+  const text = String(src ?? '');
+  const key = `\u0000inline:${text}`;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  let htmlOut;
+  try {
+    htmlOut = DOMPurify.sanitize(marked.parseInline(text), PURIFY);
+  } catch {
+    htmlOut = DOMPurify.sanitize(text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])));
+  }
+  if (cache.size > 400) cache.clear();
+  cache.set(key, htmlOut);
+  return htmlOut;
+}
+
 /** Plain text of an AHP StringOrMarkdown value. */
 export function mdPlain(v, max = 0) {
   let s = typeof v === 'string' ? v : v && typeof v.markdown === 'string' ? v.markdown : '';

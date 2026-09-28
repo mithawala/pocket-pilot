@@ -30,15 +30,15 @@ function renderQrSvg(text) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" role="img" aria-label="Pairing QR code"><rect width="${size}" height="${size}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 }
 
-// VS Code "Dark Modern" theme colours for the variables the sidebar uses.
+// VS Code "One Dark Pro" (Atom One Dark) colours for the variables the sidebar uses.
 const VSCODE_DARK = `
-:root { --vscode-foreground: #cccccc; --vscode-font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; --vscode-font-size: 13px;
-  --vscode-widget-border: #313131; --vscode-sideBarSectionHeader-background: #1d1d1d; --vscode-badge-background: #616161; --vscode-badge-foreground: #f8f8f8;
-  --vscode-editorWarning-foreground: #cca700; --vscode-errorForeground: #f85149; --vscode-button-background: #0078d4; --vscode-button-foreground: #fff;
-  --vscode-button-hoverBackground: #026ec1; --vscode-button-secondaryBackground: #313131; --vscode-button-secondaryForeground: #cccccc;
-  --vscode-button-secondaryHoverBackground: #3c3c3c; --vscode-textLink-foreground: #4daafc; --vscode-toolbar-hoverBackground: rgba(90,93,94,.31);
+:root { --vscode-foreground: #abb2bf; --vscode-font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; --vscode-font-size: 13px;
+  --vscode-widget-border: #3e4452; --vscode-sideBarSectionHeader-background: #282c34; --vscode-badge-background: #4d78cc; --vscode-badge-foreground: #ffffff;
+  --vscode-editorWarning-foreground: #e5c07b; --vscode-errorForeground: #e06c75; --vscode-button-background: #4d78cc; --vscode-button-foreground: #fff;
+  --vscode-button-hoverBackground: #5a86dd; --vscode-button-secondaryBackground: #3a3f4b; --vscode-button-secondaryForeground: #d7dae0;
+  --vscode-button-secondaryHoverBackground: #454b58; --vscode-textLink-foreground: #61afef; --vscode-toolbar-hoverBackground: rgba(90,93,94,.31);
   --vscode-editor-font-family: Consolas, "Courier New", monospace; }
-html, body { background: #181818; }`;
+html, body { background: #21252b; }`;
 
 function sidebarHarness() {
   const state = {
@@ -203,7 +203,9 @@ async function newPage(cdp, { width, height, dpr = 2, mobile = true }) {
   return page;
 }
 
-const HIDE_BANNER = `document.head.insertAdjacentHTML('beforeend', '<style>.demo-banner{display:none!important}</style>')`;
+// Phone shots: iPhone-like safe areas (status bar / home indicator) so the product page can frame
+// them uncropped, and without the demo banner.
+const PHONE_CHROME = `document.head.insertAdjacentHTML('beforeend', '<style>:root{--safe-top:47px!important;--safe-bottom:30px!important}.demo-banner{display:none!important}.shell.has-banner .topbar{padding-top:calc(var(--safe-top) + 4px)!important}</style>')`;
 const click = (selector, text) => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => ${text ? `e.textContent.includes(${JSON.stringify(text)})` : 'true'}); if (!el) throw new Error('not found: ' + ${JSON.stringify(`${selector} ${text || ''}`)}); el.click(); return true; })()`;
 
 async function main() {
@@ -216,25 +218,27 @@ async function main() {
     const phone = await newPage(cdp, { width: 390, height: 844 });
     const demo = async (hash = '') => {
       await phone.goto(`${base}/pwa/?demo${hash}`);
-      await phone.waitFor('document.querySelector(".session, .composer")');
-      await phone.eval(HIDE_BANNER);
-      await sleep(900);
+      await phone.waitFor('document.querySelector(".srow, .composer")');
+      await phone.eval(PHONE_CHROME);
+      await sleep(1100);
     };
     await demo();
     await phone.shot('sessions.webp');
     await demo(`#/s/${encodeURIComponent('copilotcli:/demo-auth')}`);
     await phone.shot('approval.webp');
-    await phone.eval(click('.composer button', 'Claude Opus 5.5'));
+    await phone.eval(click('.composer .pick', 'Claude Opus 5.5'));
     await sleep(800);
     await phone.shot('models.webp');
     await demo(`#/s/${encodeURIComponent('copilotcli:/demo-flaky')}`);
     await phone.shot('chat.webp');
     await demo();
-    await phone.eval(click('.fab'));
+    await phone.eval(click('.newbar'));
     await sleep(800);
     await phone.shot('new-session.webp');
     await phone.goto(`${base}/pwa/`);
-    await sleep(1200);
+    await phone.waitFor('document.querySelector(".hero")');
+    await phone.eval(PHONE_CHROME);
+    await sleep(1000);
     await phone.shot('pair.webp');
     await phone.close();
 

@@ -23,6 +23,21 @@ function parseRoute() {
   return { name: 'home' };
 }
 
+const THEME_COLORS = { dark: '#21252b', light: '#f0f0f1' };
+
+/** Applies "dark" (One Dark), "light" (One Light) or "system"; mirrored to localStorage for the first paint. */
+export function applyTheme(theme) {
+  const t = ['dark', 'light', 'system'].includes(theme) ? theme : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  const effective = t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[effective]);
+  try {
+    localStorage.setItem('pp:theme', t);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export class AppController extends EventTarget {
   constructor({ pendingFragment, demo = false }) {
     super();
@@ -30,7 +45,7 @@ export class AppController extends EventTarget {
     this.currentId = null;
     this.active = null;
     this.pendingFragment = pendingFragment || null;
-    this.theme = 'system';
+    this.theme = 'dark';
     this.installEvent = null;
     this.ready = false;
     this.demo = demo;
@@ -42,7 +57,7 @@ export class AppController extends EventTarget {
   }
 
   async init() {
-    this.theme = (await db.get('theme').catch(() => null)) || 'system';
+    this.theme = (await db.get('theme').catch(() => null)) || 'dark';
     this._applyTheme();
     if (this.demo) {
       // Sample data only: never touches the real paired PCs stored on this device.
@@ -199,8 +214,7 @@ export class AppController extends EventTarget {
   }
 
   _applyTheme() {
-    if (this.theme === 'system') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', this.theme);
+    applyTheme(this.theme);
   }
 
   async install() {
@@ -216,7 +230,7 @@ export class AppController extends EventTarget {
 function HostSwitcher({ app, open, onClose }) {
   return html`<${Sheet} open=${open} onClose=${onClose} title="Your PCs">
     ${app.hosts.map((h) => html`<button class=${`list-item ${h.hostId === app.currentId ? 'on' : ''}`} onClick=${() => { app.selectHost(h.hostId); onClose(); }}>
-      <${Icon} name="cpu" /><span class="grow">${h.hostName}</span>${h.hostId === app.currentId && html`<span class="check"><${Icon} name="check" /></span>`}
+      <${Icon} name="monitor" /><span class="grow">${h.hostName}</span>${h.hostId === app.currentId && html`<span class="check"><${Icon} name="check" /></span>`}
     </button>`)}
     <button class="list-item" onClick=${() => { onClose(); location.hash = '#/settings'; }}><${Icon} name="gear" /><span class="grow">Manage PCs</span></button>
   </${Sheet}>`;
@@ -250,23 +264,23 @@ export function App({ app }) {
     if (route.name === 'open') {
       app.openFromNotification(route.hostId, route.uri);
     }
-    window.scrollTo(0, 0);
   }, [route.name, route.uri]);
 
-  if (!app.ready) return html`<div class="empty">Loading…</div>`;
+  if (!app.ready) return html`<div class="shell"><div class="boot"><span class="spinner lg"></span></div></div>`;
   const installHint = app.installEvent ? html`<button class="btn block" style="margin-top:12px" onClick=${() => app.install()}><${Icon} name="phone" /> Install Pocket Pilot</button>` : null;
 
   let screen;
+  const scrollable = (inner) => html`<div class="screen"><div class="scroll-wrap"><div class="scroll">${inner}</div></div></div>`;
   if (route.name === 'pair' && app.pendingFragment) {
-    screen = html`<${PairScreen} fragment=${app.pendingFragment}
+    screen = scrollable(html`<${PairScreen} fragment=${app.pendingFragment}
       onPaired=${async (record) => {
         app.pendingFragment = null;
         await app.addHost(record);
         toast(`Paired with ${record.hostName} 🎉`);
       }}
-      onCancel=${() => { app.pendingFragment = null; location.hash = '#/'; }} />`;
+      onCancel=${() => { app.pendingFragment = null; location.hash = '#/'; }} />`);
   } else if (!app.current) {
-    screen = html`<${Welcome} installPrompt=${installHint} onScan=${() => setScanning(true)} onLink=${startPairing} />`;
+    screen = scrollable(html`<${Welcome} installPrompt=${installHint} onScan=${() => setScanning(true)} onLink=${startPairing} />`);
   } else if (route.name === 'settings') {
     screen = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => history.length > 1 ? history.back() : (location.hash = '#/')} onPairNew=${() => setScanning(true)} />`;
   } else if (route.name === 'chat' && app.active) {
@@ -279,5 +293,11 @@ export function App({ app }) {
       onSettings=${() => { location.hash = '#/settings'; }}
       onSwitchHost=${() => setSwitcher(true)} />`;
   }
-  return html`<${Toasts} />${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my PC →</b></a>`}${screen}<${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}`;
+  return html`<div class=${`shell ${app.demo ? 'has-banner' : ''}`}>
+    ${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my PC →</b></a>`}
+    ${screen}
+    <${Toasts} />
+    <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />
+    ${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}
+  </div>`;
 }

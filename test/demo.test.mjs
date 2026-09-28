@@ -17,7 +17,7 @@ test('demo: approving the pending tool call completes the turn through the real 
   const { store } = createDemo();
   try {
     const list = store.sortedSessions();
-    assert.equal(list.length, 5);
+    assert.equal(list.length, 6);
     assert.equal(list[0].resource, 'copilotcli:/demo-auth', '"Needs you" sorts first');
     const chat = store.chatFor('copilotcli:/demo-auth');
     const turn = store.chatState.get(chat).activeTurn;
@@ -30,6 +30,44 @@ test('demo: approving the pending tool call completes the turn through the real 
     });
     assert.match(JSON.stringify(done.turns[0].responseParts), /42 tests pass/);
     assert.equal(store.sessions.get('copilotcli:/demo-auth').status & 24, 0, 'no longer needs input or in progress');
+  } finally {
+    store.dispose();
+  }
+});
+
+test('demo: answering the agent\'s question completes the turn with the chosen option', async () => {
+  const { store } = createDemo();
+  try {
+    const chat = store.chatFor('copilotcli:/demo-dates');
+    const part = store.chatState.get(chat).activeTurn.responseParts.find((p) => p.kind === 'inputRequest');
+    assert.equal(part.request.questions[0].kind, 'single-select');
+    store.answerInput(chat, part.request.id, 'accept', { lib: { state: 'submitted', value: { kind: 'selected', value: 'dayjs' } } });
+    const done = await until(() => {
+      const cs = store.chatState.get(chat);
+      return !cs.activeTurn && cs.turns.length === 1 && cs;
+    });
+    const parts = done.turns[0].responseParts;
+    assert.equal(parts.find((p) => p.kind === 'inputRequest').response, 'accept');
+    assert.match(JSON.stringify(parts), /npm install dayjs/);
+    assert.match(JSON.stringify(parts), /Going with \*\*Day\.js\*\*/);
+  } finally {
+    store.dispose();
+  }
+});
+
+test('ui helpers: code languages and the composer model label', async () => {
+  const { canonicalLanguage, rawLanguage } = await import('../pwa/js/lib/highlight.js');
+  const { modelChip } = await import('../pwa/js/ui/model-picker.js');
+  assert.equal(rawLanguage({ className: 'language-TS' }), 'ts');
+  assert.equal(canonicalLanguage('ts'), 'typescript');
+  assert.equal(canonicalLanguage('ps1'), 'powershell');
+  assert.equal(canonicalLanguage('html'), 'xml');
+  assert.equal(canonicalLanguage('brainfuck'), null);
+  const { store } = createDemo();
+  try {
+    const models = store.models('copilotcli');
+    assert.deepEqual(modelChip(models, { id: 'claude-opus-5.5', config: { thinkingLevel: 'xhigh', contextSize: 200000 } }), { name: 'Claude Opus 5.5', tag: 'Extra High' });
+    assert.deepEqual(modelChip(models, null), { name: 'Default model', tag: '' });
   } finally {
     store.dispose();
   }

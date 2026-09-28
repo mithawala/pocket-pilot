@@ -30,6 +30,20 @@ export function modelSummary(models, sel) {
   return bits.join(' · ');
 }
 
+/** Compact label for the composer's model picker: the name plus its thinking level, if any. */
+export function modelChip(models, sel) {
+  if (!sel) return { name: 'Default model', tag: '' };
+  const m = models.find((x) => x.id === sel.id);
+  const think = enumProps(m).find(([k]) => /think|effort|reason/i.test(k));
+  let tag = '';
+  if (think) {
+    const [k, p] = think;
+    const v = sel.config?.[k];
+    if (v !== undefined) tag = p.enumLabels?.[p.enum.indexOf(v)] ?? String(v);
+  }
+  return { name: m?.name || sel.id, tag };
+}
+
 function describe(m) {
   const bits = [];
   if (m.maxContextWindow) bits.push(m.maxContextWindow >= 1e6 ? `${Math.round(m.maxContextWindow / 1e5) / 10}M context` : `${Math.round(m.maxContextWindow / 1000)}K context`);

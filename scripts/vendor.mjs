@@ -15,6 +15,9 @@ const update = process.argv.includes('--update');
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
 const AHP = '@microsoft/agent-host-protocol@0.9.0';
+const HLJS = '@highlightjs/cdn-assets@11.12.0';
+// Languages for code blocks in chat (loaded on demand); aliases such as ts/sh/ps1/yml come with them.
+const HLJS_LANGS = ['bash', 'c', 'cpp', 'csharp', 'css', 'diff', 'dockerfile', 'go', 'ini', 'java', 'javascript', 'json', 'kotlin', 'markdown', 'php', 'plaintext', 'powershell', 'python', 'ruby', 'rust', 'shell', 'sql', 'swift', 'typescript', 'xml', 'yaml'];
 
 /** @type {{pkg:string, from:string, to:string, url?:string, patch?:(s:string)=>string}[]} */
 const files = [
@@ -33,6 +36,9 @@ const files = [
   { pkg: 'qrcode-generator@2.0.4', from: 'dist/qrcode.js', to: 'media/vendor/qrcode.js' },
   { pkg: 'jsqr@1.4.0', from: 'dist/jsQR.js', to: 'pwa/vendor/jsqr/jsQR.js' },
   { pkg: 'jsqr@1.4.0', from: 'LICENSE', to: 'pwa/vendor/jsqr/LICENSE' },
+  { pkg: HLJS, from: 'es/core.min.js', to: 'pwa/vendor/hljs/core.min.js' },
+  ...HLJS_LANGS.map((l) => ({ pkg: HLJS, from: `es/languages/${l}.min.js`, to: `pwa/vendor/hljs/languages/${l}.min.js` })),
+  { pkg: HLJS, from: 'LICENSE', to: 'pwa/vendor/hljs/LICENSE' },
 ];
 
 async function fetchText(url) {

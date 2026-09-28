@@ -4,11 +4,13 @@ import { Turn, PendingTurn } from './parts.js';
 import { Composer } from './composer.js';
 import { ConnectionBanner } from './sessions.js';
 import { statusOf, folderName, providerLabel, filePath, S, has } from '../lib/format.js';
+import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 
 const PAGE = 25;
 
 function FileViewer({ store, uri, onClose }) {
   const [state, setState] = useState({ loading: true });
+  const codeRef = useRef(null);
   useEffect(() => {
     if (!uri) return;
     setState({ loading: true });
@@ -24,9 +26,14 @@ function FileViewer({ store, uri, onClose }) {
       setState({ text: text.length > 200000 ? text.slice(0, 200000) + '\n… (truncated)' : text });
     }).catch((err) => setState({ error: err.message }));
   }, [uri]);
+  const ext = uri ? (filePath(uri).split(/[\\/]/).pop().match(/\.([\w-]+)$/)?.[1] || '').toLowerCase() : '';
+  const lang = canonicalLanguage(ext) ? ext : '';
+  useEffect(() => {
+    if (state.text && lang && state.text.length < 120000 && codeRef.current) highlightElement(codeRef.current).catch(() => {});
+  }, [state.text, lang]);
   return html`<${Sheet} open=${!!uri} onClose=${onClose} title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
     <div class="kv" style="margin-bottom:8px">${uri ? filePath(uri) : ''}</div>
-    ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>` : html`<div class="md"><pre><code>${state.text}</code></pre></div>`}
+    ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>` : html`<div class="md"><pre><code key=${uri} ref=${codeRef} class=${lang ? `language-${lang}` : ''}>${state.text}</code></pre></div>`}
   </${Sheet}>`;
 }
 
@@ -61,7 +68,10 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
   const [fileUri, setFileUri] = useState(null);
   const [menu, setMenu] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
-  const endRef = useRef(null);
+  const scrollRef = useRef(null);
+  const contentRef = useRef(null);
+  // Follow new output while the user is at the bottom, like VS Code's chat.
+  const stick = useRef(true);
   const first = useRef(true);
 
   useEffect(() => store.watchSession(uri), [uri, store]);
@@ -69,7 +79,9 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
   const sessionState = store.sessionState.get(uri);
   const chat = store.chatFor(uri);
   const chatState = chat ? store.chatState.get(chat) : null;
-  const ctx = { store, chat };
+  const provider = session?.provider || sessionState?.provider;
+  const models = store.models(provider);
+  const ctx = { store, chat, provider, modelName: (id) => models.find((m) => m.id === id)?.name || id };
 
   useEffect(() => {
     if (session && !has(session.status, S.IsRead) && document.visibilityState === 'visible') {
@@ -81,11 +93,17 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
     }
   }, [session?.status]);
 
-  useEffect(() => {
-    const onScroll = () => setAtBottom(window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const pin = (smooth) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  };
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 90;
+    stick.current = bottom;
+    setAtBottom(bottom);
+  };
 
   const turns = chatState?.turns || [];
   const active = chatState?.activeTurn;
@@ -96,18 +114,29 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
     if (!chatState) return;
     if (first.current) {
       first.current = false;
-      endRef.current?.scrollIntoView({ block: 'end' });
+      pin(false);
       return;
     }
-    if (atBottom) endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    if (stick.current) pin(false);
   }, [signature, !!chatState]);
+
+  // Stay pinned when the view shrinks (keyboard) or content reflows (highlighting, images).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    if (contentRef.current) ro.observe(contentRef.current);
+    return () => ro.disconnect();
+  }, [!!chatState]);
 
   useEffect(() => {
     const onClick = async (e) => {
       const copy = e.target.closest('.copy-btn');
       if (copy) {
-        const pre = copy.parentElement;
-        const text = [...pre.childNodes].filter((n) => n !== copy).map((n) => n.textContent).join('');
+        const text = copy.closest('.code-block')?.querySelector('pre')?.textContent || '';
         try {
           await navigator.clipboard.writeText(text);
           copy.textContent = 'Copied';
@@ -129,31 +158,40 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;
   const title = session?.title || chatState?.title || 'Session';
+  const folder = folderName(session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0]);
+  const empty = chatState && !turns.length && !active && !localPending.length;
 
   return html`<div class="screen">
     <div class="topbar">
       <button class="icon-btn" onClick=${onBack} aria-label="Back"><${Icon} name="back" /></button>
-      <div class="grow">
+      <div class="titles">
         <h1>${title}</h1>
-        <div class="sub">${providerLabel(session?.provider)} · ${folderName(session?.workingDirectories?.[0])} ${status.key !== 'idle' ? html`· <${StatusPill} status=${status} />` : ''}</div>
+        <div class="sub"><span>${providerLabel(provider)}</span>${folder && html`<span class="sep">·</span><span>${folder}</span>`}${status.key !== 'idle' && html`<span class="sep">·</span><${StatusPill} status=${status} />`}</div>
       </div>
       <button class="icon-btn" onClick=${() => setMenu(true)} aria-label="Session options"><${Icon} name="more" /></button>
     </div>
-    ${inputNeeded.length > 0 && html`<button class="banner warn" onClick=${() => document.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-      <${Icon} name="alert" size="18" /> ${inputNeeded.length === 1 ? 'The agent is waiting for you' : `${inputNeeded.length} requests are waiting for you`}<span style="margin-left:auto">Review ↓</span>
+    ${inputNeeded.length > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+      <${Icon} name="alert-circle" /><span>${inputNeeded.length === 1 ? 'The agent is waiting for you' : `${inputNeeded.length} requests are waiting for you`}</span><span class="go">Review</span>
     </button>`}
     <${ConnectionBanner} conn=${conn} store=${store} onRepair=${onRepair} />
-    <div class="chat">
-      ${!chatState && html`<div class="empty"><${Spinner} lg /><p>Loading conversation…</p></div>`}
-      ${chatState?.turnsNextCursor && hidden === 0 && html`<button class="btn sm load-older" onClick=${() => store.loadOlder(chat).catch((e) => toast(e.message, 'err'))}>Load older messages</button>`}
-      ${hidden > 0 && html`<button class="btn sm load-older" onClick=${() => setShown(shown + PAGE)}>Show ${Math.min(PAGE, hidden)} earlier turns</button>`}
-      ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} ctx=${ctx} />`)}
-      ${active && html`<${Turn} key=${active.id} turn=${active} active=${true} activity=${chatState.activity || session?.activity} ctx=${ctx} />`}
-      ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} />`)}
-      ${chatState && !turns.length && !active && !localPending.length && html`<div class="empty">No messages yet. Say hello 👋</div>`}
-      <div ref=${endRef}></div>
+    <div class="scroll-wrap">
+      <div class="scroll" ref=${scrollRef} onScroll=${onScroll}>
+        <div class="chat" ref=${contentRef}>
+          ${!chatState && html`<div class="chat-empty"><${Spinner} lg /><p>Loading conversation…</p></div>`}
+          ${chatState?.turnsNextCursor && hidden === 0 && html`<button class="btn sm load-older" onClick=${() => store.loadOlder(chat).catch((e) => toast(e.message, 'err'))}>Load older messages</button>`}
+          ${hidden > 0 && html`<button class="btn sm load-older" onClick=${() => setShown(shown + PAGE)}>Show ${Math.min(PAGE, hidden)} earlier turns</button>`}
+          ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} ctx=${ctx} />`)}
+          ${active && html`<${Turn} key=${active.id} turn=${active} active=${true} activity=${chatState.activity || session?.activity} ctx=${ctx} />`}
+          ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} />`)}
+          ${empty && html`<div class="chat-empty">
+            <div class="big"><${Icon} name="sparkle" /></div>
+            <h2>${providerLabel(provider)} is ready</h2>
+            <p>${folder ? html`Ask anything about <b>${folder}</b>. ` : ''}The agent works on your PC, and you can follow along here or in VS Code.</p>
+          </div>`}
+        </div>
+      </div>
+      ${!atBottom && chatState && html`<button class="jump" onClick=${() => { stick.current = true; pin(true); }} aria-label="Scroll to the latest message"><${Icon} name="arrow-down" /></button>`}
     </div>
-    ${!atBottom && html`<button class="chip jump" onClick=${() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}><${Icon} name="down" /> Latest</button>`}
     ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} />`}
     <${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />
     <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} />

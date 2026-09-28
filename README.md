@@ -7,6 +7,7 @@
 <p align="center"><img src="media/icon.png" width="96" alt="Pocket Pilot"></p>
 
 - **Same sessions, same history.** The phone app is a real client of VS Code's *Agent Host Protocol*: you see exactly the sessions and full history VS Code shows, live, token by token.
+- **Feels like VS Code.** Atom One Dark (or One Light) theme, VS Code-style chat input with the mode and model pickers under the text, compact tool progress rows, the same confirmation buttons, and syntax-highlighted code.
 - **Everything you can do at your desk.** Send messages, queue follow-ups, steer a running agent, stop it, approve or skip tool calls (with the same options VS Code offers), answer the agent's questions, pick the model with its thinking level and context size, switch mode (Interactive / Plan / Autopilot) and approvals, start new sessions in any folder, send photos and files.
 - **Push notifications** when an agent needs approval, asks a question, finishes or fails — sent directly from your PC with standard Web Push (no Firebase, no account).
 - **Secure by design:** QR pairing with approval in VS Code, per-device keys that can't be exported, Face ID / fingerprint (passkeys), end-to-end encryption through the tunnel, instant revocation.
@@ -105,7 +106,7 @@ pwsh scripts/publish.ps1         # push to GitHub, publish the site to GitHub Pa
 
 Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `pwa/` (phone app; `pwa/js/core/` is shared with the extension, `pwa/js/demo/` drives the demo mode), `site/` (product page), `media/` (sidebar), `scripts/`, `test/`.
 
-Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
+Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), [highlight.js](https://highlightjs.org) (BSD-3-Clause). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
 
 ## License
 

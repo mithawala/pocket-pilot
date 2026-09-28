@@ -43,7 +43,7 @@ function tool(id, toolName, displayName, kind, invocation, past, input, output) 
   };
 }
 
-const userMsg = (text, model = 'claude-opus-5.5') => ({ text, origin: { kind: 'user' }, model: { id: model, config: { thinkingLevel: 'max', contextSize: 1000000 } } });
+const userMsg = (text, model = 'claude-opus-5.5', config = { thinkingLevel: 'max', contextSize: 1000000 }) => ({ text, origin: { kind: 'user' }, model: { id: model, config } });
 
 function folder(name) {
   return `file:///c%3A/Users/you/code/${name}`;
@@ -72,9 +72,9 @@ function sessionsData() {
         { kind: 'reasoning', id: 'r1', content: 'The auth module still calls the legacy session store. I will move token handling into TokenService, update the middleware, then run the whole test suite.' },
         tool('a1', 'view', 'Read', 'read', 'Read [auth/middleware.ts](file:///c%3A/Users/you/code/acme-api/src/auth/middleware.ts)', 'Read [auth/middleware.ts](file:///c%3A/Users/you/code/acme-api/src/auth/middleware.ts)', { path: 'src/auth/middleware.ts' }),
         tool('a2', 'grep', 'Search', 'search', 'Search for `legacySession`', 'Found 7 matches for `legacySession`', { pattern: 'legacySession' }, 'src/auth/middleware.ts:14\nsrc/auth/login.ts:31\nsrc/auth/logout.ts:9\n…'),
-        tool('a3', 'edit', 'Edit File', 'edit', 'Edit [auth/middleware.ts]', 'Edited [auth/middleware.ts]', { path: 'src/auth/middleware.ts' }),
-        tool('a4', 'edit', 'Edit File', 'edit', 'Edit [auth/login.ts]', 'Edited [auth/login.ts]', { path: 'src/auth/login.ts' }),
-        tool('a5', 'create', 'Create File', 'create', 'Create [auth/token-service.ts]', 'Created [auth/token-service.ts]', { path: 'src/auth/token-service.ts' }),
+        tool('a3', 'edit', 'Edit File', 'edit', 'Edit [auth/middleware.ts](file:///c%3A/Users/you/code/acme-api/src/auth/middleware.ts)', 'Edited [auth/middleware.ts](file:///c%3A/Users/you/code/acme-api/src/auth/middleware.ts)', { path: 'src/auth/middleware.ts' }),
+        tool('a4', 'edit', 'Edit File', 'edit', 'Edit [auth/login.ts](file:///c%3A/Users/you/code/acme-api/src/auth/login.ts)', 'Edited [auth/login.ts](file:///c%3A/Users/you/code/acme-api/src/auth/login.ts)', { path: 'src/auth/login.ts' }),
+        tool('a5', 'create', 'Create File', 'create', 'Create [auth/token-service.ts](file:///c%3A/Users/you/code/acme-api/src/auth/token-service.ts)', 'Created [auth/token-service.ts](file:///c%3A/Users/you/code/acme-api/src/auth/token-service.ts)', { path: 'src/auth/token-service.ts' }),
         { kind: 'markdown', id: 'm1', content: 'I moved all token handling into `TokenService` and updated 12 files. Next I want to run the full test suite with coverage.' },
         {
           kind: 'toolCall',
@@ -93,16 +93,42 @@ function sessionsData() {
     },
   });
 
+  // 1b. The agent asked a question.
+  add('dates', 'Pick a date library for the booking form', 'copilotcli', 'acme-web', S.Input | S.InProgress | S.IsRead, 7, 'Waiting for your answer', {
+    activeTurn: {
+      id: 'demo-dates-t1', startedAt: ago(9), usage: undefined,
+      message: userMsg('The booking form needs a date picker. Pick a date library and wire it up.', 'gpt-5.6-sol', { thinkingLevel: 'high', contextSize: 272000 }),
+      responseParts: [
+        { kind: 'reasoning', id: 'q1', content: 'There is no date library yet, and the options trade bundle size for API style. The team should choose.' },
+        tool('q2', 'grep', 'Search', 'search', 'Search for `moment|dayjs|date-fns`', 'Searched for `moment|dayjs|date-fns`, no results', { pattern: 'moment|dayjs|date-fns' }),
+        {
+          kind: 'inputRequest',
+          request: {
+            id: 'demo-question', message: 'The project has no date library yet. Which one should I add?',
+            questions: [{
+              id: 'lib', kind: 'single-select', title: 'Date library', message: 'All three are tree-shakeable and handle time zones.', required: true,
+              options: [
+                { id: 'date-fns', label: 'date-fns', description: 'Plain functions, about 6 KB for what the form needs', recommended: true },
+                { id: 'dayjs', label: 'Day.js', description: 'Moment-style API, 2 KB core plus plugins' },
+                { id: 'temporal', label: 'Temporal polyfill', description: 'The upcoming standard; larger today' },
+              ],
+            }],
+          },
+        },
+      ],
+    },
+  });
+
   // 2. Working right now.
   add('dark', 'Add dark mode to the settings page', 'copilotcli', 'acme-web', S.InProgress | S.IsRead, 0, 'Editing ThemeToggle.tsx', {
     activeTurn: {
       id: 'demo-dark-t1', startedAt: ago(2), usage: undefined,
       message: userMsg('Add a dark mode toggle to the settings page and remember the choice.'),
       responseParts: [
-        tool('d1', 'view', 'Read', 'read', 'Read [settings/Page.tsx]', 'Read [settings/Page.tsx]', { path: 'src/settings/Page.tsx' }),
-        tool('d2', 'create', 'Create File', 'create', 'Create [ThemeToggle.tsx]', 'Created [ThemeToggle.tsx]', { path: 'src/settings/ThemeToggle.tsx' }),
+        tool('d1', 'view', 'Read', 'read', 'Read [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)', 'Read [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)', { path: 'src/settings/Page.tsx' }),
+        tool('d2', 'create', 'Create File', 'create', 'Create [ThemeToggle.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/ThemeToggle.tsx)', 'Created [ThemeToggle.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/ThemeToggle.tsx)', { path: 'src/settings/ThemeToggle.tsx' }),
         { kind: 'markdown', id: 'dm1', content: 'Added a `ThemeToggle` component that stores the choice in `localStorage`. Now wiring it into the settings page…' },
-        { kind: 'toolCall', toolCall: { status: 'running', toolCallId: 'd3', toolName: 'edit', displayName: 'Edit File', _meta: { toolKind: 'edit' }, invocationMessage: md('Edit [settings/Page.tsx]'), toolInput: JSON.stringify({ path: 'src/settings/Page.tsx' }), confirmed: 'not-needed' } },
+        { kind: 'toolCall', toolCall: { status: 'running', toolCallId: 'd3', toolName: 'edit', displayName: 'Edit File', _meta: { toolKind: 'edit' }, invocationMessage: md('Edit [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)'), toolInput: JSON.stringify({ path: 'src/settings/Page.tsx' }), confirmed: 'not-needed' } },
       ],
     },
   });
@@ -114,9 +140,9 @@ function sessionsData() {
       message: userMsg('The checkout e2e test fails about 1 in 5 runs on CI. Find out why and fix it.'),
       responseParts: [
         { kind: 'reasoning', id: 'fr1', content: 'Intermittent failures usually mean a race. Let me look at the test and how it waits for the payment iframe.' },
-        tool('f1', 'view', 'Read', 'read', 'Read [e2e/checkout.spec.ts]', 'Read [e2e/checkout.spec.ts]', { path: 'e2e/checkout.spec.ts' }),
+        tool('f1', 'view', 'Read', 'read', 'Read [e2e/checkout.spec.ts](file:///c%3A/Users/you/code/acme-web/e2e/checkout.spec.ts)', 'Read [e2e/checkout.spec.ts](file:///c%3A/Users/you/code/acme-web/e2e/checkout.spec.ts)', { path: 'e2e/checkout.spec.ts' }),
         tool('f2', 'powershell', 'Run Shell Command', 'terminal', 'Run `npx playwright test checkout --repeat-each 20`', 'Ran `npx playwright test checkout --repeat-each 20`', { command: 'npx playwright test checkout --repeat-each 20' }, '4 failed, 16 passed\nTimeoutError: locator.click: waiting for "Pay now"'),
-        tool('f3', 'edit', 'Edit File', 'edit', 'Edit [e2e/checkout.spec.ts]', 'Edited [e2e/checkout.spec.ts]', { path: 'e2e/checkout.spec.ts' }),
+        tool('f3', 'edit', 'Edit File', 'edit', 'Edit [e2e/checkout.spec.ts](file:///c%3A/Users/you/code/acme-web/e2e/checkout.spec.ts)', 'Edited [e2e/checkout.spec.ts](file:///c%3A/Users/you/code/acme-web/e2e/checkout.spec.ts)', { path: 'e2e/checkout.spec.ts' }),
         tool('f4', 'powershell', 'Run Shell Command', 'terminal', 'Run `npx playwright test checkout --repeat-each 50`', 'Ran `npx playwright test checkout --repeat-each 50`', { command: 'npx playwright test checkout --repeat-each 50' }, '50 passed (1.4m)'),
         { kind: 'markdown', id: 'fm1', content: 'Found it: the test clicked **Pay now** before the payment iframe had finished loading, so the click sometimes landed on a disabled button.\n\n```ts\n// before\nawait page.click(\'text=Pay now\');\n\n// after\nconst pay = page.frameLocator(\'#payment\').getByRole(\'button\', { name: \'Pay now\' });\nawait expect(pay).toBeEnabled();\nawait pay.click();\n```\n\nIt now passes **50/50** runs locally. ✅' },
       ],
@@ -260,6 +286,16 @@ class DemoStore extends HostStore {
         : x)));
       await wait(400);
       await this._stream(chat, 'All **42 tests pass** and coverage went up to **94%**. ✅ The auth module now uses `TokenService` everywhere — want me to open a pull request?');
+      this._finish(chat, sessionUri);
+    } else if (action.type === 'chat/inputCompleted') {
+      const picked = action.answers?.lib?.value?.value;
+      const name = { 'date-fns': 'date-fns', dayjs: 'Day.js', temporal: 'the Temporal polyfill' }[picked] || 'date-fns';
+      const pkg = { 'date-fns': 'date-fns', dayjs: 'dayjs', temporal: '@js-temporal/polyfill' }[picked] || 'date-fns';
+      this._setSummary(sessionUri, { status: S.InProgress | S.IsRead, activity: `Installing ${pkg}` });
+      await wait(900);
+      this._parts(chat, (p) => [...p, tool(uuid(), 'powershell', 'Run Shell Command', 'terminal', `Run \`npm install ${pkg}\``, `Ran \`npm install ${pkg}\``, { command: `npm install ${pkg}` }, `added 1 package in 2s`)]);
+      await wait(500);
+      await this._stream(chat, `${action.response === 'accept' ? `Going with **${name}**.` : 'No preference, so I went with **date-fns**.'} The booking form now uses a \`<DatePicker>\` with localized labels:\n\n\`\`\`tsx\nimport { format } from '${pkg === 'date-fns' ? 'date-fns' : pkg}';\n\nexport function BookingDate({ value, onChange }: Props) {\n  return (\n    <DatePicker\n      value={value}\n      onChange={onChange}\n      label={(d) => format(d, 'PPP')}\n    />\n  );\n}\n\`\`\``);
       this._finish(chat, sessionUri);
     } else if (action.type === 'chat/turnCancelled') {
       this._setSummary(sessionUri, { status: S.Idle | S.IsRead, activity: undefined });
