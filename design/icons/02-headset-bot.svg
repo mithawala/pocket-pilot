@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Headset bot — a friendly robot with a pilot's radio headset</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a55e8"/><stop offset="1" stop-color="#2a1f72"/></linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4f0"/><stop offset="1" stop-color="#f6dcd4"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M112 252C112 122 184 78 256 78S400 122 400 252" stroke="#191240" stroke-width="26" stroke-linecap="round" fill="none"/>
+  <rect x="132" y="118" width="248" height="226" rx="92" fill="url(#head)"/>
+  <rect x="164" y="160" width="184" height="130" rx="42" fill="#1a1440"/>
+  <circle cx="216" cy="218" r="27" fill="#ffb627"/>
+  <circle cx="296" cy="218" r="27" fill="#ffb627"/>
+  <circle cx="225" cy="207" r="8" fill="#fff3c4"/>
+  <circle cx="305" cy="207" r="8" fill="#fff3c4"/>
+  <path d="M238 258q18 16 36 0" stroke="#ffb627" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <rect x="180" y="262" width="12" height="16" rx="4" fill="#ffb627"/>
+  <rect x="320" y="262" width="12" height="16" rx="4" fill="#ffb627"/>
+  <rect x="94" y="192" width="54" height="100" rx="25" fill="#191240"/>
+  <rect x="364" y="192" width="54" height="100" rx="25" fill="#191240"/>
+  <g stroke="#8f82ff" stroke-width="5" stroke-linecap="round">
+    <path d="M110 214h22M108 230h26M108 246h26M108 262h26M110 278h22"/>
+    <path d="M380 214h22M378 230h26M378 246h26M378 262h26M380 278h22"/>
+  </g>
+  <path d="M121 292C121 340 156 356 202 342" stroke="#191240" stroke-width="11" stroke-linecap="round" fill="none"/>
+  <rect x="196" y="330" width="30" height="22" rx="11" fill="#ffb627"/>
+  <rect x="198" y="352" width="116" height="92" rx="30" fill="url(#head)"/>
+  <rect x="220" y="370" width="72" height="42" rx="10" fill="none" stroke="#7b6be6" stroke-width="5"/>
+  <rect x="234" y="384" width="12" height="12" rx="2" fill="#191240"/>
+  <rect x="254" y="384" width="12" height="12" rx="2" fill="#191240"/>
+  <circle cx="276" cy="390" r="6" fill="#191240"/>
+</svg>

@@ -5,7 +5,12 @@
   "version": "0.1.0",
   "publisher": "mithawala",
   "license": "MIT",
+  "preview": true,
   "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#21252b",
+    "theme": "dark"
+  },
   "homepage": "https://mithawala.github.io/pocket-pilot/",
   "repository": {
     "type": "git",

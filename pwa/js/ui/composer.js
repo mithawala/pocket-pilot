@@ -38,7 +38,7 @@ function enumOptions(schema) {
 const MODE_ICONS = { interactive: 'chat', plan: 'checklist', autopilot: 'rocket' };
 const APPROVAL_ICONS = { default: 'shield', assisted: 'shield-check', autoApprove: 'shield-off' };
 
-export function Composer({ store, conn, sessionUri, session, chat, chatState }) {
+export function Composer({ store, conn, sessionUri, session, chat, chatState, autoFocus = false }) {
   const draftKey = `draft:${sessionUri}`;
   const modelKey = `model:${sessionUri}`;
   const [text, setText] = useState(() => sessionStorage.getItem(draftKey) || '');
@@ -69,6 +69,11 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState }) 
       el.style.height = `${Math.min(180, el.scrollHeight)}px`;
     }
   }, [text]);
+
+  // Desktop: focus the input when a session opens, like VS Code's chat (not on touch, where it pops the keyboard).
+  useEffect(() => {
+    if (autoFocus && matchMedia('(pointer: fine)').matches) ta.current?.focus({ preventScroll: true });
+  }, []);
 
   const active = !!chatState?.activeTurn;
   const lastModel = [...(chatState?.turns || [])].reverse().find((t) => t.message?.model)?.message.model || chatState?.activeTurn?.message?.model || null;

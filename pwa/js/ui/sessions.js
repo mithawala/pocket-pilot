@@ -12,7 +12,7 @@ function StatusIcon({ st, unread }) {
   return html`<${Icon} name="chat" />`;
 }
 
-function SessionRow({ s, onOpen }) {
+function SessionRow({ s, onOpen, selected }) {
   const st = statusOf(s.status);
   const unread = !has(s.status, S.IsRead);
   const activity = s.activity ? mdPlain(s.activity, 100) : '';
@@ -21,7 +21,7 @@ function SessionRow({ s, onOpen }) {
     : st.key === 'error' ? html`<span class="st-error">Error</span>`
     : null;
   const where = folderName(s.workingDirectories?.[0]) || providerLabel(s.provider);
-  return html`<button class=${`srow is-${st.key} ${unread ? 'unread' : ''}`} onClick=${() => onOpen(s.resource)}>
+  return html`<button class=${`srow is-${st.key} ${unread ? 'unread' : ''} ${selected ? 'on' : ''}`} aria-current=${selected ? 'true' : undefined} onClick=${() => onOpen(s.resource)}>
     <span class="si"><${StatusIcon} st=${st} unread=${unread} /></span>
     <span class="sb">
       <span class="l1"><span class="ttl">${s.title || 'Untitled session'}</span><span class="time">${ago(s.modifiedAt)}</span></span>
@@ -161,10 +161,9 @@ export function ConnectionBanner({ conn, store, onRepair }) {
   return html`<div class="banner warn"><${Spinner} /><span>PC offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
 }
 
-export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt }) {
+export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
   useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root');
   const [q, setQ] = useState('');
-  const [newOpen, setNewOpen] = useState(false);
   const list = store.sortedSessions();
   const filtered = q ? list.filter((s) => `${s.title} ${folderName(s.workingDirectories?.[0])}`.toLowerCase().includes(q.toLowerCase())) : list;
   const needs = filtered.filter((s) => has(s.status, S.Input));
@@ -191,15 +190,31 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
           ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg /></div>`}
           ${groups.map(([title, items]) => items.length > 0 && html`<div key=${title}>
             <div class="group-title">${title}</div>
-            ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} />`)}
+            ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}
           </div>`)}
           ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : 'No sessions yet. Start one below.'}</div>`}
         </div>
       </div>
     </div>
     ${store.online && html`<div class="bottom-bar">
-      <button class="newbar" onClick=${() => setNewOpen(true)}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
+      <button class="newbar" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
     </div>`}
-    ${store.online && html`<${NewSession} store=${store} open=${newOpen} onClose=${() => setNewOpen(false)} onCreated=${onOpen} />`}
+    ${store.online && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} />`}
+  </div>`;
+}
+
+/** Desktop main pane when no session is open (like VS Code's empty editor area). */
+export function DesktopHome({ store, host, onNew }) {
+  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status');
+  const list = store.sortedSessions();
+  const waiting = list.filter((s) => has(s.status, S.Input)).length;
+  const running = list.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress)).length;
+  return html`<div class="screen">
+    <div class="scroll-wrap"><div class="scroll"><div class="chat"><div class="chat-empty">
+      <div class="big"><${Icon} name="sparkle" /></div>
+      <h2>Open a session, or start a new one</h2>
+      <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${host.hostName}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in VS Code on your PC.</p>
+      ${store.online && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
+    </div></div></div></div>
   </div>`;
 }

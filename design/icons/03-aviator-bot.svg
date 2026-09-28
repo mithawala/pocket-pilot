@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Aviator bot — a robot in a leather flying cap with a wings pin</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0ea5a4"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9722f"/><stop offset="1" stop-color="#8f4a1c"/></linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f9ff"/><stop offset="1" stop-color="#d6e6ff"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="140" y="150" width="232" height="218" rx="86" fill="url(#head)"/>
+  <path d="M140 224C120 266 124 324 160 352L182 332C162 304 160 266 168 234Z" fill="#7c3f18"/>
+  <path d="M372 224C392 266 388 324 352 352L330 332C350 304 352 266 344 234Z" fill="#7c3f18"/>
+  <circle cx="158" cy="332" r="9" fill="#fcd34d"/>
+  <circle cx="354" cy="332" r="9" fill="#fcd34d"/>
+  <path d="M134 246C134 146 190 102 256 102S378 146 378 246C330 222 182 222 134 246Z" fill="url(#cap)"/>
+  <path d="M256 104V222" stroke="#7c3f18" stroke-width="6" stroke-linecap="round"/>
+  <path d="M178 150C202 126 228 118 250 116" stroke="#e4944f" stroke-width="10" stroke-linecap="round" fill="none" opacity=".7"/>
+  <path d="M214 176L256 194L298 176L288 170L256 184L224 170Z" fill="#fcd34d"/>
+  <circle cx="256" cy="190" r="9" fill="#fcd34d"/>
+  <rect x="176" y="244" width="160" height="100" rx="40" fill="#0f1f3a"/>
+  <circle cx="222" cy="290" r="17" fill="#67e8f9"/>
+  <circle cx="290" cy="290" r="17" fill="#67e8f9"/>
+  <circle cx="227" cy="284" r="5" fill="#fff"/>
+  <circle cx="295" cy="284" r="5" fill="#fff"/>
+  <path d="M240 318q16 11 32 0" stroke="#67e8f9" stroke-width="7" stroke-linecap="round" fill="none"/>
+</svg>

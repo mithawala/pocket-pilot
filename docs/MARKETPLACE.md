@@ -1,0 +1,29 @@
+# Publishing to the VS Code Marketplace
+
+Pocket Pilot is already packaged in a Marketplace-ready way. What remains is a one-time publisher account and an upload.
+
+## One-time setup
+
+1. Sign in at the [Marketplace publisher management page](https://marketplace.visualstudio.com/manage) with the Microsoft account that should own the extension.
+2. Click **Create publisher** and use the ID **`mithawala`** (it must match `"publisher"` in [`package.json`](../package.json); the ID can't be changed later). The display name can be anything, for example "Asif Mithawala".
+
+## Publish or update
+
+1. Bump `"version"` in `package.json` and add a section to [`CHANGELOG.md`](../CHANGELOG.md).
+2. Build the package: `node scripts/package-vsix.mjs` (creates `pocket-pilot-<version>.vsix`).
+3. On the publisher page, choose **New extension → Visual Studio Code** (first time) or **… → Update** (later) and upload the `.vsix`. The Marketplace scans it and lists it within minutes.
+
+Command-line publishing is optional: `npx @vscode/vsce publish --packagePath pocket-pilot-<version>.vsix`. It authenticates with a Microsoft Entra ID identity (recommended) or an Azure DevOps personal access token with the **Marketplace (Manage)** scope.
+
+## Already taken care of
+
+- **Icon:** a PNG of at least 128×128 px (`media/icon.png`). SVG icons are rejected.
+- **README and CHANGELOG:** no SVG images. The packager rewrites relative image and link URLs to absolute `https://raw.githubusercontent.com/...` and `https://github.com/...` URLs, like `vsce` does, so they render on the Marketplace and in VS Code's extension page.
+- **Manifest:** license, repository, homepage, bug tracker, categories, keywords, gallery banner colours, `engines.vscode`, and no proposed APIs.
+- **Preview flag:** the extension is marked as Preview (`"preview": true`), because it relies on the local agent-host endpoint that VS Code exposes and that may change between VS Code releases.
+
+## Things to keep in mind
+
+- **Trademarks:** keep "Copilot" and GitHub or Microsoft logos out of the extension name and icon. Mentioning that it works with GitHub Copilot in the description is fine.
+- **Personal project:** if you work for a company whose products the extension relates to, check its policy on publishing personal or open-source projects first.
+- **Other editors (optional):** to reach VS Code forks such as VSCodium or Cursor, publish the same `.vsix` to [Open VSX](https://open-vsx.org) with `npx ovsx publish`.

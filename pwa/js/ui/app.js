@@ -1,11 +1,11 @@
-import { html, useState, useEffect, useChange } from '../lib/ui.js';
+import { html, useState, useEffect, useMemo, useChange } from '../lib/ui.js';
 import { db, persistStorage } from '../lib/db.js';
 import { HostConnection } from '../net/host-connection.js';
 import { HostStore } from '../model/host-store.js';
 import { webauthn } from '../lib/webauthn.js';
 import { subscribe as pushSubscribe, currentSubscription } from '../lib/push.js';
 import { Toasts, Sheet, Icon, toast } from './common.js';
-import { SessionsScreen } from './sessions.js';
+import { SessionsScreen, DesktopHome } from './sessions.js';
 import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
 import { SettingsScreen, NotificationSetup } from './settings.js';
@@ -24,6 +24,18 @@ function parseRoute() {
 }
 
 const THEME_COLORS = { dark: '#21252b', light: '#f0f0f1' };
+
+/** True on desktop-sized windows, where the app shows sessions and chat side by side like VS Code. */
+function useWide() {
+  const mq = useMemo(() => matchMedia('(min-width: 900px)'), []);
+  const [wide, setWide] = useState(mq.matches);
+  useEffect(() => {
+    const on = () => setWide(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
 
 /** Applies "dark" (One Dark), "light" (One Light) or "system"; mirrored to localStorage for the first paint. */
 export function applyTheme(theme) {
@@ -241,6 +253,8 @@ export function App({ app }) {
   const [route, setRoute] = useState(parseRoute());
   const [switcher, setSwitcher] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const wide = useWide();
   const startPairing = (frag) => {
     setScanning(false);
     app.pendingFragment = frag;
@@ -281,6 +295,23 @@ export function App({ app }) {
       onCancel=${() => { app.pendingFragment = null; location.hash = '#/'; }} />`);
   } else if (!app.current) {
     screen = scrollable(html`<${Welcome} installPrompt=${installHint} onScan=${() => setScanning(true)} onLink=${startPairing} />`);
+  } else if (wide && app.active && ['home', 'chat', 'settings', 'open'].includes(route.name)) {
+    // Desktop: the sessions list is a sidebar and the chat (or settings) fills the rest, like VS Code.
+    const list = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
+      pushPrompt=${app.active.conn.state === 'online' && !app.demo ? html`<${NotificationSetup} app=${app} host=${app.current} compact=${true} />` : null}
+      selected=${route.name === 'chat' ? route.uri : null} newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
+      onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
+      onSettings=${() => { location.hash = '#/settings'; }}
+      onSwitchHost=${() => setSwitcher(true)} />`;
+    let main;
+    if (route.name === 'chat') {
+      main = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} embedded=${true} onRepair=${() => app.repair(app.current)} onBack=${() => { location.hash = '#/'; }} />`;
+    } else if (route.name === 'settings') {
+      main = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => { location.hash = '#/'; }} onPairNew=${() => setScanning(true)} />`;
+    } else {
+      main = html`<${DesktopHome} store=${app.active.store} host=${app.current} onNew=${() => setNewOpen(true)} />`;
+    }
+    screen = html`<div class="split"><aside class="pane-list" aria-label="Sessions">${list}</aside><main class="pane-main">${main}</main></div>`;
   } else if (route.name === 'settings') {
     screen = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => history.length > 1 ? history.back() : (location.hash = '#/')} onPairNew=${() => setScanning(true)} />`;
   } else if (route.name === 'chat' && app.active) {
@@ -289,6 +320,7 @@ export function App({ app }) {
     const pushPrompt = html`<${NotificationSetup} app=${app} host=${app.current} compact=${true} />`;
     screen = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
       pushPrompt=${app.active.conn.state === 'online' && !app.demo ? pushPrompt : null}
+      newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}
       onSwitchHost=${() => setSwitcher(true)} />`;

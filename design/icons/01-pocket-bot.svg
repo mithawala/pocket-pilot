@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Pocket bot — a robot peeking out of a pocket</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5dfc"/><stop offset="1" stop-color="#22b8f0"/></linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dde3ff"/></linearGradient>
+    <linearGradient id="pocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d42c4"/><stop offset="1" stop-color="#1b2785"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M256 130V94" stroke="#eef1ff" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="256" cy="80" r="18" fill="#ffd166"/>
+  <rect x="116" y="196" width="30" height="64" rx="15" fill="#c3cafb"/>
+  <rect x="366" y="196" width="30" height="64" rx="15" fill="#c3cafb"/>
+  <rect x="138" y="124" width="236" height="204" rx="78" fill="url(#head)"/>
+  <rect x="168" y="160" width="176" height="118" rx="46" fill="#1b1f45"/>
+  <circle cx="218" cy="210" r="21" fill="#5ef0ff"/>
+  <circle cx="294" cy="210" r="21" fill="#5ef0ff"/>
+  <circle cx="225" cy="203" r="7" fill="#fff"/>
+  <circle cx="301" cy="203" r="7" fill="#fff"/>
+  <path d="M234 246q22 16 44 0" stroke="#5ef0ff" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M88 296Q256 262 424 296L406 416Q400 444 372 448H140Q112 444 106 416Z" fill="url(#pocket)"/>
+  <path d="M110 310Q256 280 402 310" stroke="#8ea4ff" stroke-width="6" stroke-dasharray="16 12" stroke-linecap="round" fill="none"/>
+  <path d="M150 342H362" stroke="#3f55d6" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+  <ellipse cx="170" cy="286" rx="30" ry="21" fill="url(#head)"/>
+  <ellipse cx="342" cy="286" rx="30" ry="21" fill="url(#head)"/>
+  <path d="M160 280v12M176 278v14M334 278v14M350 280v12" stroke="#c3cafb" stroke-width="4" stroke-linecap="round"/>
+</svg>

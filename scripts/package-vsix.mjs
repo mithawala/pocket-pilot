@@ -27,6 +27,22 @@ const files = [];
 for (const [src, dest] of INCLUDE_FILES) if (fs.existsSync(path.join(root, src))) files.push({ src, dest: `extension/${dest}` });
 for (const d of INCLUDE_DIRS) for (const f of walk(d)) if (!EXCLUDE.some((re) => re.test(f))) files.push({ src: f, dest: `extension/${f}` });
 
+// Like vsce: VS Code and the Marketplace only render README/CHANGELOG images from absolute https URLs,
+// so relative images point at the raw files on GitHub and relative links at the repository.
+const repoSlug = (/github\.com[/:]([^/]+\/[^/.]+)/.exec(pkg.repository?.url || '') || [])[1];
+function absolutize(md) {
+  if (!repoSlug) return md;
+  const raw = `https://raw.githubusercontent.com/${repoSlug}/HEAD/`;
+  const blob = `https://github.com/${repoSlug}/blob/HEAD/`;
+  const isRelative = (u) => !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(u);
+  const clean = (u) => u.replace(/^\.\//, '');
+  return md
+    .replace(/(<img\b[^>]*?\bsrc=")([^"]+)"/gi, (m, a, u) => (isRelative(u) ? `${a}${raw}${clean(u)}"` : m))
+    .replace(/(!\[[^\]]*\]\()([^)\s]+)/g, (m, a, u) => (isRelative(u) ? `${a}${raw}${clean(u)}` : m))
+    .replace(/(^|[^!])(\[[^\]]*\]\()([^)\s]+)/g, (m, pre, a, u) => (isRelative(u) ? `${pre}${a}${blob}${clean(u)}` : m));
+}
+const TRANSFORM = { 'extension/README.md': absolutize, 'extension/CHANGELOG.md': absolutize };
+
 const esc = (s) => String(s ?? '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));
 const repo = pkg.repository?.url || '';
 const manifest = `<?xml version="1.0" encoding="utf-8"?>
@@ -37,7 +53,7 @@ const manifest = `<?xml version="1.0" encoding="utf-8"?>
     <Description xml:space="preserve">${esc(pkg.description)}</Description>
     <Tags>${esc((pkg.keywords || []).join(','))}</Tags>
     <Categories>${esc((pkg.categories || []).join(','))}</Categories>
-    <GalleryFlags>Public</GalleryFlags>
+    <GalleryFlags>${pkg.preview ? 'Public Preview' : 'Public'}</GalleryFlags>
     <Properties>
       <Property Id="Microsoft.VisualStudio.Code.Engine" Value="${esc(pkg.engines.vscode)}" />
       <Property Id="Microsoft.VisualStudio.Code.ExtensionDependencies" Value="" />
@@ -52,6 +68,8 @@ const manifest = `<?xml version="1.0" encoding="utf-8"?>
       <Property Id="Microsoft.VisualStudio.Services.Links.Support" Value="${esc(pkg.bugs?.url)}" />
       <Property Id="Microsoft.VisualStudio.Services.GitHubFlavoredMarkdown" Value="true" />
       <Property Id="Microsoft.VisualStudio.Services.Content.Pricing" Value="Free" />
+      <Property Id="Microsoft.VisualStudio.Services.Branding.Color" Value="${esc(pkg.galleryBanner?.color || '#21252b')}" />
+      <Property Id="Microsoft.VisualStudio.Services.Branding.Theme" Value="${esc(pkg.galleryBanner?.theme || 'dark')}" />
     </Properties>
     <License>extension/LICENSE.txt</License>
     <Icon>extension/${esc(pkg.icon)}</Icon>
@@ -93,7 +111,10 @@ const dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.
 const entries = [
   { name: '[Content_Types].xml', data: Buffer.from(contentTypes) },
   { name: 'extension.vsixmanifest', data: Buffer.from(manifest) },
-  ...files.map((f) => ({ name: f.dest, data: fs.readFileSync(path.join(root, f.src)) })),
+  ...files.map((f) => {
+    const data = fs.readFileSync(path.join(root, f.src));
+    return { name: f.dest, data: TRANSFORM[f.dest] ? Buffer.from(TRANSFORM[f.dest](data.toString('utf8'))) : data };
+  }),
 ];
 const chunks = [];
 const central = [];

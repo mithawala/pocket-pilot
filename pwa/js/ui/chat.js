@@ -31,7 +31,7 @@ function FileViewer({ store, uri, onClose }) {
   useEffect(() => {
     if (state.text && lang && state.text.length < 120000 && codeRef.current) highlightElement(codeRef.current).catch(() => {});
   }, [state.text, lang]);
-  return html`<${Sheet} open=${!!uri} onClose=${onClose} title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
+  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
     <div class="kv" style="margin-bottom:8px">${uri ? filePath(uri) : ''}</div>
     ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>` : html`<div class="md"><pre><code key=${uri} ref=${codeRef} class=${lang ? `language-${lang}` : ''}>${state.text}</code></pre></div>`}
   </${Sheet}>`;
@@ -62,7 +62,7 @@ function SessionMenu({ open, onClose, store, uri, session, onDeleted }) {
   </${Sheet}>`;
 }
 
-export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
+export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = false }) {
   useChange(store, (d) => !d.uri || d.uri === uri || d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || store.chatFor(uri) === d.uri);
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
@@ -163,12 +163,13 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
 
   return html`<div class="screen">
     <div class="topbar">
-      <button class="icon-btn" onClick=${onBack} aria-label="Back"><${Icon} name="back" /></button>
+      ${!embedded && html`<button class="icon-btn" onClick=${onBack} aria-label="Back"><${Icon} name="back" /></button>`}
       <div class="titles">
         <h1>${title}</h1>
         <div class="sub"><span>${providerLabel(provider)}</span>${folder && html`<span class="sep">·</span><span>${folder}</span>`}${status.key !== 'idle' && html`<span class="sep">·</span><${StatusPill} status=${status} />`}</div>
       </div>
       <button class="icon-btn" onClick=${() => setMenu(true)} aria-label="Session options"><${Icon} name="more" /></button>
+      ${embedded && html`<button class="icon-btn" onClick=${onBack} aria-label="Close"><${Icon} name="x" /></button>`}
     </div>
     ${inputNeeded.length > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
       <${Icon} name="alert-circle" /><span>${inputNeeded.length === 1 ? 'The agent is waiting for you' : `${inputNeeded.length} requests are waiting for you`}</span><span class="go">Review</span>
@@ -192,7 +193,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair }) {
       </div>
       ${!atBottom && chatState && html`<button class="jump" onClick=${() => { stick.current = true; pin(true); }} aria-label="Scroll to the latest message"><${Icon} name="arrow-down" /></button>`}
     </div>
-    ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} />`}
+    ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} autoFocus=${embedded} />`}
     <${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />
     <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} />
   </div>`;

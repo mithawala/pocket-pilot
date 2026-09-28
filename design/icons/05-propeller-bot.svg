@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Propeller bot — a playful robot in a propeller beanie</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#ec4899"/></linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf5"/><stop offset="1" stop-color="#fde6d6"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="250" y="112" width="12" height="46" rx="6" fill="#334155"/>
+  <ellipse cx="210" cy="110" rx="48" ry="14" fill="#22d3ee" transform="rotate(-8 210 110)"/>
+  <ellipse cx="302" cy="110" rx="48" ry="14" fill="#facc15" transform="rotate(8 302 110)"/>
+  <circle cx="256" cy="112" r="12" fill="#f8fafc" stroke="#334155" stroke-width="5"/>
+  <rect x="142" y="186" width="228" height="200" rx="82" fill="url(#head)"/>
+  <path d="M142 262C142 186 192 152 256 152S370 186 370 262Z" fill="#6d28d9"/>
+  <path d="M152 226C192 206 320 206 360 226" stroke="#a78bfa" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <rect x="132" y="250" width="248" height="24" rx="12" fill="#5b21b6"/>
+  <circle cx="216" cy="318" r="20" fill="#1e1b4b"/>
+  <circle cx="296" cy="318" r="20" fill="#1e1b4b"/>
+  <circle cx="223" cy="311" r="6" fill="#fff"/>
+  <circle cx="303" cy="311" r="6" fill="#fff"/>
+  <ellipse cx="186" cy="348" rx="15" ry="9" fill="#fb7185" opacity=".55"/>
+  <ellipse cx="326" cy="348" rx="15" ry="9" fill="#fb7185" opacity=".55"/>
+  <path d="M236 350q20 16 40 0" stroke="#1e1b4b" stroke-width="8" stroke-linecap="round" fill="none"/>
+</svg>

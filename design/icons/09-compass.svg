@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Compass — a flight compass with a paper-plane needle</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4338ca"/><stop offset="1" stop-color="#1e1b4b"/></linearGradient>
+    <linearGradient id="plane" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f97316"/><stop offset="1" stop-color="#fdba74"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="162" fill="#1e1b4b" fill-opacity=".55" stroke="#e0e7ff" stroke-width="16"/>
+  <g stroke="#c7d2fe" stroke-linecap="round">
+    <g stroke-width="10">
+      <path d="M256 108V136M256 376V404M108 256H136M376 256H404"/>
+    </g>
+    <g stroke-width="5" stroke-opacity=".75">
+      <path d="M330 128L322 142M384 182L370 190M384 330L370 322M330 384L322 370M182 384L190 370M128 330L142 322M128 182L142 190M182 128L190 142"/>
+    </g>
+  </g>
+  <path d="M256 86L244 110H268Z" fill="#fb7185"/>
+  <path d="M166 314L366 150L302 350L268 300Z" fill="url(#plane)"/>
+  <path d="M268 300L366 150L256 312Z" fill="#fed7aa"/>
+  <circle cx="262" cy="262" r="10" fill="#fff"/>
+</svg>

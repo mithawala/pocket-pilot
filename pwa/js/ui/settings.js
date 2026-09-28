@@ -89,9 +89,9 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
 
       <div class="section-title">Security</div>
       <div class="card stack small sec-list">
-        <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this phone and your PC (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
-        <div class="row"><${Icon} name="key" /><span>This phone’s private key never leaves it and cannot be exported. Your GitHub token never leaves your PC.</span></div>
-        <div class="row"><${Icon} name="shield" /><span>Remove this phone anytime in VS Code (Pocket Pilot panel) — it is disconnected immediately.</span></div>
+        <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this device and your PC (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
+        <div class="row"><${Icon} name="key" /><span>This device’s private key never leaves it and cannot be exported. Your GitHub token never leaves your PC.</span></div>
+        <div class="row"><${Icon} name="shield" /><span>Remove this device anytime in VS Code (Pocket Pilot panel) — it is disconnected immediately.</span></div>
       </div>
 
       <div class="section-title">About</div>

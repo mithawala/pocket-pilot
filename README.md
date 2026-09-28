@@ -4,7 +4,7 @@
 
 **[Product page](https://mithawala.github.io/pocket-pilot/) · [Live demo](https://mithawala.github.io/pocket-pilot/app/?demo) · [Download the extension](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix)**
 
-<p align="center"><img src="media/icon.png" width="96" alt="Pocket Pilot"></p>
+<p align="center"><img src="docs/images/screens.jpg" width="860" alt="Pocket Pilot on a phone: the sessions list, a tool approval and a finished chat"></p>
 
 - **Same sessions, same history.** The phone app is a real client of VS Code's *Agent Host Protocol*: you see exactly the sessions and full history VS Code shows, live, token by token.
 - **Feels like VS Code.** Atom One Dark (or One Light) theme, VS Code-style chat input with the mode and model pickers under the text, compact tool progress rows, the same confirmation buttons, and syntax-highlighted code.
@@ -15,16 +15,7 @@
 
 ## How it works
 
-```
- Phone (PWA on GitHub Pages)                      Your PC
-┌──────────────────────────┐                ┌──────────────────────────────────────────────┐
-│ AHP client (official     │   wss, E2E     │ Pocket Pilot extension                       │
-│ reducers) + secure       │◄──encrypted───►│  relay ──AHP (named pipe)──► VS Code agent   │
-│ channel + passkey        │   via Cloudflare│  ▲ auth tokens injected     host (Copilot CLI,│
-│ + Web Push               │   quick tunnel │  │ here, never sent out      Claude sessions)│
-└──────────────────────────┘                │  └ monitor ──Web Push──► push service ──► phone│
-                                             └──────────────────────────────────────────────┘
-```
+<p align="center"><img src="docs/images/how-it-works.png" width="860" alt="Your phone connects to the Pocket Pilot extension on your PC through a Cloudflare quick tunnel; every hop is end-to-end encrypted"></p>
 
 1. VS Code (1.133+) runs agent sessions in its **agent host** and publishes a local, token-protected endpoint for the [Agent Host Protocol](https://github.com/microsoft/agent-host-protocol) (AHP).
 2. The extension runs a small **relay** on `127.0.0.1` and exposes it through a free **Cloudflare quick tunnel** (`cloudflared` is downloaded once from the official GitHub release and checksum-verified).
@@ -103,6 +94,8 @@ node scripts/serve.mjs           # serve dist/site on http://127.0.0.1:8790 (the
 node scripts/screenshots.mjs     # regenerate site/img/* from the demo app with headless Edge/Chrome
 pwsh scripts/publish.ps1         # push to GitHub, publish the site to GitHub Pages and the VSIX to a release
 ```
+
+Publishing to the VS Code Marketplace: see [docs/MARKETPLACE.md](docs/MARKETPLACE.md). Icon options for a new logo are in [design/icons/](design/icons/).
 
 Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `pwa/` (phone app; `pwa/js/core/` is shared with the extension, `pwa/js/demo/` drives the demo mode), `site/` (product page), `media/` (sidebar), `scripts/`, `test/`.
 

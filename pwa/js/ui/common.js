@@ -96,7 +96,7 @@ export function Toasts() {
 
 // ---------------------------------------------------------------- sheet
 
-export function Sheet({ open, onClose, title, children }) {
+export function Sheet({ open, onClose, title, children, wide = false }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -106,7 +106,7 @@ export function Sheet({ open, onClose, title, children }) {
   if (!open) return null;
   return html`<div>
     <div class="scrim" onClick=${onClose}></div>
-    <div class="sheet" role="dialog" aria-modal="true" aria-label=${title}>
+    <div class=${`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label=${title}>
       <div class="grab"></div>
       ${title ? html`<h3>${title}</h3>` : null}
       ${children}

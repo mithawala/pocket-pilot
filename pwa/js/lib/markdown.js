@@ -4,17 +4,24 @@ import DOMPurify from '../../vendor/dompurify/purify.es.js';
 
 marked.setOptions({ gfm: true, breaks: false });
 
+// DOMPurify drops file: URLs before afterSanitizeAttributes runs, so remember them on the way in.
+const fileHrefs = new WeakMap();
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+  if (node.tagName === 'A' && data.attrName === 'href' && /^file:/i.test(data.attrValue || '')) fileHrefs.set(node, data.attrValue);
+});
+
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
+    const file = fileHrefs.get(node);
     const href = node.getAttribute('href') || '';
-    if (/^https?:\/\//i.test(href)) {
-      node.setAttribute('target', '_blank');
-      node.setAttribute('rel', 'noopener noreferrer');
-    } else if (/^file:/i.test(href)) {
-      // Local files cannot be opened on the phone: keep the label, remember the path.
-      node.setAttribute('data-file', href);
+    if (file) {
+      // Local files cannot be opened on the phone: keep the label, remember the path (opens the preview).
+      node.setAttribute('data-file', file);
       node.removeAttribute('href');
       node.classList.add('file-link');
+    } else if (/^https?:\/\//i.test(href)) {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
     } else {
       node.removeAttribute('href');
     }

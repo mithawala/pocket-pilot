@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Monogram — a bold "P" with a paper plane leaving its bowl</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M252 404Q316 392 338 312" stroke="#fff" stroke-opacity=".45" stroke-width="9" stroke-dasharray="14 14" stroke-linecap="round" fill="none"/>
+  <rect x="148" y="112" width="68" height="292" rx="34" fill="#fff"/>
+  <path fill="#fff" fill-rule="evenodd" d="M182 112H288A104 104 0 0 1 288 320H182ZM216 172H284A44 44 0 0 1 284 260H216Z"/>
+  <path d="M312 206L428 136L380 256L360 228Z" fill="#fde047"/>
+  <path d="M360 228L428 136L348 240Z" fill="#facc15"/>
+  <path d="M360 228L354 256L370 238Z" fill="#ca8a04"/>
+</svg>

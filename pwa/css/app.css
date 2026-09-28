@@ -424,7 +424,33 @@ details.card > summary { cursor: pointer; }
 
 @media (min-width: 900px) {
   .srow { padding-left: 20px; padding-right: 20px; }
+  /* Desktop: VS Code-like sidebar (sessions) + main area (chat). */
+  .split { flex: 1; min-height: 0; display: flex; }
+  .pane-list { width: 340px; flex: none; min-width: 0; display: flex; flex-direction: column; background: var(--bg-2); border-right: 1px solid var(--line); }
+  .pane-list .topbar, .pane-list .bottom-bar { background: var(--bg-2); }
+  .pane-list .srow { padding-left: 14px; padding-right: 14px; }
+  .pane-list .srow.on { background: var(--sel); box-shadow: inset 2px 0 0 var(--focus); }
+  .pane-list .group-title { margin-left: 14px; }
+  .pane-list .filter { margin-left: 10px; margin-right: 10px; }
+  .pane-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+  .pane-main .topbar { padding-left: 12px; }
+  .home-new { max-width: 520px; margin-top: 22px; }
+  .chat-empty .big { width: 64px; height: 64px; border-radius: 16px; }
+  .chat-empty .big svg { width: 32px; height: 32px; }
+  .chat-empty h2 { font-size: 20px; }
+  .chat-empty p { max-width: 460px; font-size: 14px; }
+  /* Sheets become centred quick picks. */
+  .sheet { top: 9vh; bottom: auto; left: 50%; right: auto; width: min(560px, calc(100vw - 48px)); max-height: 82vh; margin: 0; padding: 12px 12px 14px; border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); transform: translateX(-50%); animation: drop 0.16s ease; }
+  .sheet.wide { width: min(980px, calc(100vw - 48px)); }
+  .sheet .grab { display: none; }
+  .scrim { background: rgba(0, 0, 0, 0.4); }
+  .page.safe { max-width: 600px; padding-top: 40px; }
+  .composer textarea { min-height: 48px; }
 }
+@media (min-width: 1280px) {
+  .pane-list { width: 380px; }
+}
+@keyframes drop { from { opacity: 0; transform: translate(-50%, -8px); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

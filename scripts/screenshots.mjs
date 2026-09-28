@@ -81,12 +81,29 @@ function ogHarness() {
   <div class="phone"><img src="/site/img/sessions.webp" alt=""></div></body></html>`;
 }
 
+function readmeHarness() {
+  const phone = (img, lift = 0) => `<div class="phone" style="transform:translateY(${lift}px)"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="/site/img/${img}" alt=""></div></div>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; height: 700px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 56px;
+    background: radial-gradient(700px 420px at 50% 0%, rgba(82,139,255,.28), transparent 70%), radial-gradient(600px 400px at 10% 100%, rgba(198,120,221,.22), transparent 70%), #16181d; font-family: "Segoe UI", sans-serif; }
+  .phone { width: 280px; padding: 10px; border-radius: 46px; background: linear-gradient(155deg, #3b404e, #1a1d25 45%, #0f1116); box-shadow: 0 40px 80px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.08); }
+  .screen { position: relative; overflow: hidden; border-radius: 37px; background: #282c34; container-type: inline-size; }
+  .screen img { display: block; width: 100%; height: auto; }
+  .status { position: absolute; top: 0; left: 0; right: 0; height: 12cqw; display: flex; align-items: center; justify-content: space-between; padding: 0 7.4cqw 0 8.8cqw; font-size: 3.9cqw; font-weight: 600; color: #fff; }
+  .island { position: absolute; left: 50%; top: 2.8cqw; width: 29cqw; height: 8.4cqw; margin-left: -14.5cqw; border-radius: 99px; background: #000; }
+  .bars { position: relative; width: 7cqw; height: 3.4cqw; border: .45cqw solid rgba(255,255,255,.9); border-radius: 1.1cqw; }
+  .screen::after { content: ''; position: absolute; left: 50%; bottom: 2cqw; width: 34cqw; height: 1.3cqw; margin-left: -17cqw; border-radius: 99px; background: rgba(255,255,255,.78); }
+  </style></head><body>${phone('sessions.webp', 20)}${phone('approval.webp', -20)}${phone('chat.webp', 20)}</body></html>`;
+}
+
 function startServer() {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
-    if (url.pathname === '/__sidebar.html' || url.pathname === '/__og.html') {
+    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness }[url.pathname];
+    if (harness) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
-      res.end(url.pathname === '/__og.html' ? ogHarness() : sidebarHarness());
+      res.end(harness());
       return;
     }
     let file = path.join(repo, decodeURIComponent(url.pathname));
@@ -192,12 +209,14 @@ async function newPage(cdp, { width, height, dpr = 2, mobile = true }) {
       await sleep(300);
       await page.waitFor('document.readyState === "complete"');
     },
-    async shot(name, { format = 'webp', clip } = {}) {
+    async shot(name, { format = 'webp', clip, dir = outDir } = {}) {
       const r = await send('Page.captureScreenshot', { format, ...(format === 'png' ? {} : { quality: 88 }), ...(clip ? { clip: { ...clip, scale: 1 }, captureBeyondViewport: true } : {}) });
       const buf = Buffer.from(r.data, 'base64');
-      fs.writeFileSync(path.join(outDir, name), buf);
-      console.log(`  ${name}  ${(buf.length / 1024).toFixed(0)} KB`);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, name), buf);
+      console.log(`  ${path.relative(repo, path.join(dir, name)).split(path.sep).join('/')}  ${(buf.length / 1024).toFixed(0)} KB`);
     },
+    reducedMotion: () => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }, { name: 'prefers-reduced-motion', value: 'reduce' }] }),
     close: () => cdp.send('Target.closeTarget', { targetId }),
   };
   return page;
@@ -258,6 +277,23 @@ async function main() {
     await sleep(300);
     await og.shot('og.png', { format: 'png' });
     await og.close();
+
+    console.log('Rendering README images…');
+    const docs = path.join(repo, 'docs', 'images');
+    const banner = await newPage(cdp, { width: 1280, height: 700, dpr: 1, mobile: false });
+    await banner.goto(`${base}/__readme.html`);
+    await banner.waitFor('[...document.images].every((i) => i.complete && i.naturalWidth > 0)');
+    await sleep(300);
+    await banner.shot('screens.jpg', { format: 'jpeg', dir: docs });
+    await banner.close();
+    const how = await newPage(cdp, { width: 1200, height: 900, dpr: 1, mobile: false });
+    await how.reducedMotion();
+    await how.goto(`${base}/site/index.html`);
+    await how.waitFor('document.querySelector("#how .diagram")');
+    await sleep(500);
+    const box = await how.eval('(() => { const r = document.querySelector("#how .diagram").getBoundingClientRect(); return { x: Math.max(0, r.left - 28), y: r.top + scrollY - 28, width: r.width + 56, height: r.height + 56 }; })()');
+    await how.shot('how-it-works.png', { format: 'png', dir: docs, clip: box });
+    await how.close();
   } finally {
     await close();
     server.close();
