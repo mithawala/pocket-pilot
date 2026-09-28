@@ -4,6 +4,7 @@
 // verified against the SHA-256 digest GitHub publishes for the release asset.
 const { spawn, execFile } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
@@ -57,6 +58,17 @@ function processName(pid) {
     } else {
       execFile('ps', ['-p', String(pid), '-o', 'comm='], (err, out) => resolve(err ? '' : String(out)));
     }
+  });
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
   });
 }
 
@@ -167,7 +179,8 @@ class TunnelManager extends EventEmitter {
       const args = ['tunnel', '--no-autoupdate', '--config', emptyConfig, '--url', `http://127.0.0.1:${this.port}`];
       let proc;
       try {
-        proc = spawn(this.binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        // Its own folder as working directory: it must never hold another folder (e.g. an install) in use.
+        proc = spawn(this.binary, args, { cwd: this.o.storageDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       } catch (err) {
         this._setState('error', err.message);
         reject(err);
@@ -256,7 +269,7 @@ class TunnelManager extends EventEmitter {
     const deadline = Date.now() + timeoutMs;
     let lastErr;
     // Probing a brand-new hostname too early can get NXDOMAIN negatively cached by the OS resolver.
-    await new Promise((r) => setTimeout(r, 8000));
+    if (!this.kept) await new Promise((r) => setTimeout(r, 8000));
     while (Date.now() < deadline) {
       if (!this.url) throw new Error('No tunnel URL');
       try {
@@ -309,4 +322,160 @@ class TunnelManager extends EventEmitter {
   }
 }
 
-module.exports = { TunnelManager, assetName, extractFromTgz };
+/**
+ * A quick tunnel that outlives the process that started it. cloudflared runs detached and is found
+ * again through tunnel.json and its local metrics endpoint, so the public address stays the same when
+ * another process takes over the relay on the same local port (the GitHub Copilot app's hub moves
+ * between chats as they are closed or deleted, and restarts with the app).
+ */
+class PersistentTunnel extends TunnelManager {
+  constructor(o) {
+    super(o);
+    this.stateFile = path.join(o.storageDir, 'tunnel.json');
+    this.running = null;
+  }
+
+  saved() {
+    try {
+      return JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+
+  async _hostname(metricsPort) {
+    try {
+      const res = await this.fetch(`http://127.0.0.1:${metricsPort}/quicktunnel`, { signal: AbortSignal.timeout(2500) });
+      return res.ok ? (await res.json())?.hostname || null : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _alive(s) {
+    if (!s?.pid || !s.metricsPort) return false;
+    try {
+      process.kill(s.pid, 0);
+    } catch (err) {
+      if (err.code !== 'EPERM') return false;
+    }
+    return !!(await this._hostname(s.metricsPort));
+  }
+
+  /** The local port a still-running tunnel forwards to (listen there to keep its address), or 0. */
+  async adoptablePort() {
+    const s = this.saved();
+    return s && (await this._alive(s)) ? s.port : 0;
+  }
+
+  async start(port, binary) {
+    this.port = port;
+    this.binary = binary;
+    this.stopping = false;
+    const s = this.saved();
+    if (s && s.port === port && (await this._alive(s))) {
+      this.running = s;
+      this.kept = true;
+      this.url = `https://${await this._hostname(s.metricsPort)}`;
+      this.log('info', `Kept the running tunnel ${this.url} (cloudflared pid ${s.pid})`);
+      this._setState('online');
+      this._watch();
+      this.emit('url', this.url);
+      return this.url;
+    }
+    if (s) await this._end(s);
+    return this._spawnDetached();
+  }
+
+  async _spawnDetached() {
+    this.url = null;
+    this.kept = false;
+    this._setState('starting');
+    const dir = this.o.storageDir;
+    fs.mkdirSync(dir, { recursive: true });
+    const emptyConfig = path.join(dir, 'cloudflared-empty.yml');
+    if (!fs.existsSync(emptyConfig)) fs.writeFileSync(emptyConfig, '# Pocket Pilot: isolates the quick tunnel from ~/.cloudflared/config.yml\n');
+    const metricsPort = await freePort();
+    // No pipes: a detached cloudflared writing to the pipe of a process that ended would be stopped.
+    const args = ['tunnel', '--no-autoupdate', '--config', emptyConfig, '--metrics', `127.0.0.1:${metricsPort}`, '--loglevel', 'warn', '--logfile', path.join(dir, 'cloudflared.log'), '--url', `http://127.0.0.1:${this.port}`];
+    const proc = spawn(this.binary, args, { cwd: dir, detached: true, stdio: 'ignore', windowsHide: true });
+    let failed = null;
+    proc.on('error', (err) => {
+      failed = err;
+    });
+    proc.unref();
+    const s = { pid: proc.pid, port: this.port, metricsPort, startedAt: Date.now() };
+    if (proc.pid) fs.writeFileSync(this.stateFile, JSON.stringify(s));
+    for (const end = Date.now() + 60000; Date.now() < end && !failed;) {
+      await new Promise((r) => setTimeout(r, 500));
+      const host = await this._hostname(metricsPort);
+      const ready = host && (await this.fetch(`http://127.0.0.1:${metricsPort}/ready`, { signal: AbortSignal.timeout(2500) }).then((r) => r.ok).catch(() => false));
+      if (ready) {
+        this.running = s;
+        this.url = `https://${host}`;
+        this.restarts = 0;
+        this.log('info', `Tunnel URL: ${this.url} (cloudflared pid ${s.pid})`);
+        this._setState('online');
+        this._watch();
+        this.emit('url', this.url);
+        return this.url;
+      }
+    }
+    await this._end(s);
+    const msg = failed ? failed.message : 'cloudflared did not open the tunnel in time';
+    this._setState('error', msg);
+    throw new Error(msg);
+  }
+
+  /** Starts a new tunnel if cloudflared ends on its own (not when this process ends: it is left running). */
+  _watch() {
+    clearInterval(this._watchTimer);
+    this._watchTimer = setInterval(async () => {
+      if (this.stopping || !this.running || this._checking) return;
+      this._checking = true;
+      try {
+        if (await this._alive(this.running)) return;
+        this.running = null;
+        fs.rmSync(this.stateFile, { force: true });
+        this.restarts++;
+        this.log('warn', 'The tunnel stopped; opening a new one');
+        this._setState('error', 'Tunnel dropped, reconnecting…');
+        await this._spawnDetached().catch((err) => this.log('error', err.message));
+      } finally {
+        this._checking = false;
+      }
+    }, 15000);
+    this._watchTimer.unref?.();
+  }
+
+  async _end(s) {
+    if (s?.pid && /cloudflared/i.test(await processName(s.pid))) {
+      try {
+        process.kill(s.pid);
+      } catch {
+        /* already gone */
+      }
+    }
+    if (this.saved()?.pid === s?.pid) fs.rmSync(this.stateFile, { force: true });
+  }
+
+  /** keep: leave cloudflared running for whichever process runs the relay next (same address). */
+  async stop({ keep = false } = {}) {
+    this.stopping = true;
+    clearInterval(this._watchTimer);
+    const s = this.running;
+    this.running = null;
+    this.url = null;
+    if (!keep && s) await this._end(s);
+    this._setState('stopped');
+  }
+
+  /** Ends a tunnel that an earlier process left running (turning remote access off with no hub around). */
+  static async end(storageDir) {
+    const t = new PersistentTunnel({ storageDir });
+    const s = t.saved();
+    if (s) await t._end(s);
+  }
+}
+
+module.exports = { TunnelManager, PersistentTunnel, assetName, extractFromTgz };

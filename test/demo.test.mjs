@@ -134,6 +134,65 @@ test('demo: steering reaches the running agent; stop and send restarts with the 
   }
 });
 
+test('demo: a queued message can be edited in place, sent immediately or removed, like VS Code', async () => {
+  const { store } = createDemo();
+  try {
+    const uri = 'copilotcli:/demo-dark';
+    const chat = store.chatFor(uri);
+    assert.ok(store.chatState.get(chat).activeTurn, 'the agent is working');
+    const long = `Please ${'also check the layout on narrow screens and '.repeat(8)}then commit.`;
+    assert.equal(store.sendMessage(uri, { text: long, attachments: [{ type: 'simple', label: 'a.png' }] }), 'queued');
+    store.sendMessage(uri, { text: 'Second' });
+    const [first, second] = store.chatState.get(chat).queuedMessages;
+    store.editPending(chat, 'queued', first.id, 'Shorter, please');
+    let q = store.chatState.get(chat).queuedMessages;
+    assert.deepEqual(q.map((m) => m.message.text), ['Shorter, please', 'Second'], 'edited where it was in the queue');
+    assert.equal(q[0].id, first.id);
+    assert.equal(q[0].message.attachments.length, 1, 'attachments stay');
+    // Send Immediately: steers the running agent and leaves the queue.
+    store.sendPendingNow(uri, chat, second.id);
+    q = store.chatState.get(chat).queuedMessages;
+    assert.deepEqual(q.map((m) => m.message.text), ['Shorter, please']);
+    await until(() => JSON.stringify(store.chatState.get(chat).activeTurn?.responseParts || []).includes('Second'));
+    // An emptied message is removed; one the agent already took can't be edited.
+    store.editPending(chat, 'queued', first.id, '   ');
+    assert.equal(store.chatState.get(chat).queuedMessages?.length || 0, 0);
+    assert.throws(() => store.editPending(chat, 'queued', first.id, 'late'), /already sent/);
+  } finally {
+    store.dispose();
+  }
+});
+
+test('status: a working session shows as working even when an old sub-agent failed', async () => {
+  const { effectiveStatus, S } = await import('../pwa/js/lib/format.js');
+  const { createRequire } = await import('node:module');
+  const monitor = createRequire(import.meta.url)('../extension/core/monitor.js');
+  const cases = [
+    [32 | 2, { defaultChat: 'a', chats: [{ resource: 'a', status: 8 }, { resource: 'b', status: 2 }] }],
+    [2, { defaultChat: 'a', chats: [{ resource: 'a', status: 1 }, { resource: 'b', status: 16 }] }],
+    [2, { defaultChat: 'a', chats: [{ resource: 'a', status: 2 }] }],
+    [2 | 64, { chats: [{ resource: 'x', status: 1, modifiedAt: '2026-01-02' }, { resource: 'y', status: 2, modifiedAt: '2026-01-01' }] }],
+    [2, undefined],
+  ];
+  for (const [raw, state] of cases) assert.equal(effectiveStatus(raw, state), monitor.effectiveStatus(raw, state), 'the app and the extension agree');
+  assert.equal(effectiveStatus(34, cases[0][1]), 32 | S.InProgress);
+
+  const { store } = createDemo();
+  try {
+    const uri = 'copilotcli:/demo-dark';
+    const raw = store.sessions.get(uri);
+    // What an older extension sends for this session while its main chat works.
+    store.sessions.set(uri, { ...raw, status: (raw.status & ~31) | S.Error });
+    store.sessionState.set(uri, { ...store.sessionState.get(uri), defaultChat: 'c1', chats: [{ resource: 'c1', status: S.InProgress }, { resource: 'c2', status: S.Error }] });
+    assert.equal(store.statusFor(store.sessions.get(uri)) & 31, S.InProgress);
+    assert.equal(store.sortedSessions().find((s) => s.resource === uri).status & 31, S.InProgress);
+    store.sessionState.delete(uri);
+    assert.equal(store.statusFor(store.sessions.get(uri)) & 31, S.Error, 'without the state there is nothing to correct with');
+  } finally {
+    store.dispose();
+  }
+});
+
 test('sessions: folder grouping follows the project; folders that need you or are working come first', async () => {
   const { folderGroups, projectOf } = await import('../pwa/js/ui/sessions.js');
   const { store } = createDemo();

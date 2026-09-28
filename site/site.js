@@ -54,6 +54,61 @@
       if (/Android/i.test(navigator.userAgent)) select('android');
     });
 
+    // Get started: VS Code or the GitHub Copilot app. #copilot-app / #vscode links pick the tab.
+    const platforms = document.querySelector('[data-platforms]');
+    if (platforms) {
+      const selectPlatform = (name) => {
+        platforms.querySelectorAll('[data-platform]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.platform === name)));
+        document.querySelectorAll('[data-platform-panel]').forEach((p) => {
+          p.hidden = p.dataset.platformPanel !== name;
+          if (!p.hidden) p.querySelectorAll('[data-reveal]').forEach((el) => el.classList.add('in'));
+        });
+      };
+      platforms.querySelectorAll('[data-platform]').forEach((b) => b.addEventListener('click', () => selectPlatform(b.dataset.platform)));
+      document.querySelectorAll('a[href="#copilot-app"], a[href="#vscode"]').forEach((a) => a.addEventListener('click', () => selectPlatform(a.getAttribute('href') === '#vscode' ? 'vscode' : 'copilot')));
+      const fromHash = () => {
+        const name = { '#copilot-app': 'copilot', '#vscode': 'vscode' }[location.hash];
+        if (!name) return;
+        selectPlatform(name);
+        document.getElementById('start').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+      };
+      addEventListener('hashchange', fromHash);
+      fromHash();
+    }
+
+    // Hero: the desktop side switches between VS Code and the GitHub Copilot app.
+    const hero = document.querySelector('[data-hero]');
+    if (hero) {
+      const tabs = hero.querySelectorAll('[data-show]');
+      let chosen = false;
+      const show = (name) => {
+        tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.show === name)));
+        hero.querySelectorAll('[data-view]').forEach((w) => {
+          const on = w.dataset.view === name;
+          if (on && w.hidden) {
+            w.classList.remove('fade-in');
+            void w.offsetWidth;
+            w.classList.add('fade-in');
+          }
+          w.hidden = !on;
+        });
+      };
+      tabs.forEach((b) => b.addEventListener('click', () => {
+        chosen = true;
+        show(b.dataset.show);
+      }));
+      let paused = false;
+      hero.addEventListener('mouseenter', () => { paused = true; });
+      hero.addEventListener('mouseleave', () => { paused = false; });
+      if (!reduced) {
+        setInterval(() => {
+          if (chosen || paused || document.hidden) return;
+          const current = [...tabs].find((b) => b.getAttribute('aria-selected') === 'true')?.dataset.show;
+          show(current === 'vscode' ? 'copilot' : 'vscode');
+        }, 7000);
+      }
+    }
+
     // Copy buttons.
     document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
       try {

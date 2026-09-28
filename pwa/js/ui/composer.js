@@ -39,6 +39,81 @@ function enumOptions(schema) {
 const MODE_ICONS = { interactive: 'chat', plan: 'checklist', autopilot: 'rocket' };
 const APPROVAL_ICONS = { default: 'shield', assisted: 'shield-check', autoApprove: 'shield-off' };
 
+/**
+ * A message waiting for the agent, like VS Code's queue above the chat input: the whole text (clamped,
+ * tap to expand), Edit (or tap the text), Send Immediately for queued messages, and Remove.
+ */
+function PendingItem({ store, sessionUri, chat, kind, item }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const text = item.message?.text || '';
+  const files = item.message?.attachments?.length || 0;
+  const label = kind === 'steering' ? 'Steering' : 'Queued';
+  const hint = kind === 'steering' ? 'Sent to the running agent after its next tool call' : 'Sent when the agent finishes its current turn';
+  const run = (fn) => {
+    try {
+      fn();
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  };
+  const startEdit = () => {
+    setDraft(text);
+    setEditing(true);
+  };
+  const save = () => run(() => {
+    store.editPending(chat, kind, item.id, draft);
+    setEditing(false);
+  });
+  useEffect(() => {
+    const el = box.current;
+    if (!editing || !el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(240, el.scrollHeight)}px`;
+  }, [editing, draft]);
+  useEffect(() => {
+    const el = box.current;
+    if (editing && el) {
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [editing]);
+  if (editing) {
+    return html`<div class="pending-item editing">
+      <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
+      <div class="pe">
+        <textarea ref=${box} value=${draft} aria-label=${`Edit the ${label.toLowerCase()} message`} onInput=${(e) => setDraft(e.target.value)}
+          onKeyDown=${(e) => {
+            if (e.key === 'Escape') setEditing(false);
+            else if (e.key === 'Enter' && !e.shiftKey && fine()) {
+              e.preventDefault();
+              save();
+            }
+          }}></textarea>
+        <div class="pe-bar">
+          <span class="muted small">${fine() ? 'Enter to save · Esc to cancel' : hint}</span>
+          <button class="btn sm" onClick=${() => setEditing(false)}>Cancel</button>
+          <button class="btn sm primary" onClick=${save}>Save</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return html`<div class="pending-item" title=${hint}>
+    <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
+    <button class=${`pt ${open ? 'open' : ''}`} onClick=${startEdit} aria-label=${`${label}: ${text}. Tap to edit`}>
+      <b>${label}</b> ${text}${files ? html` <span class="muted">· ${files} attachment${files === 1 ? '' : 's'}</span>` : ''}
+    </button>
+    <div class="pa">
+      ${text.length > 160 && html`<button onClick=${() => setOpen(!open)} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}
+      <button onClick=${startEdit} aria-label="Edit" title="Edit"><${Icon} name="edit" size="16" /></button>
+      ${kind === 'queued' && html`<button onClick=${() => run(() => store.sendPendingNow(sessionUri, chat, item.id))} aria-label="Send immediately" title="Send Immediately"><${Icon} name="send" size="16" /></button>`}
+      <button onClick=${() => run(() => store.removePending(chat, kind, item.id))} aria-label=${kind === 'steering' ? 'Remove' : 'Remove from queue'} title=${kind === 'steering' ? 'Remove' : 'Remove from Queue'}><${Icon} name="x" size="16" /></button>
+    </div>
+  </div>`;
+}
+
 const SpeechRecognition = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
 
 /** Dictation with the browser's speech recognition (the text lands in the input for review). */
@@ -200,6 +275,39 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
     }
   };
 
+  // Ctrl+V / ⌘V of a screenshot or copied files attaches them; pasted text stays text.
+  const onPaste = (e) => {
+    const cd = e.clipboardData;
+    const files = [...(cd?.items || [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
+    if (!files.length || (cd.getData('text/plain') || '').trim()) return;
+    e.preventDefault();
+    let n = attachments.filter((a) => a.name.startsWith('Pasted image')).length;
+    addFiles(files.map((f) => {
+      if (!/^image\//.test(f.type) || (f.name && !/^image\.\w+$/i.test(f.name))) return f;
+      n++;
+      return new File([f], `Pasted image${n > 1 ? ` ${n}` : ''}.${f.type.split('/')[1] || 'png'}`, { type: f.type });
+    }));
+  };
+
+  // Files dropped anywhere on the input area are attached.
+  const [dragging, setDragging] = useState(false);
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  const onDragOver = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragging) setDragging(true);
+  };
+  const onDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false);
+  };
+  const onDrop = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDragging(false);
+    addFiles([...e.dataTransfer.files]);
+  };
+
   const queued = chatState?.queuedMessages || [];
   const steering = chatState?.steeringMessage;
   const hasText = !!text.trim() || attachments.length > 0;
@@ -208,17 +316,17 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const chip = modelChip(models, currentModel);
   const opts = hasOptions(models, currentModel) ? optionsChip(models, currentModel) : '';
   const placeholder = dictation.listening ? 'Listening…' : active ? 'Steer the agent, or add to the queue…' : `Ask ${providerLabel(session?.provider)} or describe a task…`;
-  return html`<div class="composer-wrap">
+  return html`<div class=${`composer-wrap ${dragging ? 'dropping' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
     ${(queued.length > 0 || steering) && html`<div class="pending-list">
-      ${steering && html`<div class="pending-item"><${Icon} name="bolt" /><span>Steering: ${steering.message.text}</span><button onClick=${() => store.removePending(chat, 'steering', steering.id)} aria-label="Remove"><${Icon} name="x" size="16" /></button></div>`}
-      ${queued.map((q) => html`<div class="pending-item" key=${q.id}><${Icon} name="list" /><span>Queued: ${q.message.text}</span><button onClick=${() => store.removePending(chat, 'queued', q.id)} aria-label="Remove"><${Icon} name="x" size="16" /></button></div>`)}
+      ${steering && html`<${PendingItem} key=${steering.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="steering" item=${steering} />`}
+      ${queued.map((q) => html`<${PendingItem} key=${q.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="queued" item=${q} />`)}
     </div>`}
     <div class=${`composer ${dictation.listening ? 'listening' : ''}`}>
       ${(attachments.length > 0 || uploading > 0) && html`<div class="att-row">
         ${attachments.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="image" /><span>${a.name}</span><button onClick=${() => setAttachments(attachments.filter((_, j) => j !== i))} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`)}
         ${uploading > 0 && html`<span class="chip"><span class="spinner"></span>Uploading…</span>`}
       </div>`}
-      <textarea ref=${ta} rows="1" placeholder=${placeholder} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey}></textarea>
+      <textarea ref=${ta} rows="1" placeholder=${placeholder} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} onPaste=${onPaste}></textarea>
       <input ref=${fileInput} type="file" multiple class="hidden" accept="image/*,.pdf,.txt,.md,.json,.csv,.log,.zip,.png,.jpg,.jpeg,.gif,.webp" onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
       <div class="cbar">
         <div class="left">

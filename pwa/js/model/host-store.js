@@ -3,7 +3,7 @@
 // phone renders exactly what VS Code renders.
 import { AhpClient } from '../../vendor/ahp/client/index.js';
 import { rootReducer, sessionReducer, chatReducer, SUPPORTED_PROTOCOL_VERSIONS } from '../../vendor/ahp/types/index.js';
-import { S, has, uuid } from '../lib/format.js';
+import { S, has, uuid, effectiveStatus } from '../lib/format.js';
 
 const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
@@ -301,8 +301,22 @@ export class HostStore extends EventTarget {
     return this.agents().find((a) => a.provider === provider)?.models || [];
   }
 
+  /**
+   * A session's status, corrected with its state when this app has it (see effectiveStatus): a working
+   * session must not show "Error" because an older sub-agent failed. Current extensions already send
+   * corrected statuses; this covers PCs that still run an older one.
+   */
+  statusFor(summary) {
+    const raw = summary?.status;
+    if (typeof raw !== 'number' || (raw & 31) !== S.Error) return raw;
+    return effectiveStatus(raw, this.sessionState.get(summary.resource));
+  }
+
   sortedSessions() {
-    const arr = [...this.sessions.values()].filter((s) => !has(s.status, S.IsArchived));
+    const arr = [...this.sessions.values()].filter((s) => !has(s.status, S.IsArchived)).map((s) => {
+      const status = this.statusFor(s);
+      return status === s.status ? s : { ...s, status };
+    });
     const rank = (s) => (has(s.status, S.Input) ? 0 : has(s.status, S.InProgress) ? 1 : 2);
     return arr.sort((a, b) => rank(a) - rank(b) || String(b.modifiedAt).localeCompare(String(a.modifiedAt)));
   }
@@ -419,6 +433,29 @@ export class HostStore extends EventTarget {
 
   removePending(chat, kind, id) {
     this._dispatch(chat, { type: 'chat/pendingMessageRemoved', kind, id });
+  }
+
+  _pending(chat, kind, id) {
+    const cs = this.chatState.get(chat);
+    return kind === 'steering' ? (cs?.steeringMessage?.id === id ? cs.steeringMessage : null) : cs?.queuedMessages?.find((m) => m.id === id) || null;
+  }
+
+  /** Changes the text of a message that is still waiting (VS Code's "Edit" on a queued message). */
+  editPending(chat, kind, id, text) {
+    const cur = this._pending(chat, kind, id);
+    if (!cur) throw new Error('That message was already sent to the agent');
+    if (!text.trim()) return this.removePending(chat, kind, id);
+    // The same id replaces the message where it is in the queue.
+    this._dispatch(chat, { type: 'chat/pendingMessageSet', kind, id, message: { ...cur.message, text } });
+  }
+
+  /** Sends a queued message to the running agent now (VS Code's "Send Immediately"). */
+  sendPendingNow(sessionUri, chat, id) {
+    const cur = this._pending(chat, 'queued', id);
+    if (!cur) throw new Error('That message was already sent to the agent');
+    this.removePending(chat, 'queued', id);
+    if (this.chatState.get(chat)?.activeTurn) this.steer(sessionUri, { text: cur.message.text, attachments: cur.message.attachments });
+    else this.sendMessage(sessionUri, { text: cur.message.text, attachments: cur.message.attachments, model: cur.message.model });
   }
 
   confirmTool(chat, turnId, toolCallId, approved, option) {

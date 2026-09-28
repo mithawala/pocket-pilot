@@ -43,6 +43,7 @@
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></symbol>
     <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="7" r="2" /><path d="M6 7v10M18 9c0 5-6 4-11 9" /></symbol>
     <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.5l-5.2 1.7L12 16l-1.8-4.8L5 9.5l5.2-1.6z" /><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z" /></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" /></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z" /></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></symbol>
     <symbol id="i-devices" viewBox="0 0 24 24"><rect x="2" y="4" width="14" height="10" rx="2" /><path d="M6 18h6" /><rect x="17" y="8" width="5" height="12" rx="1.5" /></symbol>
@@ -70,7 +71,7 @@
       </nav>
       <div class="nav-actions">
         <a class="icon-link" href="https://github.com/mithawala/pocket-pilot" aria-label="Source code on GitHub"><svg class="ic"><use href="#i-github" /></svg></a>
-        <a class="btn btn-sm btn-primary" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg><span>Download</span></a>
+        <a class="btn btn-sm btn-primary" href="#start"><svg class="ic"><use href="#i-download" /></svg><span>Get Pocket Pilot</span></a>
         <button class="menu-btn" type="button" aria-label="Menu" aria-expanded="false"><svg class="ic"><use href="#i-menu" /></svg></button>
       </div>
     </div>
@@ -83,18 +84,30 @@
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <a class="phone-callout" href="./app/"><svg class="ic"><use href="#i-phone" /></svg><span>On your phone? <b>Open the Pocket Pilot app</b></span><svg class="ic"><use href="#i-arrow" /></svg></a>
-          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · VS Code &amp; the GitHub Copilot app</div>
+          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · For VS Code and the GitHub Copilot app</div>
           <h1>Your coding agents, <span class="grad">in your pocket.</span></h1>
-          <p class="lead">See every GitHub Copilot and Claude agent session running in VS Code (or in the GitHub Copilot app) on your phone, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
-          <div class="cta-row">
-            <a class="btn btn-primary btn-lg" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download for VS Code</a>
-            <a class="btn btn-ghost btn-lg" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Try the live demo</a>
+          <p class="lead">Every GitHub Copilot and Claude agent session — in VS Code or the GitHub Copilot app — on your phone, tablet or another computer, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
+          <div class="get" role="group" aria-label="Get Pocket Pilot">
+            <a class="get-card" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix">
+              <span class="get-ic"><svg class="ic"><use href="#i-code" /></svg></span>
+              <span class="get-txt"><b>VS Code</b><small>Extension · download</small></span>
+              <svg class="ic get-go"><use href="#i-download" /></svg>
+            </a>
+            <a class="get-card" href="#copilot-app">
+              <span class="get-ic"><svg class="ic"><use href="#i-sparkles" /></svg></span>
+              <span class="get-txt"><b>GitHub Copilot app</b><small>Plugin · also the CLI</small></span>
+              <svg class="ic get-go"><use href="#i-arrow" /></svg>
+            </a>
           </div>
-          <p class="fineprint">Version %VERSION% · VS Code 1.133+, or the <a href="#copilot-app">GitHub Copilot app &amp; CLI plugin</a> · Windows, macOS &amp; Linux · iPhone &amp; Android</p>
+          <p class="fineprint"><a class="demo-link" href="./app/?demo"><svg class="ic"><use href="#i-play" /></svg>Try the live demo</a> · Version %VERSION% · VS Code 1.133+ or the GitHub Copilot app / CLI · Windows, macOS &amp; Linux · iPhone, Android and any desktop browser</p>
         </div>
 
-        <div class="hero-visual" aria-label="Pocket Pilot in VS Code and on a phone">
-          <div class="window">
+        <div class="hero-visual" data-hero aria-label="Pocket Pilot in VS Code or the GitHub Copilot app, and on a phone">
+          <div class="hero-switch" role="tablist" aria-label="Show Pocket Pilot in">
+            <button type="button" role="tab" aria-selected="true" data-show="vscode">VS Code</button>
+            <button type="button" role="tab" aria-selected="false" data-show="copilot">GitHub Copilot app</button>
+          </div>
+          <div class="window" data-view="vscode">
             <div class="window-bar"><i></i><i></i><i></i><span>acme-web — Visual Studio Code</span></div>
             <div class="window-body">
               <div class="activity">
@@ -115,6 +128,26 @@
     /&gt;
   );
 }</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="window app-window" data-view="copilot" hidden>
+            <div class="window-bar"><i></i><i></i><i></i><span>GitHub Copilot</span></div>
+            <div class="window-body">
+              <div class="app-side" aria-hidden="true">
+                <span class="nav-ln w70"></span><span class="nav-ln w55"></span><span class="nav-ln w62"></span>
+                <span class="nav-sec"></span>
+                <span class="nav-ln w80 on"></span><span class="nav-ln w66"></span><span class="nav-ln w74"></span>
+              </div>
+              <div class="app-panel">
+                <div class="app-panel-bar"><img src="./app/icons/icon.svg" alt="" />Pocket Pilot</div>
+                <img class="app-panel-shot" src="./img/copilot-panel.webp" alt="The Pocket Pilot panel in the GitHub Copilot app: the pairing QR code, status and paired devices" width="340" height="760" loading="lazy" />
+              </div>
+              <div class="app-chat">
+                <div class="app-msg user"><code>/pocket-pilot</code></div>
+                <div class="app-msg bot"><img src="./app/icons/icon.svg" alt="" /><p>Pocket Pilot is open in the panel: scan the QR code with your phone. It keeps running when you close this chat.</p></div>
+                <div class="app-input">Ask Copilot…</div>
               </div>
             </div>
           </div>
@@ -282,67 +315,116 @@
         <div class="section-head" data-reveal>
           <div class="kicker">Get started</div>
           <h2>Set up in two minutes.</h2>
-          <p>You'll need VS Code 1.133 or later with GitHub Copilot or Claude agent sessions, and a phone running iOS 16.4+ or Android.</p>
+          <p>Pick where your agents run. You'll need VS Code 1.133 or later, or the GitHub Copilot app (or CLI), and a phone with iOS 16.4+ or Android, or any other device with a current browser.</p>
         </div>
 
-        <ol class="steps">
-          <li class="step" data-reveal>
-            <div class="step-num">1</div>
-            <div class="step-body">
-              <h3>Install the extension</h3>
-              <p>Download <b>pocket-pilot.vsix</b>. In VS Code, open <b>Extensions → ··· → Install from VSIX…</b>, or run:</p>
-              <div class="cmd"><code>code --install-extension pocket-pilot.vsix</code><button type="button" class="copy" data-copy="code --install-extension pocket-pilot.vsix" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
-              <a class="btn btn-primary" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download pocket-pilot.vsix</a>
-            </div>
-          </li>
-          <li class="step with-media" data-reveal>
-            <div class="step-num">2</div>
-            <div class="step-body">
-              <h3>Start remote access</h3>
-              <p>Open the <b>Pocket Pilot</b> panel in the activity bar and click <b>Start remote access</b>. The first time, VS Code asks you to:</p>
-              <ul class="checks small">
-                <li><svg class="ic"><use href="#i-check" /></svg><span>download <code>cloudflared</code> once (about 55 MB, verified)</span></li>
-                <li><svg class="ic"><use href="#i-check" /></svg><span>optionally turn on auto-reconnect (an encrypted secret gist, the only part that uses your GitHub account)</span></li>
-              </ul>
-            </div>
-            <div class="step-media sidebar-frame"><img src="./img/sidebar.webp" alt="Pocket Pilot panel with the pairing QR code" width="330" height="900" loading="lazy" /></div>
-          </li>
-          <li class="step with-media" data-reveal>
-            <div class="step-num">3</div>
-            <div class="step-body">
-              <h3>Scan &amp; pair your phone</h3>
-              <p>Scan the QR code, check that the fingerprint matches, click <b>Allow</b> in VS Code and set up Face ID or your fingerprint. For a tablet or another computer, click <b>Copy link</b> in the panel and open it there.</p>
-              <div class="tabs-box" data-tabs>
-                <div class="tab-btns" role="tablist">
-                  <button type="button" role="tab" data-tab="ios" aria-selected="true">iPhone</button>
-                  <button type="button" role="tab" data-tab="android" aria-selected="false">Android</button>
-                </div>
-                <div class="tab-panel" data-panel="ios">
-                  <ol>
-                    <li>Open <a href="./app/">the app</a> in <b>Safari</b> and tap <b>Share → Add to Home Screen</b>.</li>
-                    <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.</li>
-                    <li>iOS only shows notifications for Home Screen apps, so always use that icon.</li>
-                  </ol>
-                </div>
-                <div class="tab-panel" data-panel="android" hidden>
-                  <ol>
-                    <li>Point your camera at the QR code in VS Code and open the link.</li>
-                    <li>Tap <b>Install</b> (or Chrome menu → <b>Add to Home screen</b>) for an app-like experience.</li>
-                    <li>Notifications work in the browser too.</li>
-                  </ol>
+        <div class="platforms" role="tablist" aria-label="Where your agents run" data-platforms data-reveal>
+          <button type="button" role="tab" aria-selected="true" data-platform="vscode"><svg class="ic"><use href="#i-code" /></svg><span><b>VS Code</b><small>Extension</small></span></button>
+          <button type="button" role="tab" aria-selected="false" data-platform="copilot"><svg class="ic"><use href="#i-sparkles" /></svg><span><b>GitHub Copilot app</b><small>Plugin · also for the Copilot CLI</small></span></button>
+        </div>
+
+        <div id="vscode" class="platform-panel" data-platform-panel="vscode">
+          <ol class="steps">
+            <li class="step" data-reveal>
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h3>Install the extension</h3>
+                <p>Download <b>pocket-pilot.vsix</b>. In VS Code, open <b>Extensions → ··· → Install from VSIX…</b>, or run:</p>
+                <div class="cmd"><code>code --install-extension pocket-pilot.vsix</code><button type="button" class="copy" data-copy="code --install-extension pocket-pilot.vsix" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+                <a class="btn btn-primary" href="https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix"><svg class="ic"><use href="#i-download" /></svg>Download pocket-pilot.vsix</a>
+              </div>
+            </li>
+            <li class="step with-media" data-reveal>
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h3>Start remote access</h3>
+                <p>Open the <b>Pocket Pilot</b> panel in the activity bar and click <b>Start remote access</b>. The first time, VS Code asks you to:</p>
+                <ul class="checks small">
+                  <li><svg class="ic"><use href="#i-check" /></svg><span>download <code>cloudflared</code> once (about 55 MB, verified)</span></li>
+                  <li><svg class="ic"><use href="#i-check" /></svg><span>optionally turn on auto-reconnect (an encrypted secret gist, the only part that uses your GitHub account)</span></li>
+                </ul>
+              </div>
+              <div class="step-media sidebar-frame"><img src="./img/sidebar.webp" alt="Pocket Pilot panel with the pairing QR code" width="330" height="900" loading="lazy" /></div>
+            </li>
+            <li class="step with-media" data-reveal>
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h3>Scan &amp; pair your phone</h3>
+                <p>Scan the QR code, check that the fingerprint matches, click <b>Allow</b> in VS Code and set up Face ID or your fingerprint. For a tablet or another computer, click <b>Copy link</b> in the panel and open it there.</p>
+                <div class="tabs-box" data-tabs>
+                  <div class="tab-btns" role="tablist">
+                    <button type="button" role="tab" data-tab="ios" aria-selected="true">iPhone</button>
+                    <button type="button" role="tab" data-tab="android" aria-selected="false">Android</button>
+                  </div>
+                  <div class="tab-panel" data-panel="ios">
+                    <ol>
+                      <li>Open <a href="./app/">the app</a> in <b>Safari</b> and tap <b>Share → Add to Home Screen</b>.</li>
+                      <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.</li>
+                      <li>iOS only shows notifications for Home Screen apps, so always use that icon.</li>
+                    </ol>
+                  </div>
+                  <div class="tab-panel" data-panel="android" hidden>
+                    <ol>
+                      <li>Point your camera at the QR code in VS Code and open the link.</li>
+                      <li>Tap <b>Install</b> (or Chrome menu → <b>Add to Home screen</b>) for an app-like experience.</li>
+                      <li>Notifications work in the browser too.</li>
+                    </ol>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="step-media phone-mini"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/pair.webp" alt="The Pocket Pilot app's pairing screen" width="390" height="844" loading="lazy" /></div></div></div>
-          </li>
-          <li class="step" data-reveal>
-            <div class="step-num">4</div>
-            <div class="step-body">
-              <h3>Turn on notifications</h3>
-              <p>Tap <b>Enable notifications</b>, and your agents can reach you when they need approval, have a question, or finish.</p>
-            </div>
-          </li>
-        </ol>
+              <div class="step-media phone-mini"><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="./img/pair.webp" alt="The Pocket Pilot app's pairing screen" width="390" height="844" loading="lazy" /></div></div></div>
+            </li>
+            <li class="step" data-reveal>
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <h3>Turn on notifications</h3>
+                <p>Tap <b>Enable notifications</b>, and your agents can reach you when they need approval, have a question, or finish.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+        <div id="copilot-app" class="platform-panel" data-platform-panel="copilot" hidden>
+          <ol class="steps">
+            <li class="step" data-reveal>
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h3>Install the plugin</h3>
+                <p>Run these in a terminal. The GitHub Copilot app uses the same plugins, so restart it afterwards.</p>
+                <div class="cmd"><code>copilot plugin marketplace add mithawala/pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin marketplace add mithawala/pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+                <div class="cmd"><code>copilot plugin install pocket-pilot@pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin install pocket-pilot@pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
+                <p class="small muted">It shows up in the app under <b>Customize → Extensions</b>: a plugin brings a small extension that runs with your chats. Keep its switch on.</p>
+              </div>
+            </li>
+            <li class="step with-media" data-reveal>
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h3>Open Pocket Pilot</h3>
+                <p>Type <code>/pocket-pilot</code> in any chat, or just ask <i>“pair my phone”</i>, and confirm. In the GitHub Copilot app the <b>Pocket Pilot panel</b> opens next to the chat; the CLI opens it in your browser and prints the QR code. The first time, <code>cloudflared</code> is downloaded once (about 55 MB, verified).</p>
+              </div>
+              <div class="step-media sidebar-frame panel-frame"><img src="./img/copilot-panel.webp" alt="The Pocket Pilot panel with the pairing QR code, status and paired devices" width="340" height="760" loading="lazy" /></div>
+            </li>
+            <li class="step" data-reveal>
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h3>Scan, allow, done</h3>
+                <p>Scan the code with your phone or tablet (on another computer, open the copied link), click <b>Allow</b> in the panel or the chat, and set up Face ID or your fingerprint. Every chat you use in the app or the CLI now shows up on your devices.</p>
+                <ul class="checks small">
+                  <li><svg class="ic"><use href="#i-check" /></svg><span>Close or delete the chat you started it from: another open chat takes over within seconds, at the same address</span></li>
+                  <li><svg class="ic"><use href="#i-check" /></svg><span><code>/pocket-pilot status</code> shows the tunnel and your devices; <code>/pocket-pilot off</code> or <b>Turn off</b> in the panel closes the tunnel</span></li>
+                  <li><svg class="ic"><use href="#i-check" /></svg><span>A chat appears on your devices once it has a message. Start new chats on your PC.</span></li>
+                  <li><svg class="ic"><use href="#i-check" /></svg><span>Pair VS Code and the app separately; the phone switches between them like between two PCs</span></li>
+                </ul>
+              </div>
+            </li>
+            <li class="step" data-reveal>
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <h3>Turn on notifications</h3>
+                <p>Tap <b>Enable notifications</b>, and your agents can reach you when they need approval, have a question, or finish.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
 
         <div class="open-app" data-reveal>
           <img class="qr" src="./img/app-qr.svg" alt="QR code that opens the Pocket Pilot app" width="148" height="148" />
@@ -355,47 +437,6 @@
             </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section id="copilot-app" class="section">
-      <div class="wrap">
-        <div class="section-head" data-reveal>
-          <div class="kicker">GitHub Copilot app &amp; CLI</div>
-          <h2>Not in VS Code?<br /><span class="grad">Bring the plugin.</span></h2>
-          <p>The Pocket Pilot plugin gives the same phone app to the chats you run in the GitHub Copilot desktop app and the Copilot CLI: the same history and live replies, approvals, questions, models and modes, notifications and end-to-end encryption.</p>
-        </div>
-
-        <ol class="steps">
-          <li class="step" data-reveal>
-            <div class="step-num">1</div>
-            <div class="step-body">
-              <h3>Install the plugin</h3>
-              <p>Run these in a terminal. The GitHub Copilot app uses the same plugins, so restart it afterwards.</p>
-              <div class="cmd"><code>copilot plugin marketplace add mithawala/pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin marketplace add mithawala/pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
-              <div class="cmd"><code>copilot plugin install pocket-pilot@pocket-pilot</code><button type="button" class="copy" data-copy="copilot plugin install pocket-pilot@pocket-pilot" aria-label="Copy command"><svg class="ic"><use href="#i-copy" /></svg></button></div>
-            </div>
-          </li>
-          <li class="step" data-reveal>
-            <div class="step-num">2</div>
-            <div class="step-body">
-              <h3>Type <code>/pocket-pilot</code> in a chat</h3>
-              <p>Or just ask <i>“pair my phone”</i>. Confirm, and a page with the QR code opens in your browser; the CLI prints it too. The first time, <code>cloudflared</code> is downloaded once (about 55 MB, verified).</p>
-            </div>
-          </li>
-          <li class="step" data-reveal>
-            <div class="step-num">3</div>
-            <div class="step-body">
-              <h3>Scan, allow, done</h3>
-              <p>Scan the code with the Pocket Pilot app, click <b>Allow</b> on the page (or in the chat) and set up Face ID or your fingerprint. Every chat you use in the app or the CLI now shows up on your phone.</p>
-              <ul class="checks small">
-                <li><svg class="ic"><use href="#i-check" /></svg><span><code>/pocket-pilot status</code> shows the tunnel and your phones; <code>/pocket-pilot off</code> closes the tunnel</span></li>
-                <li><svg class="ic"><use href="#i-check" /></svg><span>A chat appears on the phone once it has a message. Start new chats on your PC.</span></li>
-                <li><svg class="ic"><use href="#i-check" /></svg><span>Pair VS Code and the app separately; the phone switches between them like between two PCs</span></li>
-              </ul>
-            </div>
-          </li>
-        </ol>
       </div>
     </section>
 
@@ -461,16 +502,19 @@
         <div class="faq" data-reveal>
           <details><summary>How is this different from Copilot's built-in <code>/remote</code>?</summary><p>GitHub's remote control (<code>/remote on</code> or <code>copilot --remote</code>) streams a Copilot CLI session to GitHub.com and the GitHub Mobile app. It's official, covers the terminal, VS Code and JetBrains, and sits right next to your cloud agents and pull requests on GitHub. Pocket Pilot connects your phone straight to VS Code instead: every agent session shows up without switching it on (Claude sessions too), you can start new sessions on your PC from your phone, and the link is end-to-end encrypted, so no copy of the session is stored in a cloud. <a href="#compare">See the full comparison</a>.</p></details>
           <details><summary>Which sessions show up?</summary><p>Every session hosted by VS Code's agent host, including GitHub Copilot (Copilot CLI) and Claude agent sessions, from every open VS Code window. Classic chat-panel conversations that don't run in the agent host aren't part of the protocol, so they don't show up. With the <a href="#copilot-app">plugin</a>, the chats you use in the GitHub Copilot app and the Copilot CLI show up too.</p></details>
-          <details><summary>Does it work with the GitHub Copilot app?</summary><p>Yes. Install the <a href="#copilot-app">Pocket Pilot plugin</a> and type <code>/pocket-pilot</code> in a chat. The plugin runs inside the app's own sessions and uses the same encrypted tunnel, pairing, passkeys and notifications as the VS Code extension. Approvals and questions can be answered on the PC or the phone; whichever answers first wins.</p></details>
+          <details><summary>Does it work with the GitHub Copilot app?</summary><p>Yes. Install the <a href="#copilot-app">Pocket Pilot plugin</a> and type <code>/pocket-pilot</code> in a chat: the Pocket Pilot panel opens next to it with the QR code. The plugin runs with the app's own chats and uses the same encrypted tunnel, pairing, passkeys and notifications as the VS Code extension. Approvals and questions can be answered on the PC or the phone; whichever answers first wins.</p></details>
+          <details><summary>What happens if I close or delete the chat I ran <code>/pocket-pilot</code> in?</summary><p>Nothing you'd notice. Remote access isn't tied to that chat: another open chat takes over within seconds, the Cloudflare tunnel keeps its address, and your devices reconnect by themselves. With no chat open, it waits, and your devices reconnect as soon as you open a chat again, even after restarting the app. To turn it off, run <code>/pocket-pilot off</code> or click <b>Turn off</b> in the Pocket Pilot panel.</p></details>
+          <details><summary>Why is Pocket Pilot listed under Extensions in the Copilot app?</summary><p>The plugin brings a small extension that runs alongside your chats; that's how they reach your phone. <b>Customize → Extensions</b> lists it as <i>pocket-pilot · Plugin: pocket-pilot</i>, and its switch turns Pocket Pilot on or off.</p></details>
+          <details><summary>How do I uninstall the Copilot app plugin?</summary><p>Run <code>/pocket-pilot off</code>, quit VS Code and the GitHub Copilot app, then run <code>copilot plugin uninstall pocket-pilot@pocket-pilot</code> in a terminal. On Windows, VS Code keeps a watch on every installed Copilot plugin's folder while it runs, so uninstalling or updating any plugin then fails with <i>Access is denied (os error 5)</i>. That isn't specific to Pocket Pilot.</p></details>
           <details><summary>Is it really free?</summary><p>Yes. Cloudflare quick tunnels are free and need no account, the app is a static site on GitHub Pages, and notifications use your phone's built-in push service. Pocket Pilot has no servers and no paid tier.</p></details>
           <details><summary>Can Cloudflare, GitHub or anyone else read my code?</summary><p>Not along the way. Everything between your phone and your PC is end-to-end encrypted, so the tunnel only relays ciphertext, and nothing is stored in a cloud. Your prompts still go to the AI model exactly as they do in VS Code. The optional auto-reconnect gist only holds your PC's current address, encrypted with a key that only your paired devices have.</p></details>
-          <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code (or the GitHub Copilot app / CLI) must be running and the PC awake. If the VS Code window or the chat hosting the tunnel closes, another one takes over automatically.</p></details>
+          <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code (or the GitHub Copilot app / CLI) must be running and the PC awake. If the VS Code window running Pocket Pilot closes, another window takes over automatically; in the GitHub Copilot app, another open chat does.</p></details>
           <details><summary>Does it work on iPhone?</summary><p>Yes. Add the app to your Home Screen from Safari to get notifications (iOS 16.4+) and a full-screen experience, then pair with the scanner built into the app.</p></details>
           <details><summary>Can I pair a tablet or another computer?</summary><p>Yes, any device with a current browser. Scan the QR code on a phone or tablet; on a computer, click <b>Copy link</b> in the Pocket Pilot panel and open the link there. The passkey uses Face ID, your fingerprint, Windows Hello or the screen lock, and wide screens get a desktop layout with your sessions next to the chat.</p></details>
           <details><summary>Does Pocket Pilot need my GitHub account?</summary><p>Not for remote access. VS Code keeps its agent host signed in to GitHub, and Pocket Pilot never touches that sign-in or your token. Only the optional auto-reconnect asks to use your GitHub account once, to keep your PC's encrypted address in a secret gist.</p></details>
-          <details><summary>What if I lose a device?</summary><p>Remove it in the Pocket Pilot panel in VS Code (or on the <code>/pocket-pilot</code> page for the Copilot app) and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the device would also need your Face ID or fingerprint.</p></details>
+          <details><summary>What if I lose a device?</summary><p>Remove it in the Pocket Pilot panel in VS Code or the GitHub Copilot app and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the device would also need your Face ID or fingerprint.</p></details>
           <details><summary>My network blocks the tunnel. Now what?</summary><p>Quick tunnels need outbound port 7844. Set <code>pocketPilot.tunnel.mode</code> to <code>custom</code> and use a tunnel your network allows, such as a named Cloudflare tunnel, Dev Tunnels or Tailscale Funnel.</p></details>
-          <details><summary>How do I update?</summary><p>From the VS Code Marketplace, VS Code updates Pocket Pilot for you. If you installed the <code>.vsix</code>, the extension checks for new releases and offers a one-click <b>Update</b> (or run <b>Pocket Pilot: Check for Updates</b>). For the Copilot app, run <code>copilot plugin update pocket-pilot@pocket-pilot</code>; <code>/pocket-pilot</code> tells you when there's a new version. The phone app updates itself.</p></details>
+          <details><summary>How do I update?</summary><p>From the VS Code Marketplace, VS Code updates Pocket Pilot for you. If you installed the <code>.vsix</code>, the extension checks for new releases and offers a one-click <b>Update</b> (or run <b>Pocket Pilot: Check for Updates</b>). For the Copilot app, run <code>copilot plugin update pocket-pilot@pocket-pilot</code> with VS Code and the app closed (see the uninstall question); <code>/pocket-pilot</code> tells you when there's a new version. The phone app updates itself.</p></details>
           <details><summary>I have several VS Code windows open. Which one do I use?</summary><p>Any of them. One window hosts the tunnel, and every other window shows the same panel: the QR code, the tunnel, your paired devices. Buttons work from any window, and a device's pairing request appears in the window you're using. Your devices see the sessions of all windows either way.</p></details>
           <details><summary>Is this an official Microsoft or GitHub product?</summary><p>No. Pocket Pilot is an independent open-source project built on the Agent Host Protocol that VS Code exposes locally.</p></details>
         </div>

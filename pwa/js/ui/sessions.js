@@ -218,7 +218,8 @@ export function ConnectionBanner({ conn, store, onRepair }) {
 }
 
 export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
-  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root');
+  // Session state changes can correct a session's status (see HostStore.statusFor).
+  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || (d.kind === 'session' && (store.sessions.get(d.uri)?.status & 31) === S.Error));
   const [q, setQ] = useState('');
   const [groupBy, setGroupByState] = useState(() => (readPref('pp:groupBy', 'recent') === 'folder' ? 'folder' : 'recent'));
   const [collapsed, setCollapsed] = useState(() => new Set(readPref('pp:collapsedFolders', [])));
@@ -285,7 +286,7 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
 
 /** Desktop main pane when no session is open (like VS Code's empty editor area). */
 export function DesktopHome({ store, host, onNew }) {
-  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status');
+  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || (d.kind === 'session' && (store.sessions.get(d.uri)?.status & 31) === S.Error));
   const list = store.sortedSessions();
   const waiting = list.filter((s) => has(s.status, S.Input)).length;
   const running = list.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress)).length;

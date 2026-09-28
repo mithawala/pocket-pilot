@@ -8,6 +8,24 @@ export function statusOf(status) {
   return { key: 'idle', label: 'Idle', tone: 'idle' };
 }
 
+const ACTIVITY = 31;
+
+/**
+ * A session's status as a person reads it: its main chat's activity, with "needs input" from any chat.
+ * The protocol promotes an error in *any* chat (say, a sub-agent that failed long ago) to the whole
+ * session. Same rule as the extension's session monitor (extension/core/monitor.js), which corrects
+ * the statuses it sends; the app applies it too, for PCs that run an older extension.
+ */
+export function effectiveStatus(raw, state) {
+  const chats = state?.chats || [];
+  if (typeof raw !== 'number' || !chats.length) return raw;
+  const main = chats.find((c) => c.resource === state.defaultChat) || [...chats].sort((a, b) => String(b.modifiedAt).localeCompare(String(a.modifiedAt)))[0];
+  if (!main || typeof main.status !== 'number') return raw;
+  let activity = main.status & ACTIVITY;
+  if (chats.some((c) => typeof c.status === 'number' && (c.status & S.Input) === S.Input)) activity = S.Input;
+  return (raw & ~ACTIVITY) | (activity || S.Idle);
+}
+
 export function ago(ts) {
   const t = typeof ts === 'string' ? Date.parse(ts) : ts;
   if (!t) return '';

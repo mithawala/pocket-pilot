@@ -16,8 +16,14 @@ The GitHub Copilot app uses the same plugins; restart it after installing.
 
 ## Use
 
-Type `/pocket-pilot` in a chat (or ask "pair my phone"), confirm, and scan the QR code on the page
-that opens (on another computer, open the copied link instead). `/pocket-pilot status` shows the
-tunnel and paired devices; `/pocket-pilot off` closes the tunnel. Remove devices on the pairing page.
+Type `/pocket-pilot` in a chat (or ask "pair my phone") and confirm. In the GitHub Copilot app the
+Pocket Pilot panel opens next to the chat; the CLI opens it in your browser and prints the QR code.
+Scan it (on another computer, open the copied link). `/pocket-pilot status` shows the tunnel and
+paired devices; `/pocket-pilot off` or **Turn off** in the panel closes the tunnel. Remove devices in
+the panel.
+
+Remote access isn't tied to that chat: close or delete it and another open chat takes over within
+seconds, at the same address. On Windows, quit VS Code and the app before updating or uninstalling
+the plugin (VS Code keeps every plugin folder in use while it runs).
 
 More: https://mithawala.github.io/pocket-pilot/ · Source: https://github.com/mithawala/pocket-pilot

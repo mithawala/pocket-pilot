@@ -405,11 +405,23 @@ a.btn { text-decoration: none; }
   .pick .model-name { max-width: 128px; }
 }
 .att-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 3px 4px; }
-.pending-list { display: grid; gap: 4px; max-width: 860px; margin: 0 auto 6px; }
-.pending-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; font-size: 13px; color: var(--text-2); background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; }
-.pending-item > svg { width: 14px; height: 14px; color: var(--muted); flex: none; }
-.pending-item span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pending-item button { display: grid; place-items: center; color: var(--muted); }
+.pending-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; max-width: 860px; margin: 0 auto 6px; }
+.pending-item { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 5px 4px 5px 10px; font-size: 13px; color: var(--text-2); background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; }
+.pending-item > svg { width: 14px; height: 14px; margin-top: 4px; color: var(--muted); flex: none; }
+.pending-item .pt { flex: 1; min-width: 0; padding: 2px 0; text-align: left; color: inherit; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: text; }
+.pending-item .pt.open { display: block; -webkit-line-clamp: unset; line-clamp: none; max-height: 40vh; overflow-y: auto; }
+.pending-item .pt b { font-weight: 600; color: var(--muted); margin-right: 2px; }
+.pending-item .pt:hover { color: var(--text); }
+.pending-item .pa { display: flex; flex: none; gap: 1px; }
+.pending-item .pa button { display: grid; place-items: center; width: 28px; height: 26px; color: var(--muted); border-radius: 5px; }
+.pending-item .pa button:hover { color: var(--text); background: var(--surface); }
+.pending-item.editing { border-color: var(--focus); }
+.pending-item .pe { flex: 1; min-width: 0; }
+.pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: 240px; padding: 2px 0; font: inherit; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }
+.pending-item .pe-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px; }
+.pending-item .pe-bar .muted { flex: 1; min-width: 0; }
+.pending-item .pe-bar .btn.sm { height: 28px; padding: 0 10px; }
+.composer-wrap.dropping .composer { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 35%, transparent); }
 
 /* ---------- sheets (quick picks) */
 .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); animation: fade 0.18s ease; }

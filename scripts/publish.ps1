@@ -5,11 +5,13 @@
 #     landing page links to via releases/latest/download/pocket-pilot.vsix).
 # Needs only the default `repo` scope (no `workflow` scope):
 #   gh auth login --hostname github.com --git-protocol https --web   # once, with the account that owns the repo
-#   pwsh scripts/publish.ps1 [-Owner mithawala] [-Repo pocket-pilot] [-Node node]
+#   pwsh scripts/publish.ps1 [-Owner mithawala] [-Repo pocket-pilot] [-Node node] [-SiteOnly]
+# -SiteOnly publishes just the product page and the app (gh-pages), without pushing main or a release.
 param(
   [string]$Owner = 'mithawala',
   [string]$Repo = 'pocket-pilot',
-  [string]$Node = 'node'
+  [string]$Node = 'node',
+  [switch]$SiteOnly
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -25,16 +27,20 @@ try {
   $siteUrl = "https://$Owner.github.io/$Repo/"
   $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
 
-  Write-Host "Building site and VSIX (v$version)…"
-  & $Node scripts/build-plugin.mjs --check
-  if ($LASTEXITCODE -ne 0) { throw 'copilot-plugin is out of date: run node scripts/build-plugin.mjs and commit' }
+  if ($SiteOnly) { Write-Host "Building the site (v$version)…" } else { Write-Host "Building site and VSIX (v$version)…" }
+  if (-not $SiteOnly) {
+    & $Node scripts/build-plugin.mjs --check
+    if ($LASTEXITCODE -ne 0) { throw 'copilot-plugin is out of date: run node scripts/build-plugin.mjs and commit' }
+  }
   $env:PP_SITE_URL = $siteUrl
   & $Node scripts/build-site.mjs
   if ($LASTEXITCODE -ne 0) { throw 'build-site failed' }
-  & $Node scripts/package-vsix.mjs
-  if ($LASTEXITCODE -ne 0) { throw 'package-vsix failed' }
-  $vsix = "pocket-pilot-$version.vsix"
-  Copy-Item $vsix dist/pocket-pilot.vsix -Force
+  if (-not $SiteOnly) {
+    & $Node scripts/package-vsix.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'package-vsix failed' }
+    $vsix = "pocket-pilot-$version.vsix"
+    Copy-Item $vsix dist/pocket-pilot.vsix -Force
+  }
 
   gh repo view $slug --json name 2>$null | Out-Null
   if ($LASTEXITCODE -ne 0) {
@@ -43,9 +49,11 @@ try {
   }
   if (-not (git remote 2>$null | Select-String -Quiet '^origin$')) { git remote add origin "https://github.com/$slug.git" }
 
-  Write-Host 'Pushing main…'
-  git @git push -u origin main
-  if ($LASTEXITCODE -ne 0) { throw 'git push (main) failed' }
+  if (-not $SiteOnly) {
+    Write-Host 'Pushing main…'
+    git @git push -u origin main
+    if ($LASTEXITCODE -ne 0) { throw 'git push (main) failed' }
+  }
   $head = (git rev-parse --short HEAD).Trim()
 
   Write-Host 'Publishing dist/site to gh-pages…'
@@ -66,21 +74,23 @@ try {
   gh api -X POST "repos/$slug/pages/builds" 2>$null | Out-Null
   gh repo edit $slug --homepage $siteUrl 2>$null | Out-Null
 
-  Write-Host "Publishing release v$version…"
-  gh release view "v$version" --repo $slug --json tagName 2>$null | Out-Null
-  if ($LASTEXITCODE -eq 0) {
-    gh release upload "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --clobber
-  } else {
-    $notes = @"
+  if (-not $SiteOnly) {
+    Write-Host "Publishing release v$version…"
+    gh release view "v$version" --repo $slug --json tagName 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      gh release upload "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --clobber
+    } else {
+      $notes = @"
 **VS Code:** download **pocket-pilot.vsix**, then run **Extensions → ··· → Install from VSIX…** (or ``code --install-extension pocket-pilot.vsix``).
 
 **GitHub Copilot app & CLI:** in a terminal run ``copilot plugin marketplace add $slug`` and ``copilot plugin install pocket-pilot@pocket-pilot`` (the GitHub Copilot app uses the same plugins; restart it). Then type ``/pocket-pilot`` in a chat.
 
 Phone app: $($siteUrl)app/ · Product page: $siteUrl
 "@
-    gh release create "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --target main --title "Pocket Pilot $version" --notes $notes
+      gh release create "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --target main --title "Pocket Pilot $version" --notes $notes
+    }
+    if ($LASTEXITCODE -ne 0) { throw 'gh release failed' }
   }
-  if ($LASTEXITCODE -ne 0) { throw 'gh release failed' }
 
   $check = "$($siteUrl)app/manifest.webmanifest"
   Write-Host "Waiting for $check …"

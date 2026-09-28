@@ -46,9 +46,27 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-home-'));
 const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-ws-'));
 fs.writeFileSync(path.join(ws, 'README.md'), '# e2e workspace\n');
 process.env.POCKET_PILOT_HOME = home;
-process.env.POCKET_PILOT_IDLE_MINUTES = '2';
 process.env.POCKET_PILOT_DEBUG = '1';
 fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'none', passkey: 'off', requireApproval: false } }));
+
+// Your own Copilot settings can switch extensions off (Customize → Extensions) and list installed
+// plugins: run with a copy of the config (for the sign-in) and settings that leave Pocket Pilot on.
+const realCopilotHome = process.env.COPILOT_HOME || path.join(os.homedir(), '.copilot');
+const copilotHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-copilot-'));
+const readJsonFile = (f) => {
+  try {
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+const copilotConfig = readJsonFile(path.join(realCopilotHome, 'config.json')) || {};
+delete copilotConfig.installedPlugins;
+fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify(copilotConfig));
+const copilotSettings = readJsonFile(path.join(realCopilotHome, 'settings.json')) || {};
+if (copilotSettings.extensions?.disabledExtensions) copilotSettings.extensions.disabledExtensions = copilotSettings.extensions.disabledExtensions.filter((id) => !/pocket-pilot/i.test(id));
+fs.writeFileSync(path.join(copilotHome, 'settings.json'), JSON.stringify(copilotSettings));
+process.env.COPILOT_HOME = copilotHome;
 
 const { CopilotClient, RuntimeConnection } = await import(pathToFileURL(path.join(sdkDir, 'index.js')).href);
 const ipc = await import(pathToFileURL(path.join(root, 'copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/ipc.mjs')).href);
@@ -207,6 +225,32 @@ const steeredText = steered.responseParts.filter((p) => p.kind === 'markdown').m
 if (!/steer/i.test(steeredText)) fail(`the steering message did not reach the agent: ${steeredText.slice(0, 200)}`);
 step(`steering reached the running agent: ${steeredText.replace(/\s+/g, ' ').slice(0, 90)}`);
 
+// 7. The chat that turned remote access on can be closed and deleted: another open chat takes the hub
+//    over on the same local port (and the same tunnel), so the phone reconnects by itself.
+const canvasList = await session.rpc.canvas?.list?.().catch((err) => ({ error: err.message }));
+if (canvasList?.canvases) {
+  if (!canvasList.canvases.some((c) => c.id === 'pocket-pilot' || c.canvasId === 'pocket-pilot' || c.displayName === 'Pocket Pilot')) fail(`the Pocket Pilot panel (canvas) is not declared: ${JSON.stringify(canvasList)}`);
+  step(`Pocket Pilot panel (canvas) declared for the GitHub Copilot app (${canvasList.canvases.length} canvas(es) in this runtime)`);
+} else {
+  step(`canvas API not available in this runtime (${canvasList?.error || 'no canvas.list'}): skipped`);
+}
+const second = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
+await second.sendAndWait({ prompt: 'Reply with just the word second.' }, 120000);
+const secondUri = `copilotcli:/${second.sessionId}`;
+await until(() => store.sessions.has(secondUri), 'the second chat on the phone', 60000);
+release();
+const deletedAt = Date.now();
+await session.disconnect().catch(() => {});
+await client.deleteSession(session.sessionId).catch((err) => step(`deleteSession: ${err.message}`));
+const moved = await until(() => {
+  const h = ipc.readJson(path.join(home, 'hub.json'));
+  return h && ipc.isAlive(h.pid) && h.pid !== hub.pid ? h : null;
+}, 'another chat to take over the hub', 60000);
+if (moved.relayPort !== hub.relayPort) fail(`the new hub listens on another port (${moved.relayPort} instead of ${hub.relayPort}): devices would lose the address`);
+await until(() => conn.state === 'online' && store.sessions.has(secondUri) && !store.sessions.has(uri), 'the phone to reconnect to the new hub', 90000);
+step(`deleted the chat that started remote access: chat ${second.sessionId.slice(0, 8)} took over (hub ${hub.pid} -> ${moved.pid}, same port ${moved.relayPort}); the phone reconnected in ${((Date.now() - deletedAt) / 1000).toFixed(1)}s without pairing again`);
+const hubAfter = moved;
+
 // 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
 const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
 await new Promise((r) => setTimeout(r, 1500));
@@ -221,10 +265,10 @@ step(`status from an unattached chat: ${statusLog.find((l) => /Tunnel:/.test(l))
 await other.rpc.commands.execute({ commandName: 'pocket-pilot', args: 'off' });
 await until(() => !fs.existsSync(path.join(home, 'hub.json')), 'the hub to stop after /pocket-pilot off', 20000);
 await until(() => conn.state !== 'online', 'the phone to be disconnected', 20000);
-step('/pocket-pilot off from an unattached chat stopped the hub and disconnected the phone');
+step(`/pocket-pilot off from an unattached chat stopped the hub (pid ${hubAfter.pid}) and disconnected the phone`);
 await other.disconnect().catch(() => {});
+await second.disconnect().catch(() => {});
 
-release();
 store.dispose();
 conn.stop();
 await session.disconnect().catch(() => {});
@@ -232,6 +276,6 @@ await client.stop().catch(() => {});
 await hubRpc.request('stop').catch(() => {});
 ch.close();
 clearTimeout(watchdog);
-for (const dir of [home, ws]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+for (const dir of [home, ws, copilotHome]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 step('E2E OK');
 process.exit(0);

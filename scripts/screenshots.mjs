@@ -95,13 +95,33 @@ function readmeHarness() {
   </style></head><body>${phone('sessions.webp', 20)}${phone('approval.webp', -20)}${phone('chat.webp', 20)}</body></html>`;
 }
 
+/** The Copilot app plugin's pairing page as a panel (canvas), with sample state. */
+async function copilotPanelHarness() {
+  const { pairingPage } = await import('../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/pairing-page.mjs');
+  return pairingPage({ key: 'demo', hostName: 'Studio PC', embed: true }).replace('https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png', '/pwa/icons/icon-192.png');
+}
+const copilotPanelState = () => ({
+  hostName: 'Studio PC',
+  tunnel: { url: 'https://quiet-meadow-lantern.trycloudflare.com', reachable: true, mode: 'quick' },
+  sessions: 3,
+  rendezvous: true,
+  pairing: { link: DEMO_LINK, svg: renderQrSvg(DEMO_LINK), expiresAt: Date.now() + 9 * 60000 + 41000 },
+  approvals: [],
+  devices: [{ id: 'd1', name: 'iPhone', platform: 'iPhone · Safari', online: true, passkey: true }],
+});
+
 function startServer() {
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
-    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness }[url.pathname];
+    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness }[url.pathname];
     if (harness) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
-      res.end(harness());
+      res.end(await harness());
+      return;
+    }
+    if (url.pathname === '/pair/state') {
+      res.writeHead(200, { 'content-type': TYPES['.json'] });
+      res.end(JSON.stringify(copilotPanelState()));
       return;
     }
     let file = path.join(repo, decodeURIComponent(url.pathname));
@@ -180,6 +200,15 @@ async function main() {
     const h = await side.eval('Math.ceil(document.documentElement.scrollHeight)');
     await side.shot('sidebar.webp', { clip: { x: 0, y: 0, width: 330, height: h } });
     await side.close();
+
+    console.log('Capturing the GitHub Copilot app panel…');
+    const panel = await open(cdp, { width: 340, height: 900, mobile: false });
+    await panel.goto(`${base}/__copilot-panel.html`);
+    await panel.waitFor('document.querySelector("#qr svg") && [...document.images].every((i) => i.complete && i.naturalWidth > 0)');
+    await sleep(400);
+    const ph = await panel.eval('Math.ceil(document.querySelector(".card").getBoundingClientRect().bottom + 8)');
+    await panel.shot('copilot-panel.webp', { clip: { x: 0, y: 0, width: 340, height: ph } });
+    await panel.close();
 
     console.log('Rendering the social preview…');
     const og = await open(cdp, { width: 1200, height: 630, dpr: 1, mobile: false });

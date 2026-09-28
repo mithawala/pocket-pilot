@@ -2,13 +2,24 @@
 // these for every session; it attaches the session to the shared Pocket Pilot hub (starting the hub
 // when remote access is on) so your phone sees the same history, streams replies live, and can chat,
 // approve tools, answer questions, switch model or mode and stop the agent.
-import { joinSession } from '@github/copilot-sdk/extension';
+import * as sdk from '@github/copilot-sdk/extension';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { FILES, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
 import { renderQrText } from './lib/qr.mjs';
+
+const { joinSession } = sdk;
+const EXT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const inside = (child, parent) => {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!!rel && !rel.startsWith('..') && !path.isAbsolute(rel));
+};
+// Never keep the plugin folder in use: Windows can't update or uninstall a folder a process runs in.
+if (inside(process.cwd(), path.resolve(EXT_DIR, '..', '..', '..'))) process.chdir(os.homedir());
 
 const MAX_TURNS = 60;
 const CLIP = 8000;
@@ -135,7 +146,7 @@ async function updateNote() {
     }
   }
   return latest?.version && newer(latest.version, VERSION)
-    ? `Update available: Pocket Pilot ${latest.version} (you have ${VERSION}). Run \`copilot plugin update pocket-pilot@pocket-pilot\`, then restart the app.`
+    ? `Update available: Pocket Pilot ${latest.version} (you have ${VERSION}). Quit VS Code and the GitHub Copilot app (on Windows they keep plugin folders in use), run \`copilot plugin update pocket-pilot@pocket-pilot\`, then start the app again.`
     : '';
 }
 const debug = process.env.POCKET_PILOT_DEBUG
@@ -479,8 +490,41 @@ async function pair({ openPage = true } = {}) {
   if (!(await enable({ ask: true }))) return null;
   await session.log('Pocket Pilot: starting the secure tunnel…', { ephemeral: true });
   const s = await rpc.request('pair', {}, 180000);
-  if (openPage) openExternal(s.pageUrl);
+  if (openPage) s.openedIn = (await openPanel()) ? 'panel' : (openExternal(s.pageUrl), 'browser');
   return s;
+}
+
+// ------------------------------------------------------------------ the Pocket Pilot panel (canvas)
+// In the GitHub Copilot app the pairing page (QR code, approvals, paired devices) opens as a panel next
+// to the chat; the CLI, which has no panels, opens it in the browser instead.
+
+const CANVAS_ID = 'pocket-pilot';
+const canCanvas = () => typeof sdk.createCanvas === 'function' && !!session?.capabilities?.ui?.canvases;
+
+async function openPanel() {
+  if (!canCanvas()) return false;
+  try {
+    await session.rpc.canvas.open({ canvasId: CANVAS_ID, instanceId: CANVAS_ID });
+    return true;
+  } catch (err) {
+    debug(`canvas open failed: ${err.message}`);
+    return false;
+  }
+}
+
+function canvases() {
+  if (typeof sdk.createCanvas !== 'function') return [];
+  return [sdk.createCanvas({
+    id: CANVAS_ID,
+    displayName: 'Pocket Pilot',
+    description: 'Pair a phone, tablet or another computer with this PC to follow and control your Copilot chats from it, and see or remove paired devices.',
+    open: async () => {
+      const s = await pair({ openPage: false });
+      if (!s) throw new sdk.CanvasError('declined', 'Remote access was not turned on.');
+      const n = s.devices.length;
+      return { url: `${s.pageUrl}&embed=1`, title: 'Pocket Pilot', status: n ? `${n} paired device${n === 1 ? '' : 's'}` : 'Scan the QR code to pair' };
+    },
+  })];
 }
 
 /** A request to the hub, over this session's connection or a short control connection (no attach). */
@@ -507,7 +551,9 @@ async function onCommand(ctx) {
     }
     if (arg === 'off' || arg === 'stop') {
       setEnabled(false);
-      await hubRequest('stop').catch(() => {});
+      const stopped = await hubRequest('stop').catch(() => null);
+      // No hub right now (for example every other chat was closed): end the tunnel it left running.
+      if (!stopped) await createRequire(import.meta.url)('./vendor/extension/core/tunnel.js').PersistentTunnel.end(FILES.tunnel).catch(() => {});
       await session.log('Pocket Pilot is off: the tunnel is closed and your devices cannot connect until you run /pocket-pilot again.');
       return;
     }
@@ -517,7 +563,8 @@ async function onCommand(ctx) {
     }
     const s = await pair();
     if (!s) return;
-    await session.log(`Pocket Pilot: scan this code with your phone or tablet (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on the device you want to pair within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
+    if (s.openedIn === 'panel') await session.log(`Pocket Pilot is open in the panel next to this chat: scan the QR code there with your phone or tablet, or copy the link for another computer. Remote access keeps running when you close or delete this chat.\n\nNo panel? Open the same page in your browser: ${s.pageUrl}`, { ephemeral: true });
+    else await session.log(`Pocket Pilot: scan this code with your phone or tablet (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on the device you want to pair within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
     const note = await updateNote();
     if (note) await session.log(`Pocket Pilot: ${note}`, { level: 'warning' });
   } catch (err) {
@@ -538,7 +585,8 @@ const tool = {
     const s = await pair();
     if (!s) return 'The user declined to turn on Pocket Pilot remote access.';
     // Never hand the pairing link to the model: it only needs to know where the user should look.
-    return 'Opened the Pocket Pilot pairing page with a QR code in the browser on this PC. Tell the user to scan it with their phone or tablet camera and then allow the device on that page. The code is single-use and expires in 10 minutes.';
+    const where = s.openedIn === 'panel' ? 'in the Pocket Pilot panel next to this chat' : 'on a page in the browser on this PC';
+    return `Opened the Pocket Pilot pairing QR code ${where}. Tell the user to scan it with their phone or tablet camera (or open the copied link on another computer) and then allow the device there. The code is single-use and expires in 10 minutes.`;
   },
 };
 
@@ -556,6 +604,7 @@ if (process.env.POCKET_PILOT_DISABLE) {
   session = await joinSession({
     tools: [tool],
     commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: pair your phone or another device to control this session remotely (pair | status | off)', handler: onCommand }],
+    canvases: canvases(),
   });
   session.on((e) => forward(e));
   checkReal().then((isReal) => {

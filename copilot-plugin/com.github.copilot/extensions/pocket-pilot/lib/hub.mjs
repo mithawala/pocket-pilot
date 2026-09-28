@@ -1,9 +1,10 @@
-// The Pocket Pilot hub for the GitHub Copilot app and CLI. Exactly one session's extension process
-// hosts it (whoever takes the lock first); the others connect to it over 127.0.0.1. It runs the same
-// end-to-end encrypted relay, Cloudflare quick tunnel, pairing, passkeys and push notifications as
-// the VS Code extension, and serves every attached Copilot session to the phone over the Agent Host
-// Protocol. When the hosting session ends, another open session takes over; paired phones follow the
-// new tunnel address through the encrypted gist (auto-reconnect), exactly like after a VS Code restart.
+// The Pocket Pilot hub for the GitHub Copilot app and CLI. One chat's extension process hosts it
+// (whoever takes the lock first); the others connect to it over 127.0.0.1. It runs the same end-to-end
+// encrypted relay, Cloudflare quick tunnel, pairing, passkeys and push notifications as the VS Code
+// extension, and serves every attached Copilot session to the phone over the Agent Host Protocol.
+// When the hosting chat is closed or deleted, another open chat takes over within seconds: the
+// Cloudflare tunnel keeps running on its own and the new hub listens on the same local port, so the
+// public address stays the same and paired devices simply reconnect (also after an app restart).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -49,7 +50,7 @@ export async function startHub() {
   // remote access is taken away (for example `/pocket-pilot off` in a session that wasn't attached).
   const life = { stop: null };
   const beat = setInterval(() => {
-    if (!touchLock()) life.stop?.('another process took over the hub');
+    if (!touchLock()) life.stop?.('another process took over the hub', { keepTunnel: true });
     else if (readJson(FILES.state, {})?.enabled === false) life.stop?.('remote access was turned off');
   }, 10000);
   beat.unref?.();
@@ -76,7 +77,7 @@ async function boot(log, cleanups) {
   const { DeviceStore, FileSecrets } = core('store');
   const identityLib = core('identity');
   const { SessionMonitor } = core('monitor');
-  const { TunnelManager } = core('tunnel');
+  const { PersistentTunnel } = core('tunnel');
   const { GistRendezvous } = core('rendezvous');
   const push = core('push');
   const ahpTypes = await import(pathToFileURL(path.join(vendor, 'pwa', 'vendor', 'ahp', 'types', 'index.js')).href);
@@ -189,7 +190,12 @@ async function boot(log, cleanups) {
     const d = store.get(id);
     if (d?.push) pushTo([d], { v: 1, kind: 'test', title: '🚀 Pocket Pilot', body: `Notifications from ${hostName} work.`, hostId: identity.hostId, tag: `${identity.hostId}:test`, ts: Date.now() }, { urgency: 'high', ttl: 300 });
   });
-  await relay.listen(0, '127.0.0.1');
+  // The same local port as the previous hub: the running tunnel forwards there, and devices on a
+  // direct connection keep their address too.
+  const tunnel = new PersistentTunnel({ storageDir: FILES.tunnel, log });
+  const lastPort = (settings().tunnel === 'quick' && (await tunnel.adoptablePort())) || readJson(FILES.relay, {})?.port || 0;
+  await relay.listen(lastPort, '127.0.0.1').catch(() => relay.listen(0, '127.0.0.1'));
+  writeJson(FILES.relay, { port: relay.port });
   cleanups.push(() => relay.close());
 
   // ---------------------------------------------------------------- notifications
@@ -247,15 +253,18 @@ async function boot(log, cleanups) {
   }
   cleanups.push(() => clearTimeout(state.pairingTimer));
 
-  const tunnel = new TunnelManager({ storageDir: FILES.tunnel, log });
   tunnel.on('url', (url) => onPublicUrl(url));
-  cleanups.push(() => tunnel.stop());
+  const tunnelEnd = { keep: false };
+  cleanups.push(() => tunnel.stop({ keep: tunnelEnd.keep }));
 
   function onPublicUrl(url) {
+    // A kept tunnel keeps its address: devices know it, and so does the auto-reconnect gist.
+    const same = url === state.publicUrl || url === state.lastPublicUrl;
     state.publicUrl = url;
+    state.lastPublicUrl = url;
     state.reachable = false;
     state.tunnelError = null;
-    rendezvous.publish(url).then((ok) => ok && log('info', 'Auto-reconnect address updated')).catch(() => {});
+    if (!same) rendezvous.publish(url).then((ok) => ok && log('info', 'Auto-reconnect address updated')).catch(() => {});
     newPairingCode().catch((err) => log('warn', `Pairing code failed: ${err.message}`));
     tunnel.waitReachable().then(() => {
       state.reachable = true;
@@ -377,11 +386,13 @@ async function boot(log, cleanups) {
       return res.end();
     }
     const port = pairServer.address().port;
+    // `embed=1`: shown as a panel (canvas) in the GitHub Copilot app, which may frame it.
+    const embed = u.searchParams.get('embed') === '1';
     const send = (code, body, type = 'application/json') => {
       res.writeHead(code, {
         'content-type': type,
         'cache-control': 'no-store',
-        'x-frame-options': 'DENY',
+        ...(embed ? {} : { 'x-frame-options': 'DENY' }),
         'referrer-policy': 'no-referrer',
         'content-security-policy': "default-src 'none'; img-src https://mithawala.github.io data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
       });
@@ -404,7 +415,7 @@ async function boot(log, cleanups) {
         return {};
       }
     };
-    if (req.method === 'GET' && u.pathname === '/pair') return send(200, pairingPage({ key: pageKey, hostName }), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && u.pathname === '/pair') return send(200, pairingPage({ key: pageKey, hostName, embed }), 'text/html; charset=utf-8');
     if (req.method === 'GET' && u.pathname === '/pair/state') {
       const s = status();
       return send(200, { ...s, pairing: pairingReady() ? { ...s.pairing, svg: state.pairing.svg } : null, approvals: [...approvals.values()].map(({ done, ...a }) => a) });
@@ -428,12 +439,17 @@ async function boot(log, cleanups) {
       }
       return send(200, { ok: !!d });
     }
+    if (req.method === 'POST' && u.pathname === '/pair/off') {
+      writeJson(FILES.state, { ...(readJson(FILES.state, {}) || {}), enabled: false, changedAt: new Date().toISOString() });
+      setTimeout(() => stopRequested?.('turned off on the pairing page'), 100);
+      return send(200, { ok: true });
+    }
     return send(404, 'Not found', 'text/plain');
   }
   await new Promise((r) => pairServer.listen(0, '127.0.0.1', r));
   cleanups.push(() => pairServer.close());
 
-  writeJson(FILES.hub, { pid: process.pid, port: ipcServer.address().port, token: ipcToken, version: VERSION, startedAt: new Date().toISOString() });
+  writeJson(FILES.hub, { pid: process.pid, port: ipcServer.address().port, token: ipcToken, version: VERSION, relayPort: relay.port, startedAt: new Date().toISOString() });
   log('info', `Hub ready: relay 127.0.0.1:${relay.port}, sessions port ${ipcServer.address().port}`);
   startTunnel();
 
@@ -443,33 +459,25 @@ async function boot(log, cleanups) {
     if (readJson(FILES.hub)?.pid === process.pid) fs.rmSync(FILES.hub, { force: true });
     releaseLock();
   };
-  // The runtime ends extension processes abruptly; never leave a tunnel behind.
-  const onExit = () => {
-    try {
-      if (tunnel.proc) {
-        tunnel.proc.kill();
-        fs.rmSync(path.join(FILES.tunnel, 'cloudflared.pid'), { force: true });
-      }
-    } catch {
-      /* ignore */
-    }
-    releaseFiles();
-  };
+  // The runtime ends extension processes when their chat is closed or deleted: free the hub lock at
+  // once so another chat takes over. The tunnel stays up for it (same address for paired devices).
+  const onExit = () => releaseFiles();
   process.on('exit', onExit);
-  // Give the tunnel a clean end when the runtime stops this process (SIGKILL follows 5 s later).
   const onSignal = () => {
     onExit();
     process.exit(0);
   };
   for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.once(sig, onSignal);
-  // This process also runs the session's extension: an unexpected error in the hub must not end it.
+  // This process also runs the chat's extension: an unexpected error in the hub must not end it.
   const onCrash = (err) => log('error', `Unexpected error: ${err?.stack || err}`);
   process.on('uncaughtException', onCrash);
   process.on('unhandledRejection', onCrash);
 
-  async function stop(why = 'stopped') {
+  /** keepTunnel: another process takes over (same address); otherwise remote access is being turned off. */
+  async function stop(why = 'stopped', { keepTunnel = false } = {}) {
     if (stopped) return;
     stopped = true;
+    tunnelEnd.keep = keepTunnel;
     log('info', `Hub stopping (${why})`);
     for (const a of approvals.values()) a.done(false);
     releaseFiles();

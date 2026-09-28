@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- **GitHub Copilot app: closing or deleting a chat no longer matters.** Remote access used to live in the chat you ran `/pocket-pilot` in: when that chat closed, another chat took over with a *new* tunnel address, so phones without auto-reconnect lost the PC. Now the Cloudflare tunnel runs on its own and the chat that takes over listens on the same local port, so the address stays the same and devices reconnect by themselves within seconds (tested end to end: the chat is deleted, another chat takes over, the phone reconnects without pairing again). It also survives app restarts. `/pocket-pilot off` (or **Turn off** in the panel) ends the tunnel, even when no chat is open.
+- **Pocket Pilot panel in the GitHub Copilot app.** `/pocket-pilot` opens the pairing page as a panel (canvas) next to the chat — QR code, pending approvals, paired devices with **Remove**, and a new **Turn off remote access** button — instead of a browser tab. The CLI still opens the browser and prints the QR code.
+- **Why the plugin couldn't be uninstalled or updated, and what to do.** On Windows, VS Code's agent host watches every installed Copilot plugin's folder while it runs, and the Copilot CLI and app move a plugin's folder to update or uninstall it, which Windows then refuses (*Access is denied, os error 5*) — for any plugin, not just Pocket Pilot. Quit VS Code and the app first; the README, the product page and the `/pocket-pilot` update note say so. Pocket Pilot's own processes (its extension, the hub and `cloudflared`) never keep one of the plugin's folders in use.
+- **Queued and steering messages** show in full (wrapped, clamped to three lines with *Show all*), and like in VS Code you can **Edit** them in place (tap the text), **Send Immediately** or **Remove** them.
+- **Paste screenshots**: Ctrl+V / ⌘V of an image in the chat input attaches it (as *Pasted image*), and files dropped on the input are attached too.
+- **Working sessions no longer show "Error"** in the app even with an older PC extension: the app corrects the status of sessions it has open itself (the 0.3 extension already corrects every session on the PC).
+- **Product page:** the GitHub Copilot app is a first-class choice — two equal *Get it for* cards in the hero, a hero that switches between VS Code and the Copilot app (with the new panel), *Get started* tabs for VS Code and the Copilot app, and FAQ answers about closing chats, the *Extensions* listing and uninstalling.
+- `scripts/publish.ps1 -SiteOnly` publishes just the product page and the app.
+
 ## 0.3.0
 
 - **Model, thinking level and context size stay in sync with the PC — both ways.** The phone's selection is the chat's shared draft (`chat/draftChanged`), the same state VS Code's model picker uses: pick a model on the phone and VS Code's picker follows; change it in VS Code and the phone follows. With the GitHub Copilot app plugin the phone switches the runtime's model (the app's picker follows) and model changes made in the app show on the phone. The list of models always comes live from the PC (VS Code's agent host, or the Copilot runtime).

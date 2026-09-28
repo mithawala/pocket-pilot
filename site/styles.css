@@ -81,6 +81,59 @@ h1 { font-size: clamp(42px, 5.6vw, 72px); line-height: 1.03; letter-spacing: -0.
 .lead { font-size: clamp(17px, 1.5vw, 19.5px); color: var(--text-2); max-width: 590px; margin: 0 0 32px; }
 .fineprint { margin: 18px 0 0; font-size: 13.5px; color: var(--muted); }
 
+/* Two equal ways in: the VS Code extension and the GitHub Copilot app plugin. */
+.get { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 610px; }
+.get-card { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; border-radius: 16px; color: var(--text); background: linear-gradient(var(--bg, #07090e), var(--bg, #07090e)) padding-box, var(--grad) border-box; border: 1.5px solid transparent; box-shadow: 0 10px 30px rgba(79, 120, 255, 0.22); transition: transform 0.12s ease, box-shadow 0.2s ease; }
+.get-card:hover { text-decoration: none; transform: translateY(-2px); box-shadow: 0 16px 40px rgba(79, 120, 255, 0.38); }
+.get-ic { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 11px; color: #fff; background: var(--grad); }
+.get-ic .ic { width: 21px; height: 21px; }
+.get-txt { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
+.get-txt b { font-size: 16.5px; line-height: 1.2; white-space: nowrap; }
+.get-txt small { font-size: 13px; color: var(--muted); }
+.get-go { width: 19px; height: 19px; flex: none; color: var(--text-2); }
+.demo-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.demo-link .ic { width: 15px; height: 15px; }
+
+.hero-switch { position: absolute; z-index: 4; left: 0; top: -22px; display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(12, 15, 22, 0.82); border: 1px solid var(--line-2); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.hero-switch button { padding: 7px 13px; border: 0; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); background: none; cursor: pointer; }
+.hero-switch button[aria-selected='true'] { color: #fff; background: var(--grad); }
+.hero-visual .window[hidden] { display: none; }
+.hero-visual .window.fade-in { animation: win-in 0.45s ease; }
+@keyframes win-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* The GitHub Copilot app mock: its sidebar, the Pocket Pilot panel and the chat (under the phone). */
+.app-window .window-body { background: #1b1f27; }
+.app-side { width: 58px; flex: none; display: flex; flex-direction: column; gap: 11px; padding: 16px 10px; background: #161a21; border-right: 1px solid #0f1217; }
+.nav-ln { display: block; height: 7px; border-radius: 4px; background: #343a46; }
+.nav-ln.on { background: #56607a; }
+.nav-sec { height: 1px; margin: 4px 0; background: #2a2f39; }
+.w55 { width: 55%; } .w62 { width: 62%; } .w66 { width: 66%; } .w70 { width: 70%; } .w74 { width: 74%; } .w80 { width: 80%; }
+.app-panel { width: 46%; flex: none; display: flex; flex-direction: column; min-height: 0; background: #21252b; border-right: 1px solid #0f1217; }
+.app-panel-bar { display: flex; align-items: center; gap: 8px; height: 34px; flex: none; padding: 0 12px; font-size: 12px; font-weight: 600; color: #d7dae0; background: #1b1f27; border-bottom: 1px solid #0f1217; }
+.app-panel-bar img { width: 16px; height: 16px; border-radius: 4px; }
+.app-panel-shot { display: block; width: 100%; height: auto; }
+.app-panel { overflow: hidden; }
+.app-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px 14px; }
+.app-msg { font-size: 12px; line-height: 1.45; color: #c8cdd8; }
+.app-msg.user { align-self: flex-end; padding: 7px 11px; border-radius: 12px; background: #2d3340; }
+.app-msg.user code { padding: 0; border: 0; background: none; color: #9ecbff; }
+.app-msg.bot { display: flex; gap: 8px; align-items: flex-start; }
+.app-msg.bot img { width: 20px; height: 20px; flex: none; border-radius: 5px; }
+.app-msg.bot p { margin: 0; }
+.app-input { margin-top: auto; padding: 10px 12px; border-radius: 12px; font-size: 12px; color: #7f848e; background: #242a35; border: 1px solid #333a47; }
+
+/* Get started: one set of steps per app. */
+.platforms { display: flex; justify-content: center; gap: 12px; max-width: 1000px; margin: -18px auto 26px; }
+.platforms button { display: flex; align-items: center; gap: 12px; min-width: 260px; padding: 14px 18px; font: inherit; text-align: left; color: var(--text-2); border-radius: 16px; background: var(--panel); border: 1.5px solid var(--line-2); cursor: pointer; }
+.platforms button .ic { width: 26px; height: 26px; flex: none; }
+.platforms button span { display: grid; gap: 1px; }
+.platforms button b { font-size: 16.5px; color: var(--text); }
+.platforms button small { font-size: 13px; color: var(--muted); }
+.platforms button[aria-selected='true'] { color: #fff; background: linear-gradient(135deg, rgba(109, 93, 252, 0.22), rgba(34, 193, 238, 0.1)); border-color: rgba(109, 93, 252, 0.6); box-shadow: 0 10px 30px rgba(79, 120, 255, 0.22); }
+.platform-panel[hidden] { display: none; }
+.panel-frame { max-height: 460px; background: #21252b; }
+.step .small.muted { font-size: 14px; color: var(--muted); }
+
 .hero-visual { position: relative; height: 620px; }
 .window { position: absolute; left: 0; top: 24px; width: 94%; height: 440px; display: flex; flex-direction: column; overflow: hidden; border-radius: 14px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55); }
 .window-bar { height: 34px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #21252b; border-bottom: 1px solid #181a1f; }
@@ -306,6 +359,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   .hero-copy { max-width: 720px; margin: 0 auto; text-align: center; }
   .lead { margin-left: auto; margin-right: auto; }
   .hero-copy .cta-row { justify-content: center; }
+  .get { margin: 0 auto; }
   .hero-visual { width: 100%; max-width: 640px; margin: 0 auto; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .sec-grid { grid-template-columns: repeat(2, 1fr); }
@@ -345,7 +399,10 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   body { font-size: 16px; }
   .hero { padding: 36px 0 64px; }
   .hero-visual { height: auto; display: flex; justify-content: center; padding-top: 8px; }
-  .window, .e2e-chip { display: none; }
+  .window, .e2e-chip, .hero-switch { display: none; }
+  .get { grid-template-columns: 1fr; }
+  .platforms { flex-direction: column; margin-top: -24px; }
+  .platforms button { min-width: 0; }
   .hero-phone { position: relative; right: auto; bottom: auto; width: 262px; }
   .notif { right: auto; left: 50%; top: 58px; margin-left: -118px; width: 236px; }
   .hero-copy .btn-lg { width: 100%; }
@@ -378,6 +435,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   html { scroll-behavior: auto; }
   .js [data-reveal] { opacity: 1; transform: none; transition: none; }
   .notif { opacity: 1; animation: none; }
+  .hero-visual .window.fade-in { animation: none; }
   .link .pulse { animation: none; opacity: 0; }
   .btn, .feature { transition: none; }
 }

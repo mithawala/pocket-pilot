@@ -167,7 +167,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
     return () => document.removeEventListener('click', onClick);
   }, []);
 
-  const status = statusOf(session?.status);
+  const status = statusOf(store.statusFor(session));
   const inputNeeded = sessionState?.inputNeeded || [];
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;

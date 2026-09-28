@@ -3,7 +3,7 @@
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function pairingPage({ key, hostName }) {
+export function pairingPage({ key, hostName, embed = false }) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
@@ -24,8 +24,10 @@ button{font:inherit;border:1px solid var(--line);background:#2c313a;color:var(--
 .dev{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #2c313a}.dev:first-child{border-top:none}
 code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--strong)}.link{word-break:break-all;font-size:11.5px;color:var(--muted);max-height:3.2em;overflow:hidden}
 .warn{color:var(--warn)}.err{color:var(--err)}
+.embed{padding:8px;place-items:start stretch}.embed .card{width:100%;background:transparent;border:none;box-shadow:none;padding:8px;grid-template-columns:1fr}.embed .qr{max-width:320px}
+.foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
 </style></head>
-<body><main class="card">
+<body class="${embed ? 'embed' : ''}"><main class="card">
   <section>
     <div id="qr" class="qr wait">Starting the secure tunnel…</div>
     <p class="small muted" id="exp"></p>
@@ -44,6 +46,7 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
     <div class="row" id="status"></div>
     <h2>Paired devices</h2>
     <div id="devices" class="small muted">None yet.</div>
+    <div class="foot"><button id="off">Turn off remote access</button><span class="small muted">Keeps running when you close or delete the chat it was started from. With no chat open for 30 minutes it pauses, and comes back with your next chat.</span></div>
   </section>
 </main>
 <script>
@@ -83,10 +86,19 @@ document.addEventListener('click', async (e) => {
 });
 $('copy').onclick = async () => { if (link) { await navigator.clipboard.writeText(link); $('copy').textContent = 'Copied'; setTimeout(() => ($('copy').textContent = 'Copy link'), 1500); } };
 $('renew').onclick = async () => { await api('/pair/renew', {}).catch(() => {}); tick(); };
+$('off').onclick = async () => {
+  if (!confirm('Turn off Pocket Pilot remote access? Your paired devices stay paired; run /pocket-pilot in a chat to turn it on again.')) return;
+  $('off').disabled = true;
+  await api('/pair/off', {}).catch(() => {});
+  $('qr').className = 'qr wait'; $('qr').textContent = 'Remote access is off. Run /pocket-pilot in a chat to turn it on again.';
+  stopped = true;
+};
 let failures = 0;
+let stopped = false;
 async function tick() {
+  if (stopped) return;
   try { render(await api('/pair/state')); failures = 0; }
-  catch { if (++failures > 3) { $('qr').className = 'qr wait'; $('qr').textContent = 'Pocket Pilot stopped. Run /pocket-pilot again.'; } }
+  catch { if (++failures > 3) { $('qr').className = 'qr wait'; $('qr').textContent = 'This page lost Pocket Pilot (for example, its chat was closed). Your devices stay connected: run /pocket-pilot to open the page again.'; } }
 }
 tick(); setInterval(tick, 1500);
 </script></body></html>`;

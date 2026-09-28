@@ -14,6 +14,7 @@ export const FILES = {
   secrets: path.join(HOME, 'secrets.json'),
   devices: path.join(HOME, 'devices.json'),
   rendezvous: path.join(HOME, 'rendezvous.json'),
+  relay: path.join(HOME, 'relay.json'),
   log: path.join(HOME, 'hub.log'),
   lock: path.join(HOME, 'hub.lock'),
   tunnel: path.join(HOME, 'tunnel'),
