@@ -32,7 +32,7 @@ function FileViewer({ store, uri, onClose }) {
   useEffect(() => {
     if (state.text && lang && state.text.length < 120000 && codeRef.current) highlightElement(codeRef.current).catch(() => {});
   }, [state.text, lang]);
-  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
+  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} doneLabel="Close" title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
     <div class="kv" style="margin-bottom:8px">${uri ? filePath(uri) : ''}</div>
     ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>` : html`<div class="md"><pre><code key=${uri} ref=${codeRef} class=${lang ? `language-${lang}` : ''}>${state.text}</code></pre></div>`}
   </${Sheet}>`;

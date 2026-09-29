@@ -115,7 +115,7 @@ function FolderBrowser({ store, start, onPick, onClose }) {
     setPath(u.href);
   };
   const join = (name) => `${path.replace(/\/+$/, '')}/${encodeURIComponent(name)}`;
-  return html`<${Sheet} open=${true} onClose=${onClose} title="Choose a folder">
+  return html`<${Sheet} open=${true} onClose=${onClose} title="Choose a folder" doneLabel="Cancel">
     <div class="kv" style="margin-bottom:8px">${filePath(path)}</div>
     <div class="row" style="margin-bottom:8px">
       <button class="btn sm" onClick=${up}><${Icon} name="back" size="16" /> Up</button>
@@ -173,7 +173,7 @@ function NewSession({ store, open, onClose, onCreated }) {
       setBusy(false);
     }
   }
-  return html`<${Sheet} open=${open} onClose=${onClose} title="New session">
+  return html`<${Sheet} open=${open} onClose=${onClose} title="New session" doneLabel="Cancel">
     <div class="stack">
       ${agents.length > 1 && html`<div class="seg">${agents.map((a) => html`<button class=${provider === a.provider ? 'on' : ''} onClick=${() => { setProvider(a.provider); setModelSel(null); }}>${a.displayName}</button>`)}</div>`}
       <div class="field"><label>What should the agent do?</label>

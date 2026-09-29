@@ -238,13 +238,13 @@ function PasskeyBody({ request }) {
 /** The PC asks for the passkey again (every 12 hours by default) and the browser needs a tap for it. */
 export function PasskeySheet({ request, onCancel }) {
   if (!request) return null;
-  return html`<${Sheet} open=${true} onClose=${onCancel} title="Confirm it's you"><${PasskeyBody} request=${request} /></${Sheet}>`;
+  return html`<${Sheet} open=${true} onClose=${onCancel} title="Confirm it's you" doneLabel="Cancel"><${PasskeyBody} request=${request} /></${Sheet}>`;
 }
 
 /** After a yes on the PC: a new passkey or an authenticator app for this device. */
 export function FactorSheet({ request, onCancel }) {
   if (!request) return null;
-  return html`<${Sheet} open=${true} onClose=${onCancel} title="Set up this device again">
+  return html`<${Sheet} open=${true} onClose=${onCancel} title="Set up this device again" doneLabel="Cancel">
     <${FactorChooser} register=${request.register} allowTotp=${request.allowTotp} canPasskey=${request.canPasskey}
       storageKey=${request.storageKey} hostName=${request.hostName} deviceName=${request.deviceName}
       intro="Your PC allowed it. Save a new passkey, or use codes from an authenticator app from now on."
@@ -255,7 +255,7 @@ export function FactorSheet({ request, onCancel }) {
 /** The PC asks for a code again (every 12 hours by default). */
 export function CodeSheet({ request, onSubmit, onCancel, onReset }) {
   if (!request) return null;
-  return html`<${Sheet} open=${true} onClose=${onCancel} title="Confirm it's you">
+  return html`<${Sheet} open=${true} onClose=${onCancel} title="Confirm it's you" doneLabel="Cancel">
     <div class="stack">
       <p class="muted" style="margin:0">Open your authenticator app and enter the code for <b>Pocket Pilot</b> · ${request.hostName}${request.deviceName ? ` · ${request.deviceName}` : ''}.</p>
       ${request.wrong && html`<div class="errpart">That code didn't match. Enter the code your authenticator app shows now.</div>`}

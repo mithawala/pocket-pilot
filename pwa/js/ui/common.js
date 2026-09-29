@@ -1,4 +1,4 @@
-import { html, useEffect, useState } from '../lib/ui.js';
+import { html, useEffect, useState, useRef } from '../lib/ui.js';
 
 const P = {
   back: 'M15 18l-6-6 6-6',
@@ -101,19 +101,90 @@ export function Toasts() {
 
 // ---------------------------------------------------------------- sheet
 
-export function Sheet({ open, onClose, title, children, wide = false }) {
+// Open sheets, newest last: Escape closes only the top one (a model picker over the new-session sheet).
+const openSheets = [];
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && openSheets.length) openSheets[openSheets.length - 1].current();
+  });
+}
+
+/** Whether a downward swipe of `dy` pixels in `ms` milliseconds closes a sheet `height` pixels tall. */
+export function swipeCloses(dy, ms, height) {
+  return dy > Math.min(140, height * 0.3) || (dy > 40 && dy / Math.max(ms, 1) > 0.5);
+}
+
+/**
+ * A bottom sheet (a centred dialog on wide screens). It always says how to leave it: the Done button in
+ * its header (`doneLabel`, e.g. Cancel where closing backs out), a swipe down, a tap outside, or Escape.
+ */
+export function Sheet({ open, onClose, title, children, wide = false, doneLabel = 'Done' }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    openSheets.push(close);
+    return () => {
+      const i = openSheets.indexOf(close);
+      if (i >= 0) openSheets.splice(i, 1);
+    };
   }, [open]);
   if (!open) return null;
+  const el = () => ref.current;
+  // Swipe down to close: from the handle or the header at any time, or from the content once it's
+  // scrolled to the top (an upward swipe, or any swipe further down the content, just scrolls).
+  const start = (e) => {
+    if (e.touches.length !== 1 || !matchMedia('(max-width: 899px)').matches) return;
+    const fromHead = !!e.target.closest('.sheet-top');
+    if (!fromHead && (el().scrollTop > 0 || e.target.closest('input, textarea, select, pre'))) return;
+    const t = e.touches[0];
+    drag.current = { x0: t.clientX, y0: t.clientY, dy: 0, t0: Date.now(), active: fromHead };
+  };
+  const move = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x0;
+    const dy = t.clientY - d.y0;
+    if (!d.active) {
+      if (dy > 8 && dy > Math.abs(dx) && el().scrollTop <= 0) d.active = true;
+      else if (dy < -4 || Math.abs(dx) > 8) {
+        drag.current = null;
+        return;
+      } else return;
+    }
+    d.dy = Math.max(0, dy);
+    el().style.transition = 'none';
+    el().style.transform = `translateY(${d.dy}px)`;
+    if (e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.active) return;
+    const sheet = el();
+    sheet.style.transition = 'transform 0.18s ease';
+    if (swipeCloses(d.dy, Date.now() - d.t0, sheet.offsetHeight)) {
+      sheet.style.transform = 'translateY(100%)';
+      if (sheet.previousElementSibling) sheet.previousElementSibling.style.opacity = '0';
+      setTimeout(() => close.current(), 170);
+    } else {
+      sheet.style.transform = '';
+    }
+  };
   return html`<div>
     <div class="scrim" onClick=${onClose}></div>
-    <div class=${`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label=${title}>
-      <div class="grab"></div>
-      ${title ? html`<h3>${title}</h3>` : null}
+    <div ref=${ref} class=${`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label=${title}
+      ontouchstart=${start} ontouchmove=${move} ontouchend=${end} ontouchcancel=${end}>
+      <div class="sheet-top">
+        <div class="grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <h3>${title || ''}</h3>
+          <button type="button" class="sheet-done" onClick=${onClose}>${doneLabel}</button>
+        </div>
+      </div>
       ${children}
     </div>
   </div>`;

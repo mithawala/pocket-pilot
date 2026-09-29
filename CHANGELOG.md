@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.5
+
+- **Every sheet in the app says how to leave it.** Sheets now have a header with **Done** (or **Cancel** where closing backs out, like *New session*), and it stays in view while the list scrolls. You can also swipe a sheet down to close it, from the handle or the title at any time, or from the list once it's scrolled to the top; a short pull springs back. Tapping outside still works, and Escape now closes only the top sheet when one opens over another (the model list over *New session*). Sheets with a single choice, like the model list, mode and approvals, still close as soon as you pick.
+
 ## 0.6.4
 
 - **Turning remote access off and on in the GitHub Copilot app panel.** After **Turn off remote access**, the panel kept showing *Tunnel online*, the code buttons and the same button. The panel now shows the state at the top (*Remote access on* in green, *Remote access off* in grey, like the Pocket Pilot panel in VS Code). When it's off, a card says so and offers **Turn on remote access**, which starts it again right there; the panel stays open and shows the new QR code, and you can still remove paired devices meanwhile. It also follows along when remote access is turned off or on from a chat (`/pocket-pilot off`, `/pocket-pilot`), and moves to another chat's panel when that chat takes over.

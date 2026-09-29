@@ -431,10 +431,15 @@ a.btn { text-decoration: none; }
 /* ---------- sheets (quick picks) */
 .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); animation: fade 0.18s ease; }
 @keyframes fade { from { opacity: 0; } }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-width: 720px; max-height: 88%; margin: 0 auto; padding: 6px 12px calc(var(--safe-bottom) + 16px); overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-2); border-bottom: none; border-radius: 12px 12px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35); animation: up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-width: 720px; max-height: 88%; margin: 0 auto; padding: 0 12px calc(var(--safe-bottom) + 16px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg-2); border: 1px solid var(--line-2); border-bottom: none; border-radius: 12px 12px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35); animation: up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes up { from { opacity: 0; transform: translateY(30px); } }
-.sheet .grab { width: 36px; height: 4px; margin: 4px auto 10px; border-radius: 99px; background: var(--line-2); }
-.sheet h3 { margin: 0 4px 12px; font-size: 16px; font-weight: 600; color: var(--strong); }
+/* The handle and header stay in view while the sheet scrolls, so Done is always there. */
+.sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 6px; padding: 6px 12px 4px; background: var(--bg-2); touch-action: none; }
+.sheet .grab { width: 36px; height: 4px; margin: 4px auto 6px; border-radius: 99px; background: var(--line-2); }
+.sheet-head { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+.sheet-head h3 { flex: 1; min-width: 0; margin: 0 4px; overflow: hidden; font-size: 16px; font-weight: 600; color: var(--strong); text-overflow: ellipsis; white-space: nowrap; }
+.sheet-done { flex: none; height: 36px; padding: 0 12px; font-size: 15px; font-weight: 600; color: var(--accent); border-radius: 6px; }
+.sheet-done:hover, .sheet-done:active { background: var(--surface-3); }
 .sheet .section-title { margin: 16px 4px 6px; }
 .list-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 8px 10px; text-align: left; color: var(--text); border-radius: 6px; }
 .list-item:hover, .list-item:active { background: var(--surface); }
@@ -558,9 +563,10 @@ details.card > summary { cursor: pointer; }
   .chat-empty h2 { font-size: 20px; }
   .chat-empty p { max-width: 460px; font-size: 14px; }
   /* Sheets become centred quick picks. */
-  .sheet { top: 9vh; bottom: auto; left: 50%; right: auto; width: min(560px, calc(100vw - 48px)); max-height: 82vh; margin: 0; padding: 12px 12px 14px; border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); transform: translateX(-50%); animation: drop 0.16s ease; }
+  .sheet { top: 9vh; bottom: auto; left: 50%; right: auto; width: min(560px, calc(100vw - 48px)); max-height: 82vh; margin: 0; padding: 0 12px 14px; border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); transform: translateX(-50%); animation: drop 0.16s ease; }
   .sheet.wide { width: min(980px, calc(100vw - 48px)); }
   .sheet .grab { display: none; }
+  .sheet-top { padding-top: 10px; border-radius: 10px 10px 0 0; }
   .scrim { background: rgba(0, 0, 0, 0.4); }
   .page.safe { max-width: 600px; padding-top: 40px; }
   .composer textarea { min-height: 48px; }
