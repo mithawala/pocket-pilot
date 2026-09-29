@@ -2,9 +2,9 @@
 
 **Your Copilot agents, in your pocket.** Chat with your GitHub Copilot and Claude agent sessions — in VS Code, the GitHub Copilot app or the Copilot CLI — approve their tool calls and get notified when they need you, from your phone, anywhere. Free, end-to-end encrypted, passkey-protected, no servers.
 
-<p align="center"><a href="https://mithawala.github.io/pocket-pilot/open/"><img src="docs/images/open-in-vscode.png" width="340" alt="Open Pocket Pilot in VS Code"></a></p>
+<p align="center"><img src="docs/images/activity-bar.png" width="340" alt="The Pocket Pilot robot icon in the Activity Bar, on the far left of VS Code"></p>
 
-<p align="center">Installed it? The button opens the Pocket Pilot panel. You can also click the <b>robot icon</b> in the <b>Activity Bar</b>, the column of icons on the far left of VS Code.</p>
+<p align="center">Find Pocket Pilot in VS Code's <b>Activity Bar</b>, the icons on the far left. Right after you install it, it opens by itself.</p>
 
 **[Product page](https://mithawala.github.io/pocket-pilot/) · [Live demo](https://mithawala.github.io/pocket-pilot/app/?demo) · [Download the extension](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix) · [Plugin for the GitHub Copilot app](#github-copilot-app-and-cli)**
 
@@ -45,10 +45,7 @@
 ## Get started
 
 1. **Install the extension**: download [`pocket-pilot.vsix`](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix) from the [latest release](https://github.com/mithawala/pocket-pilot/releases/latest), then *Extensions → … → Install from VSIX* (or `code --install-extension pocket-pilot.vsix`).
-2. Open the **Pocket Pilot** panel (it opens by itself the first time; later, click the robot icon in the Activity Bar on the far left, or **Open Pocket Pilot in VS Code** at the top of this page) and click **Start remote access**. The first time, VS Code asks to:
-
-   <img src="site/img/activity-bar.png" width="300" alt="The Pocket Pilot robot icon in VS Code's Activity Bar">
-
+2. Open the **Pocket Pilot** panel (it opens by itself the first time; later, click the robot icon in the Activity Bar, shown at the top of this page) and click **Start remote access**. The first time, VS Code asks to:
    - download `cloudflared` (~55 MB, verified),
    - optionally enable auto-reconnect (secret gist, the only feature that uses your GitHub account).
 3. **Scan the QR code** with your phone's camera (for a tablet or another computer: **Copy link** and open it there). Check that the fingerprint matches, tap **Pair securely**, click **Allow** in VS Code and confirm with Face ID / fingerprint / Windows Hello.

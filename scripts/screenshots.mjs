@@ -95,19 +95,7 @@ function readmeHarness() {
   </style></head><body>${phone('sessions.webp', 20)}${phone('approval.webp', -20)}${phone('chat.webp', 20)}</body></html>`;
 }
 
-/** The "Open Pocket Pilot in VS Code" button at the top of the README (transparent PNG). */
-function buttonHarness() {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-  html, body { margin: 0; background: transparent; }
-  body { padding: 10px; }
-  .b { display: inline-flex; align-items: center; gap: 14px; height: 60px; padding: 0 26px 0 12px; border-radius: 16px; font: 700 21px "Segoe UI", -apple-system, sans-serif; color: #fff;
-    background: linear-gradient(135deg, #6d5dfc 0%, #4f78ff 55%, #22c1ee 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28); }
-  .b img { width: 42px; height: 42px; border-radius: 10px; }
-  .b svg { width: 20px; height: 20px; }
-  </style></head><body><div class="b" id="b"><img src="/pwa/icons/icon.svg" alt="">Open Pocket Pilot in VS Code<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></body></html>`;
-}
-
-/** Where the Pocket Pilot icon sits in VS Code: the Activity Bar, with the icon pointed out. */
+/** Where the Pocket Pilot icon sits in VS Code: the Activity Bar, with the icon pointed out (README). */
 function activityBarHarness() {
   const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const icons = [
@@ -161,7 +149,7 @@ const copilotPanelState = () => ({
 function startServer() {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
-    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness, '/__button.html': buttonHarness, '/__activitybar.html': activityBarHarness }[url.pathname];
+    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness, '/__activitybar.html': activityBarHarness }[url.pathname];
     if (harness) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
       res.end(await harness());
@@ -283,18 +271,12 @@ async function main() {
     await how.shot('how-it-works.png', { format: 'png', dir: docs, clip: box });
     await how.close();
 
-    console.log('Rendering the Open in VS Code button and the Activity Bar hint…');
+    console.log('Rendering the Activity Bar hint…');
     const element = async (page, id) => page.eval(`(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()`);
-    const btn = await open(cdp, { width: 640, height: 200, dpr: 2, mobile: false, transparent: true });
-    await btn.goto(`${base}/__button.html`);
-    await btn.waitFor('[...document.images].every((i) => i.complete && i.naturalWidth > 0)');
-    await sleep(200);
-    await btn.shot('open-in-vscode.png', { format: 'png', dir: docs, clip: await element(btn, 'b') });
-    await btn.close();
     const bar = await open(cdp, { width: 480, height: 420, dpr: 2, mobile: false, transparent: true });
     await bar.goto(`${base}/__activitybar.html`);
     await sleep(300);
-    await bar.shot('activity-bar.png', { format: 'png', clip: await element(bar, 'a') });
+    await bar.shot('activity-bar.png', { format: 'png', dir: docs, clip: await element(bar, 'a') });
     await bar.close();
   } finally {
     await close();

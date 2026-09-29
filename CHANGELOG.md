@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- **The README shows where Pocket Pilot is instead of a button.** VS Code's extension page only allows web links, so the *Open Pocket Pilot in VS Code* button had to go through a web page and back to VS Code. It's gone, along with that page on the product site. The top of the README now shows the robot icon in the Activity Bar, on the far left of VS Code. The panel still opens by itself right after you install the extension.
+
 ## 0.6.1
 
 - **A passkey that stopped working no longer locks a device out.** If the passkey was saved in an app you have since turned off or removed (Microsoft Authenticator, 1Password…), the phone can't find it anymore and used to stay stuck until you paired it again. Now *Confirm it's you* explains what happened and offers **Set up this device again**: click **Allow** on your PC, then save a new passkey or use an authenticator app. The device stays paired. The code prompt offers the same when the authenticator app is gone. Setting up again always needs a yes on the PC, even when pairing doesn't.
