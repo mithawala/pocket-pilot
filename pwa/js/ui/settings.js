@@ -14,12 +14,23 @@ function HostFingerprint({ host }) {
   return html`<span class="mono">${fp}</span>`;
 }
 
-export function NotificationSetup({ app, host, compact }) {
+/** Whether the "Get notified" card has something to offer for this host on this device. */
+export function pushPromptWanted(host) {
+  const reason = pushBlockedReason();
+  if (reason === 'ios-install') return true;
+  if (reason) return false;
+  return !(host?.pushEnabled && Notification.permission === 'granted');
+}
+
+export function NotificationSetup({ app, host, compact, onDismiss }) {
   const reason = pushBlockedReason();
   const [busy, setBusy] = useState(false);
   const enabled = !!host?.pushEnabled && Notification.permission === 'granted';
+  // The card at the top of the sessions list can be closed; Settings always offers notifications.
+  const close = onDismiss ? html`<button class="icon-btn card-x" onClick=${onDismiss} aria-label="Hide" title="Hide"><${Icon} name="x" /></button>` : null;
   if (reason === 'ios-install') {
-    return html`<div class="card" style="margin-bottom:12px">
+    return html`<div class=${`card ${close ? 'closable' : ''}`} style="margin-bottom:12px">
+      ${close}
       <div class="row"><${Icon} name="bell" /><b>Get notified when an agent needs you</b></div>
       <p class="muted small" style="margin:8px 0 0">On ${appleDevice()}, only the app on your Home Screen can notify you, and it's kept apart from the browser: tap <b>Share</b> → <b>Add to Home Screen</b>, open Pocket Pilot from there and pair it once more with <b>Scan the QR code</b>.</p>
     </div>`;
@@ -41,7 +52,8 @@ export function NotificationSetup({ app, host, compact }) {
   if (enabled) {
     return html`<div class="row"><span class="grow">Notifications are on for ${host.hostName}.</span><button class="btn sm" onClick=${() => app.testPush(host)}>Send test</button></div>`;
   }
-  return html`<div class="card" style="margin-bottom:12px">
+  return html`<div class=${`card ${close ? 'closable' : ''}`} style="margin-bottom:12px">
+    ${close}
     <div class="row"><${Icon} name="bell" /><b class="grow">Get notified when an agent needs you</b></div>
     <p class="muted small" style="margin:8px 0 10px">Approvals, questions and finished tasks — even when the app is closed.</p>
     <button class="btn primary sm" disabled=${busy} onClick=${enable}>${busy ? 'Enabling…' : 'Enable notifications'}</button>

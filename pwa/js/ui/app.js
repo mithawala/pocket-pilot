@@ -8,7 +8,7 @@ import { Toasts, Sheet, Icon, toast } from './common.js';
 import { SessionsScreen, DesktopHome } from './sessions.js';
 import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
-import { SettingsScreen, NotificationSetup } from './settings.js';
+import { SettingsScreen, NotificationSetup, pushPromptWanted } from './settings.js';
 import { QrScanner } from './scanner.js';
 import { isPairingFragment } from '../core/secure-channel.js';
 
@@ -25,6 +25,7 @@ function parseRoute() {
 }
 
 const THEME_COLORS = { dark: '#21252b', light: '#f0f0f1' };
+const PUSH_PROMPT_KEY = 'pp:hidePushPrompt';
 
 /** True on desktop-sized windows, where the app shows sessions and chat side by side like VS Code. */
 function useWide() {
@@ -67,6 +68,34 @@ export class AppController extends EventTarget {
   _emit() {
     this._v = (this._v || 0) + 1;
     this.dispatchEvent(new CustomEvent('change', { detail: {} }));
+  }
+
+  /** Whether this device closed the "Get notified" card (Settings still offers notifications). */
+  get pushPromptHidden() {
+    try {
+      return localStorage.getItem(PUSH_PROMPT_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  hidePushPrompt() {
+    this._promptHiddenNow = true;
+    try {
+      localStorage.setItem(PUSH_PROMPT_KEY, '1');
+    } catch {
+      /* storage unavailable: hidden until the app reloads */
+    }
+    this._emit();
+  }
+
+  /** The "Get notified" card at the top of the sessions list, while it still has something to offer. */
+  pushPrompt() {
+    if (this.demo || this.active?.conn.state !== 'online' || this.pushPromptHidden || this._promptHiddenNow || !pushPromptWanted(this.current)) return null;
+    return html`<${NotificationSetup} app=${this} host=${this.current} compact=${true} onDismiss=${() => {
+      this.hidePushPrompt();
+      toast('Hidden. You can turn on notifications anytime in Settings.');
+    }} />`;
   }
 
   async init() {
@@ -299,7 +328,7 @@ export function App({ app }) {
   } else if (wide && app.active && ['home', 'chat', 'settings', 'open'].includes(route.name)) {
     // Desktop: the sessions list is a sidebar and the chat (or settings) fills the rest, like VS Code.
     const list = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
-      pushPrompt=${app.active.conn.state === 'online' && !app.demo ? html`<${NotificationSetup} app=${app} host=${app.current} compact=${true} />` : null}
+      pushPrompt=${app.pushPrompt()}
       selected=${route.name === 'chat' ? route.uri : null} newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}
@@ -318,9 +347,8 @@ export function App({ app }) {
   } else if (route.name === 'chat' && app.active) {
     screen = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} onRepair=${() => app.repair(app.current)} onBack=${() => (history.length > 1 ? history.back() : (location.hash = '#/'))} />`;
   } else if (app.active) {
-    const pushPrompt = html`<${NotificationSetup} app=${app} host=${app.current} compact=${true} />`;
     screen = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
-      pushPrompt=${app.active.conn.state === 'online' && !app.demo ? pushPrompt : null}
+      pushPrompt=${app.pushPrompt()}
       newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}

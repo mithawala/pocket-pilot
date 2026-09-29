@@ -5,7 +5,7 @@ import { b64u, unb64u } from '../core/bytes.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 export class PairingError extends Error {
   constructor(code, message, { untrusted = false, peerCode = '' } = {}) {

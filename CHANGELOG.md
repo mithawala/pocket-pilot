@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- **The "Get notified" card can be closed.** The card at the top of the sessions list (in a phone browser it explains the Home Screen app, elsewhere it offers *Enable notifications*) now has a close button, for everyone happy to use Pocket Pilot in the browser. Once closed it stays hidden on that device, and Settings still has notifications.
+
 ## 0.5.0
 
 - **New license: PolyForm Shield 1.0.0.** Pocket Pilot stays free for everyone, including at work, and its source code stays public on GitHub to read, audit and improve. What changes: nobody may offer a product that competes with it, such as a copy, a rebrand or a paid version. The product page now says *source-available* instead of *open source*. Versions up to 0.4.3 remain under the MIT License.

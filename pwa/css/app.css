@@ -128,6 +128,10 @@ a { color: var(--accent); }
 
 /* ---------- controls */
 .card { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 14px; }
+.card.closable { position: relative; }
+.card.closable > .row { padding-right: 30px; }
+.card .card-x { position: absolute; top: 5px; right: 5px; width: 36px; height: 36px; }
+.card .card-x svg { width: 17px; height: 17px; }
 .card .card { margin: 0 !important; padding: 0; background: none; border: none; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 6px; font-size: 14.5px; font-weight: 500; color: var(--strong); background: var(--surface-2); border: 1px solid var(--line-2); white-space: nowrap; transition: background 0.12s ease; }
 .btn:hover, .btn:active { background: var(--surface-3); }
