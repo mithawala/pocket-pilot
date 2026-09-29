@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- **Pairing steps talk about your device, not an iPhone.** The Pocket Pilot panel in VS Code and in the GitHub Copilot app now reads *On your device, open mithawala.github.io/pocket-pilot/app — add it to your Home Screen first to get notifications*, and you confirm *with Face ID, your fingerprint or Windows Hello*. On an iPhone, the app itself still shows the exact *Share → Add to Home Screen* steps.
+
 ## 0.4.2
 
 - **The Pocket Pilot panel tells you where the app is**, in VS Code and in the GitHub Copilot app. Pairing is now three numbered steps: open **mithawala.github.io/pocket-pilot/app** on your device (with a tip to add it to the iPhone Home Screen first), scan the QR code in the app or with the camera, and click **Allow** on the PC.
