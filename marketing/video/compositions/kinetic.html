@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Pocket Pilot — Kinetic</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="assets/ui/app.scoped.css" />
+    <link rel="stylesheet" href="assets/lib/kit.css" />
+    <script src="assets/ui/fragments.js"></script>
+    <script src="assets/lib/kit.js"></script>
+    <style>
+      @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+      #root { background: #06070b; }
+      #stage { position: absolute; inset: 0; }
+      .big { position: absolute; left: 0; right: 0; text-align: center; font: 900 250px/0.9 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; opacity: 0; white-space: nowrap; }
+      .mid { top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; }
+      .two { top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 190px; }
+      .two > div { opacity: 0; }
+      .two div { white-space: nowrap; }
+      .sub { position: absolute; left: 0; right: 0; text-align: center; font: 600 44px/1.2 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; opacity: 0; }
+      #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+      #invert { position: absolute; inset: 0; background: #f5f7ff; opacity: 0; }
+      #notifBig { position: absolute; left: 50%; top: 50%; width: 390px; height: 110px; margin: -55px 0 0 -195px; opacity: 0; }
+      #notifBig .notif { position: absolute; left: 0; right: 0; top: 0; }
+      #phoneWrap { position: absolute; left: 747px; top: 100px; width: 426px; height: 880px; perspective: 1800px; opacity: 0; }
+      .scr { position: absolute; inset: 0; opacity: 0; }
+      .scr .pp-app { position: absolute; inset: 0; }
+      .feat { position: absolute; top: 0; bottom: 0; width: 900px; display: flex; flex-direction: column; justify-content: center; opacity: 0; }
+      .feat.l { left: 150px; }
+      .feat.r { left: 900px; align-items: flex-start; }
+      .feat .n { font: 700 30px/1 'Inter', sans-serif; letter-spacing: 6px; color: #7f9cff; margin-bottom: 26px; }
+      .feat .fw { font: 900 150px/0.88 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+      .feat .s { margin-top: 30px; font: 600 42px/1.25 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; max-width: 760px; }
+      #logoRing { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; border-radius: 50%; border: 6px solid rgba(143, 178, 255, 0.8); opacity: 0; }
+      #logo { position: absolute; left: 50%; top: 270px; width: 230px; height: 230px; margin-left: -115px; border-radius: 54px; box-shadow: 0 40px 120px rgba(79, 120, 255, 0.6); opacity: 0; }
+      #brand { position: absolute; left: 0; right: 0; top: 560px; text-align: center; font: 900 190px/1 'Inter', sans-serif; letter-spacing: -0.05em; color: #fff; }
+      #brand span { display: inline-block; opacity: 0; }
+      #tagline { top: 800px; }
+      #works { position: absolute; left: 0; right: 0; top: 250px; text-align: center; }
+      #works .k { font: 900 120px/1 'Inter', sans-serif; letter-spacing: -0.04em; text-transform: uppercase; color: #fff; opacity: 0; }
+      #works .row { margin-top: 90px; display: flex; justify-content: center; gap: 34px; }
+      #works .chip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
+      #works .chip svg { width: 56px; height: 56px; }
+      #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #end > * { opacity: 0; }
+      #end .logo { width: 170px; height: 170px; border-radius: 40px; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.55); }
+      #end .name { margin-top: 40px; font: 900 140px/1 'Inter', sans-serif; letter-spacing: -0.05em; color: #fff; }
+      #end .tag { margin-top: 22px; font: 600 50px/1.2 'Inter', sans-serif; letter-spacing: -1px; color: #d8def0; }
+      #end .url { margin-top: 56px; font: 700 40px/1 'Inter', sans-serif; letter-spacing: 0.5px; color: #8fb2ff; }
+      #fade { position: absolute; inset: 0; background: #000; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="kinetic" data-start="0" data-width="1920" data-height="1080" data-duration="40" data-fps="30">
+      <div class="glow" id="g1" style="width: 1100px; height: 1100px; left: 900px; top: -500px; background: rgba(79, 120, 255, 0.34)"></div>
+      <div class="glow" id="g2" style="width: 1000px; height: 1000px; left: -400px; top: 500px; background: rgba(150, 90, 252, 0.3)"></div>
+      <div class="bg-grid" id="grid"></div>
+      <div id="invert"></div>
+      <div id="stage">
+        <!-- 0 – 6 · the hook -->
+        <div class="big mid" id="w1">Your</div>
+        <div class="big mid" id="w2">AI agent</div>
+        <div class="big mid" id="w3">needs</div>
+        <div class="big mid" id="w4"><span class="grad">you.</span></div>
+        <div id="notifBig"></div>
+        <div class="sub" id="nsub" style="top: 770px">It’s waiting for your OK.</div>
+        <div class="big two" id="w5"><div>Away from</div><div class="l2">your desk?</div></div>
+        <div class="big two" id="w6"><div>Answer from</div><div class="l2"><span class="grad">your phone.</span></div></div>
+
+        <!-- 6 – 10 · the name -->
+        <div id="logoRing"></div>
+        <img id="logo" src="assets/img/icon.svg" alt="" />
+        <div id="brand"><span>Pocket</span> <span>Pilot</span></div>
+        <div class="sub" id="tagline">Your coding agents — in your pocket.</div>
+
+        <!-- 10 – 30 · what it does -->
+        <div id="phoneWrap"></div>
+        <div id="feats"></div>
+
+        <!-- 30 – 36 · where, and why you can trust it -->
+        <div id="works">
+          <div class="k">Works with</div>
+          <div class="row">
+            <span class="chip" data-icon="code">VS Code</span>
+            <span class="chip" data-icon="github">GitHub Copilot app</span>
+            <span class="chip" data-icon="terminal">Copilot CLI</span>
+          </div>
+        </div>
+        <div class="big two" id="t1"><div>End-to-end</div><div class="l2">encrypted.</div></div>
+        <div class="big two" id="t2"><div>Passkey</div><div class="l2">protected.</div></div>
+        <div class="big mid" id="t3" style="font-size: 170px">No accounts.</div>
+        <div class="big mid" id="t4" style="font-size: 170px">No cloud copy.</div>
+        <div class="big mid" id="t5" style="font-size: 330px"><span class="grad">Free.</span></div>
+
+        <!-- 36 – 40 · the end card -->
+        <div id="end">
+          <img class="logo" src="assets/img/icon.svg" alt="" />
+          <div class="name">Pocket Pilot</div>
+          <div class="tag">Copilot &amp; Claude sessions, <span class="grad">in your pocket.</span></div>
+          <div class="url">mithawala.github.io/pocket-pilot</div>
+        </div>
+      </div>
+      <div id="flash"></div>
+      <div id="fade"></div>
+
+      <audio id="music" src="assets/audio/kinetic.wav" data-start="0" data-duration="40" data-track-index="11" data-volume="1"></audio>
+    </div>
+
+    <script>
+      document.fonts.ready.then(() => {
+        const $ = (s, r = document) => r.querySelector(s);
+        const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+        const B = 0.5; // one beat at 120 BPM
+
+        // ---------------------------------------------------------------- the scene
+        for (const el of $$('[data-icon]')) el.insertAdjacentHTML('afterbegin', PP.icon(el.dataset.icon));
+        $('#notifBig').innerHTML = PP.notif({ id: 'nb', title: '🔔 Refactor auth module & update tests', body: 'Run in terminal? Run the full test suite with coverage' });
+
+        const FEATS = [
+          { w: 'Approve', s: 'Allow once, for the session — or skip.', screen: 'approval', tap: () => $$('#p-approval .confirm button').find((b) => b.textContent.includes('Allow Once')) },
+          { w: 'Answer', s: 'Tap an option, or type your own.', screen: 'question', tap: () => $('#p-question .opt') },
+          { w: 'Steer', s: 'Nudge it while it works. Queue what’s next.', screen: 'steer' },
+          { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#p-models .list-item').find((b) => b.textContent.includes('GPT-5.6')) },
+          { w: 'Start<br>new work', s: 'New sessions, in any folder on your PC.', screen: 'newSession', tap: () => $$('#p-newSession .sheet .list-item').find((b) => b.textContent.includes('acme-api')) },
+          { w: 'See<br>screenshots', s: 'Pinch to zoom, like your photos.', screen: 'viewer' },
+          { w: 'Every<br>session', s: 'Copilot and Claude — what needs you first.', screen: 'home' },
+          { w: 'Full<br>history', s: 'Every message, tool call and diff.', screen: 'history' },
+          { w: 'Get<br>notified', s: 'When it needs you. When it’s done.', screen: 'lock' },
+          { w: 'Live', s: 'Replies stream in as they happen.', screen: 'approved' },
+        ];
+        const screenHtml = (s) => s === 'lock'
+          ? PP.lock({ id: 'lock', children: PP.notif({ id: 'nq', title: '🔔 Pick a date library for the booking form', body: 'The agent has a question: which library should I add?' }) + PP.notif({ id: 'nd', title: '✅ Fix flaky checkout e2e test', body: 'It now passes 50/50 runs locally.', time: '2m ago' }) })
+          : PP.app(s);
+        $('#phoneWrap').innerHTML = PP.phone({ id: 'phone', content: FEATS.map((f) => `<div class="scr" id="p-${f.screen}">${screenHtml(f.screen)}</div>`).join('') });
+        $('#nq').style.top = '262px';
+        $('#nd').style.top = '376px';
+        $('#feats').innerHTML = FEATS.map((f, i) => `<div class="feat ${i % 2 ? 'r' : 'l'}" id="f${i}"><div class="n">${String(i + 1).padStart(2, '0')} / ${FEATS.length}</div><div class="fw">${f.w}</div><div class="s">${f.s}</div></div>`).join('');
+        PP.settle();
+        // Long words shrink to fit their half of the frame.
+        for (const w of $$('.feat .fw')) {
+          const size = parseFloat(getComputedStyle(w).fontSize);
+          const widest = Math.max(...w.innerHTML.split('<br>').map((line) => { const m = document.createElement('span'); m.innerHTML = line; m.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:inherit;letter-spacing:inherit;text-transform:inherit'; w.appendChild(m); const x = m.offsetWidth; m.remove(); return x; }));
+          if (widest > 820) w.style.fontSize = `${Math.floor((size * 820) / widest)}px`;
+        }
+        const screenEl = $('#phone-screen');
+        const inScreen = (el) => {
+          const s = screenEl.getBoundingClientRect();
+          const r = el.getBoundingClientRect();
+          return [r.left - s.left + r.width / 2, r.top - s.top + r.height / 2];
+        };
+        const taps = FEATS.map((f) => { const el = f.tap && f.tap(); return el ? inScreen(el) : null; });
+        const liveWords = PP.words($$('#p-approved .assistant').pop());
+        const historyScroll = $('#p-history .scroll');
+        const historyMax = historyScroll ? historyScroll.scrollHeight - historyScroll.clientHeight : 0;
+        const viewerImg = $('#p-viewer .viewer-stage img');
+        const brand = $$('#brand span');
+
+        // ---------------------------------------------------------------- the timeline
+        const tl = PP.timeline();
+        const slam = (el, t, { from = 1.35, d = 0.2 } = {}) => tl.fromTo(el, { opacity: 0, scale: from }, { opacity: 1, scale: 1, duration: d, ease: 'power4.out' }, t);
+        const off = (el, t, d = 0.1) => tl.to(el, { opacity: 0, scale: 0.94, duration: d, ease: 'power2.in' }, t);
+        const flash = (t, a = 0.18) => tl.fromTo('#flash', { opacity: a }, { opacity: 0, duration: 0.28, ease: 'power2.out' }, t);
+        const shake = (t, amp = 10) => {
+          const r = PP.rng(Math.round(t * 1000));
+          const k = [0, 1, 2, 3].map((i) => ({ x: (r() - 0.5) * 2 * amp * (1 - i / 4), y: (r() - 0.5) * 2 * amp * (1 - i / 4) }));
+          tl.fromTo('#stage', { x: 0, y: 0 }, { x: k[0].x, y: k[0].y, duration: 0.04, ease: 'none' }, t);
+          for (let i = 1; i < k.length; i++) tl.fromTo('#stage', { x: k[i - 1].x, y: k[i - 1].y }, { x: k[i].x, y: k[i].y, duration: 0.05, ease: 'none' }, t + 0.04 + (i - 1) * 0.05);
+          tl.fromTo('#stage', { x: k[k.length - 1].x, y: k[k.length - 1].y }, { x: 0, y: 0, duration: 0.06, ease: 'none' }, t + 0.04 + (k.length - 1) * 0.05);
+        };
+
+        // Ambience.
+        tl.fromTo('#g1', { x: 0, y: 0, scale: 1 }, { x: -380, y: 160, scale: 1.2, duration: 40, ease: 'sine.inOut' }, 0);
+        tl.fromTo('#g2', { x: 0, y: 0 }, { x: 420, y: -180, duration: 40, ease: 'sine.inOut' }, 0);
+        tl.fromTo('#grid', { y: 0 }, { y: 128, duration: 40, ease: 'none' }, 0);
+        tl.fromTo('#fade', { opacity: 1 }, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0);
+
+        // 0 – 2 · YOUR / AI AGENT / NEEDS / YOU.
+        ['#w1', '#w2', '#w3'].forEach((id, i) => { slam(id, i * B); off(id, i * B + B - 0.08, 0.08); });
+        slam('#w4', 3 * B, { from: 1.6, d: 0.25 });
+        flash(3 * B, 0.3);
+        shake(3 * B, 16);
+        off('#w4', 4 * B - 0.08, 0.08);
+        // 2 – 4 · the phone lights up with it
+        tl.fromTo('#notifBig', { opacity: 0, scale: 1.4, y: -200 }, { opacity: 1, scale: 2.7, y: 0, duration: 0.35, ease: 'back.out(1.4)' }, 4 * B);
+        shake(4 * B + 0.3, 12);
+        tl.fromTo('#notifBig', { rotation: 0 }, { rotation: 1.2, duration: 0.06, repeat: 7, yoyo: true, ease: 'sine.inOut' }, 4 * B + 0.35);
+        tl.to('#notifBig', { scale: 2.9, duration: 1.4, ease: 'none' }, 4 * B + 0.35);
+        slam('#nsub', 6 * B, { from: 1.1, d: 0.25 });
+        off(['#notifBig', '#nsub'], 8 * B - 0.1, 0.1);
+        // 4 – 6 · away from your desk? answer from your phone.
+        tl.fromTo('#w5', { opacity: 1 }, { opacity: 1, duration: 0.01 }, 8 * B);
+        tl.fromTo('#w5 div:first-child', { opacity: 0, x: -140 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power4.out' }, 8 * B);
+        tl.fromTo('#w5 .l2', { opacity: 0, x: 140 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power4.out' }, 9 * B);
+        off('#w5', 10 * B - 0.08, 0.08);
+        tl.fromTo('#w6', { opacity: 1 }, { opacity: 1, duration: 0.01 }, 10 * B);
+        tl.fromTo('#w6 div:first-child', { opacity: 0, x: -140 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power4.out' }, 10 * B);
+        tl.fromTo('#w6 .l2', { opacity: 0, x: 140 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power4.out' }, 11 * B);
+        flash(11 * B, 0.15);
+        off('#w6', 12 * B - 0.1, 0.1);
+
+        // 6 – 10 · Pocket Pilot
+        flash(12 * B, 0.5);
+        shake(12 * B, 18);
+        tl.fromTo('#logo', { opacity: 0, scale: 0.2, rotation: -25 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.6, ease: 'back.out(1.8)' }, 12 * B);
+        tl.fromTo('#logoRing', { opacity: 0.9, scale: 0.6, y: -155 }, { opacity: 0, scale: 3.2, y: -155, duration: 1.1, ease: 'power2.out' }, 12 * B);
+        slam(brand[0], 13 * B, { from: 1.5 });
+        slam(brand[1], 14 * B, { from: 1.5 });
+        shake(14 * B, 8);
+        slam('#tagline', 16 * B, { from: 1.08, d: 0.4 });
+        tl.fromTo(['#logo', '#brand', '#tagline'], { y: 0 }, { y: -20, duration: 3.6, ease: 'none' }, 12 * B);
+        off(['#logo', '#brand', '#tagline'], 20 * B - 0.14, 0.14);
+
+        // 10 – 30 · ten things, two seconds each
+        const T0 = 20 * B;
+        const sideX = [-430, 430]; // phone to the right of a left word, and vice versa
+        tl.fromTo('#phoneWrap', { opacity: 0, x: sideX[1], y: 700, rotation: 8, scale: 1 }, { opacity: 1, x: sideX[1], y: 0, rotation: 0, scale: 1, duration: 0.45, ease: 'power4.out' }, T0 - 0.15);
+        tl.fromTo('#phone', { rotationY: -30 }, { rotationY: -16, duration: 0.6, ease: 'power3.out' }, T0 - 0.15);
+        FEATS.forEach((f, i) => {
+          const t = T0 + i * 4 * B;
+          const right = i % 2 === 0; // phone side
+          const label = `#f${i}`;
+          if (i > 0) {
+            tl.to('#phoneWrap', { x: sideX[right ? 1 : 0], duration: 0.42, ease: 'power3.inOut' }, t - 0.21);
+            tl.to('#phone', { rotationY: right ? -16 : 16, rotationZ: right ? -2 : 2, duration: 0.42, ease: 'power3.inOut' }, t - 0.21);
+            tl.to(`#p-${FEATS[i - 1].screen}`, { opacity: 0, duration: 0.06, ease: 'none' }, t - 0.03);
+          }
+          tl.fromTo(`#p-${f.screen}`, { opacity: 0 }, { opacity: 1, duration: 0.06, ease: 'none' }, t - 0.03);
+          tl.fromTo(label, { opacity: 0, x: right ? -90 : 90 }, { opacity: 1, x: 0, duration: 0.24, ease: 'power4.out' }, t);
+          tl.fromTo(`${label} .s`, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.3 }, t + B);
+          if (i < FEATS.length - 1) tl.to(label, { opacity: 0, x: right ? -60 : 60, duration: 0.14, ease: 'power2.in' }, t + 4 * B - 0.16);
+          if (taps[i]) PP.tap(tl, screenEl, taps[i][0], taps[i][1], t + 2 * B);
+          if (i % 2 === 0) flash(t, 0.08);
+        });
+        // a few screens do something while they're on
+        const at = (i) => T0 + i * 4 * B;
+        if (viewerImg) tl.fromTo(viewerImg, { scale: 1 }, { scale: 1.7, duration: 0.8, ease: 'power2.inOut' }, at(5) + 0.6).to(viewerImg, { scale: 1, duration: 0.5, ease: 'power2.inOut' }, at(5) + 1.45);
+        if (historyScroll && historyMax > 0) tl.fromTo(historyScroll, { scrollTop: 0 }, { scrollTop: historyMax, duration: 1.6, ease: 'power2.inOut' }, at(7) + 0.1);
+        tl.fromTo('#nq', { opacity: 0, y: -120, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.5)' }, at(8) + 0.2);
+        tl.fromTo('#nd', { opacity: 0, y: -120, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.5)' }, at(8) + 2 * B);
+        tl.fromTo(liveWords, { opacity: 0 }, { opacity: 1, duration: 0.04, stagger: 0.045, ease: 'none' }, at(9) + 0.2);
+        const TE = at(FEATS.length);
+        off([`#f${FEATS.length - 1}`], TE - 0.16, 0.14);
+        tl.to('#phoneWrap', { y: 1100, rotation: -6, duration: 0.45, ease: 'power3.in' }, TE - 0.4);
+
+        // 30 – 32 · works with
+        slam('#works .k', TE, { from: 1.3 });
+        $$('#works .chip').forEach((c, i) => slam(c, TE + (i + 1) * B, { from: 1.4, d: 0.22 }));
+        off('#works', TE + 4 * B - 0.1, 0.1);
+
+        // 32 – 36 · trust, and the price
+        const TT = TE + 4 * B;
+        for (const [id, i] of [['#t1', 0], ['#t2', 2]]) {
+          tl.fromTo(id, { opacity: 1 }, { opacity: 1, duration: 0.01 }, TT + i * B);
+          tl.fromTo(`${id} div:first-child`, { opacity: 0, y: -60 }, { opacity: 1, y: 0, duration: 0.2, ease: 'power4.out' }, TT + i * B);
+          tl.fromTo(`${id} .l2`, { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.2, ease: 'power4.out' }, TT + (i + 1) * B);
+          off(id, TT + (i + 2) * B - 0.08, 0.08);
+        }
+        slam('#t3', TT + 4 * B); off('#t3', TT + 5 * B - 0.08, 0.08);
+        slam('#t4', TT + 5 * B); off('#t4', TT + 6 * B - 0.08, 0.08);
+        slam('#t5', TT + 6 * B, { from: 1.7, d: 0.3 });
+        flash(TT + 6 * B, 0.4);
+        shake(TT + 6 * B, 18);
+        off('#t5', TT + 8 * B - 0.12, 0.12);
+
+        // 36 – 40 · the end card
+        const TC = TT + 8 * B;
+        tl.fromTo('#end .logo', { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.6, ease: 'back.out(1.8)' }, TC);
+        tl.fromTo('#end .name', { opacity: 0, scale: 1.3 }, { opacity: 1, scale: 1, duration: 0.3, ease: 'power4.out' }, TC + B);
+        tl.fromTo('#end .tag', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5 }, TC + 2 * B);
+        tl.fromTo('#end .url', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5 }, TC + 3 * B);
+        tl.to('#fade', { opacity: 1, duration: 0.6, ease: 'power1.in' }, 39.4);
+
+        window.__timelines['kinetic'] = tl;
+      });
+    </script>
+  </body>
+</html>

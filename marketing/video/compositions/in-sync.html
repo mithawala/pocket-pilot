@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Pocket Pilot — In sync</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="assets/ui/app.scoped.css" />
+    <link rel="stylesheet" href="assets/lib/kit.css" />
+    <script src="assets/ui/fragments.js"></script>
+    <script src="assets/lib/kit.js"></script>
+    <style>
+      @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+      #root { background: #0b0d14; }
+      .bg-c { position: absolute; inset: 0; background: radial-gradient(1200px 800px at 70% 10%, rgba(79, 120, 255, 0.22), rgba(79, 120, 255, 0) 60%), radial-gradient(1000px 700px at 10% 110%, rgba(56, 189, 170, 0.16), rgba(56, 189, 170, 0) 60%), #0b0d14; }
+      /* titles */
+      #title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #title > * { opacity: 0; }
+      #title .logo { width: 150px; height: 150px; border-radius: 36px; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.5); }
+      #title .name { margin-top: 34px; font: 800 120px/1 'Inter', sans-serif; letter-spacing: -4px; color: #fff; }
+      #title .tag { margin-top: 26px; font: 600 46px/1.25 'Inter', sans-serif; letter-spacing: -1px; color: #d8def0; }
+      #title .tag > span { opacity: 1; }
+      .hl { position: absolute; left: 80px; top: 64px; width: 1300px; }
+      .hl .display { font-size: 64px; letter-spacing: -2.5px; }
+      .kick { position: absolute; left: 80px; top: 60px; opacity: 0; }
+      .step { position: absolute; left: 80px; top: 108px; width: 1250px; }
+      .step .display { font-size: 60px; letter-spacing: -2.4px; }
+      .step .display b { display: inline-grid; place-items: center; width: 74px; height: 74px; margin-right: 22px; border-radius: 20px; vertical-align: 6px; font: 800 40px/1 'Inter', sans-serif; letter-spacing: 0; color: #fff; background: linear-gradient(145deg, #4f78ff, #6d5dfc); box-shadow: 0 12px 30px rgba(79, 120, 255, 0.35); opacity: 0; }
+      .step .lede { margin-top: 18px; margin-left: 96px; font-size: 30px; opacity: 0; }
+      /* devices */
+      #pcCam { position: absolute; left: 70px; top: 232px; width: 1240px; height: 760px; perspective: 2400px; opacity: 0; }
+      #pc { position: absolute; inset: 0; }
+      #pc .vsc { inset: 0; }
+      .vsc .chatpane .banner { display: none; }
+      #vsc-chat .pp-app[data-screen='steer'] { opacity: 0; }
+      .vsc .code .cl.add { height: 0; overflow: hidden; opacity: 0; }
+      #phoneWrap { position: absolute; left: 1410px; top: 140px; width: 426px; height: 880px; perspective: 1800px; transform: translateY(1100px); }
+      #phone { left: 0; top: 0; }
+      .scr { position: absolute; inset: 0; opacity: 0; }
+      #p-picture { opacity: 1; }
+      .scr .pp-app { position: absolute; inset: 0; }
+      .typed { position: absolute; z-index: 5; box-sizing: border-box; padding: 11px 12px; font: 15px/20px 'Inter', sans-serif; color: #e6e9f2; border-radius: 12px; opacity: 0; }
+      .typed .ch { opacity: 0; }
+      .typed .caret { position: absolute; left: 0; top: 0; width: 2px; height: 20px; background: #61afef; }
+      #kb { transform: translateY(300px); }
+      .kb-key.hit { background: #8d8d93; }
+      #link { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+      #pulse { opacity: 0; }
+      /* setup */
+      .card { position: absolute; opacity: 0; }
+      #market { left: 90px; top: 360px; width: 1180px; padding: 44px; border-radius: 22px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); display: flex; gap: 44px; font-family: 'Inter', sans-serif; }
+      #market img { width: 180px; height: 180px; border-radius: 40px; flex: none; }
+      #market .nm { font: 700 58px/1.1 'Inter', sans-serif; letter-spacing: -1.5px; color: #fff; }
+      #market .pub { margin-top: 12px; font-size: 27px; color: #9da5b4; }
+      #market .pub b { color: #61afef; font-weight: 600; }
+      #market .ds { margin-top: 18px; font-size: 30px; line-height: 1.35; color: #d7dae0; }
+      #market .btns { margin-top: 30px; display: flex; gap: 16px; align-items: center; }
+      #market .inst { position: relative; height: 62px; min-width: 250px; border-radius: 8px; background: #3a6ee8; color: #fff; font: 600 28px/62px 'Inter', sans-serif; text-align: center; }
+      #market .inst span { position: absolute; inset: 0; }
+      #market .inst .s2, #market .inst .s3 { opacity: 0; }
+      #market .inst .s3 { background: #2d3139; border-radius: 8px; color: #98c379; }
+      #market .also { margin-left: 18px; font-size: 25px; color: #9da5b4; }
+      #panel { left: 170px; top: 290px; width: 460px; height: 760px; border-radius: 18px; overflow: hidden; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); }
+      #panel .ph { height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 18px; font: 600 16px/1 'Inter', sans-serif; letter-spacing: 1px; color: #9da5b4; border-bottom: 1px solid #181a1f; }
+      #panel img { display: block; width: 460px; }
+      #panelNote { position: absolute; left: 700px; top: 540px; width: 560px; font: 500 30px/1.4 'Inter', sans-serif; color: var(--dim); opacity: 0; }
+      #panelNote b { color: #fff; }
+      #modal { left: 190px; top: 390px; width: 1000px; padding: 40px 44px 36px; border-radius: 14px; background: #252526; border: 1px solid #454545; box-shadow: 0 40px 120px rgba(0, 0, 0, 0.65); font-family: 'Inter', sans-serif; color: #ccc; display: flex; gap: 30px; }
+      #modal .ic { flex: none; width: 64px; height: 64px; color: #e5c07b; }
+      #modal .ic svg { width: 64px; height: 64px; }
+      #modal .msg { font: 700 36px/1.3 'Inter', sans-serif; color: #fff; letter-spacing: -0.5px; }
+      #modal .where { margin-top: 16px; font-size: 26px; color: #9da5b4; }
+      #modal .det { margin-top: 14px; font-size: 26px; line-height: 1.45; color: #c5c8ce; }
+      #modal .btns { margin-top: 30px; display: flex; justify-content: flex-end; gap: 14px; }
+      #modal .btns span { padding: 14px 30px; border-radius: 6px; font: 600 26px/1 'Inter', sans-serif; background: #3a3d41; color: #fff; }
+      #modal .btns span.primary { background: #0e639c; }
+      /* phone overlays: scanner, passkey sheet, Face ID */
+      .ov { position: absolute; inset: 0; z-index: 15; opacity: 0; }
+      #scan { background: #000; overflow: hidden; }
+      #scan .feed { position: absolute; left: 50%; top: 50%; width: 635px; height: 1100px; margin: -560px 0 0 -317px; overflow: hidden; filter: brightness(0.82) contrast(1.05); }
+      #scan .feed img { width: 635px; display: block; }
+      #scan .finder { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -170px 0 0 -150px; border-radius: 24px; box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.55); }
+      #scan .finder span { position: absolute; inset: 0; border: 3px solid rgba(255, 255, 255, 0.92); border-radius: 24px; }
+      #scan .finder span.ok { border-color: #5fd38d; box-shadow: 0 0 0 6px rgba(95, 211, 141, 0.25); opacity: 0; }
+      #scan .hint { position: absolute; left: 16px; right: 16px; bottom: 66px; text-align: center; font: 600 16px/1.35 'Inter', sans-serif; color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+      #scan .hint.h2 { opacity: 0; }
+      #scan .x { position: absolute; top: 57px; right: 12px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(0, 0, 0, 0.45); }
+      #scan .x svg { width: 20px; height: 20px; }
+      #sheet { top: auto; height: 400px; bottom: 0; background: transparent; }
+      #sheet .sh { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 380px; border-radius: 38px; background: #1c1c1e; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; align-items: center; padding: 34px 26px 0; text-align: center; font-family: 'Inter', sans-serif; color: #fff; }
+      #sheet .pk { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; background: #2c2c2e; color: #fff; }
+      #sheet .pk svg { width: 36px; height: 36px; }
+      #sheet .t { margin-top: 18px; font: 700 19px/1.3 'Inter', sans-serif; }
+      #sheet .s { margin-top: 10px; font-size: 14px; line-height: 1.4; color: #a1a1a6; }
+      #sheet .acct { margin-top: 18px; width: 100%; padding: 12px 14px; border-radius: 12px; background: #2c2c2e; font-size: 15px; text-align: left; }
+      #sheet .acct small { display: block; color: #a1a1a6; font-size: 13px; margin-top: 2px; }
+      #sheet .go { margin-top: 18px; width: 100%; height: 50px; border-radius: 14px; background: #0a84ff; font: 600 17px/50px 'Inter', sans-serif; }
+      #fid { top: 50%; left: 50%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 34px; background: rgba(44, 44, 46, 0.94); display: grid; place-items: center; }
+      #fid .g, #fid .ok { position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; }
+      #fid .g { color: #fff; }
+      #fid .ok { color: #5fd38d; opacity: 0; }
+      #fid svg { width: 92px; height: 92px; }
+      #fid .lbl { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 600 14px/1 'Inter', sans-serif; color: #e6e6ea; }
+      /* notifications, trust, end */
+      #nA, #nB { opacity: 0; }
+      #tiles { position: absolute; left: 0; right: 0; top: 400px; display: flex; justify-content: center; gap: 34px; }
+      .tile { width: 470px; padding: 44px 40px; border-radius: 26px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); opacity: 0; }
+      .tile .ti { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #4f78ff, #6d5dfc); }
+      .tile .ti svg { width: 40px; height: 40px; }
+      .tile .tt { margin-top: 28px; font: 700 42px/1.15 'Inter', sans-serif; letter-spacing: -1px; color: #fff; }
+      .tile .ts { margin-top: 14px; font: 500 29px/1.4 'Inter', sans-serif; color: var(--dim); }
+      #trustHl { top: 200px; left: 0; width: 100%; text-align: center; opacity: 0; }
+      #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #end > * { opacity: 0; }
+      #end .logo { width: 170px; height: 170px; border-radius: 40px; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.55); }
+      #end .name { margin-top: 40px; font: 800 132px/1 'Inter', sans-serif; letter-spacing: -5px; color: #fff; }
+      #end .tag { margin-top: 22px; font: 600 50px/1.2 'Inter', sans-serif; letter-spacing: -1px; color: #d8def0; }
+      #end .chips { margin-top: 50px; display: flex; gap: 18px; }
+      #end .url { margin-top: 46px; font: 600 34px/1 'Inter', sans-serif; letter-spacing: 0.5px; color: #8fb2ff; }
+      #fade { position: absolute; inset: 0; background: #000; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="in-sync" data-start="0" data-width="1920" data-height="1080" data-duration="40" data-fps="30">
+      <div class="bg-c"></div>
+      <div class="bg-grid" id="grid" style="opacity: 0.6"></div>
+
+      <div id="title">
+        <img class="logo" src="assets/img/icon.svg" alt="" />
+        <div class="name">Pocket Pilot</div>
+        <div class="tag">Your PC’s agent sessions — <span class="grad">on your phone, in sync.</span></div>
+      </div>
+
+      <div id="pcCam"><div id="pc"></div></div>
+      <svg id="link" viewBox="0 0 1920 1080"><circle id="pulse" cx="1420" cy="610" r="9" fill="#fff" /></svg>
+
+      <div class="card" id="market">
+        <img src="assets/img/icon.svg" alt="" />
+        <div>
+          <div class="nm">Pocket Pilot</div>
+          <div class="pub"><b>Asif Mithawala</b> &nbsp;·&nbsp; mithawala.pocket-pilot &nbsp;·&nbsp; Free</div>
+          <div class="ds">Chat with your Copilot and Claude agent sessions, approve their tool calls and get notified — from your phone.</div>
+          <div class="btns"><div class="inst"><span class="s1">Install</span><span class="s2">Installing…</span><span class="s3">✓ Installed</span></div><span class="also">Also a plugin for the GitHub Copilot app &amp; CLI</span></div>
+        </div>
+      </div>
+      <div class="card" id="panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
+      <div id="panelNote">On your phone, open <b>mithawala.github.io/pocket-pilot/app</b> — add it to your Home Screen — and tap <b>Scan the QR code</b>.</div>
+      <div class="card" id="modal">
+        <div class="ic" data-icon="shield"></div>
+        <div>
+          <div class="msg">Allow “iPhone” to control your agent sessions?</div>
+          <div class="where">iPhone · Safari · from 192.0.2.44</div>
+          <div class="det">The device will be able to read your sessions, chat with the agents and approve their tool calls. Only allow this if you just scanned the QR code yourself.</div>
+          <div class="btns"><span class="primary" id="allowBtn">Allow</span><span>Cancel</span></div>
+        </div>
+      </div>
+
+      <div id="phoneWrap"></div>
+
+      <div class="hl" id="s1"><div class="display">Pick up any session — <span class="grad">right where it is.</span></div></div>
+      <div class="hl" id="s2"><div class="display">Type on your phone…</div></div>
+      <div class="hl" id="s3"><div class="display">…it lands on your PC. <span class="grad">Instantly.</span></div></div>
+      <div class="hl" id="s4"><div class="display">Same conversation. <span class="grad">Live on both.</span></div></div>
+      <div class="kicker kick" id="kick">Set up in a minute</div>
+      <div class="step" id="st1"><div class="display"><b>1</b>Install Pocket Pilot on your PC</div><div class="lede">The VS Code extension — or the plugin for the GitHub Copilot app &amp; CLI.</div></div>
+      <div class="step" id="st2"><div class="display"><b>2</b>Scan the QR code with your phone</div><div class="lede">It pairs your phone with this PC — nothing else.</div></div>
+      <div class="step" id="st3"><div class="display"><b>3</b>Allow it on your PC, then Face ID</div><div class="lede">Only the devices you approve can ever connect.</div></div>
+      <div class="hl" id="s5" style="top: 70px; left: 0; width: 100%; text-align: center"><div class="display">Get notified — <span class="grad">done, or needs you.</span></div></div>
+      <div class="hl" id="trustHl"><div class="kicker" style="opacity: 1">Private by design</div><div class="display" style="margin-top: 22px; font-size: 76px">Your phone talks <span class="grad">only to your PC.</span></div></div>
+      <div id="tiles">
+        <div class="tile"><div class="ti" data-icon="lock"></div><div class="tt">End-to-end encrypted</div><div class="ts">Even the tunnel only sees ciphertext.</div></div>
+        <div class="tile"><div class="ti" data-icon="face"></div><div class="tt">Only devices you approve</div><div class="ts">Face ID, fingerprint or an authenticator code.</div></div>
+        <div class="tile"><div class="ti" data-icon="cloudoff"></div><div class="tt">No accounts, no cloud copy</div><div class="ts">No servers of ours in between. Free.</div></div>
+      </div>
+
+      <div id="end">
+        <img class="logo" src="assets/img/icon.svg" alt="" />
+        <div class="name">Pocket Pilot</div>
+        <div class="tag">Your coding agents, <span class="grad">in your pocket.</span></div>
+        <div class="chips">
+          <span class="chip" data-icon="code">VS Code</span>
+          <span class="chip" data-icon="github">GitHub Copilot app &amp; CLI</span>
+          <span class="chip" data-icon="gift">Free</span>
+        </div>
+        <div class="url">mithawala.github.io/pocket-pilot</div>
+      </div>
+      <div id="fade"></div>
+
+      <audio id="music" src="assets/audio/in-sync.wav" data-start="0" data-duration="40" data-track-index="12" data-volume="1"></audio>
+    </div>
+
+    <script>
+      document.fonts.ready.then(() => {
+        const $ = (s, r = document) => r.querySelector(s);
+        const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+        const lastOf = (root, sel) => $$(sel, root).pop();
+        const hide = (els) => { for (const el of [els].flat()) if (el) el.style.opacity = '0'; };
+
+        // ---------------------------------------------------------------- the scene
+        for (const el of $$('[data-icon]')) el.insertAdjacentHTML('afterbegin', PP.icon(el.dataset.icon));
+        const K = (s) => `<span class="k">${s}</span>`, S = (s) => `<span class="s">${s}</span>`, F = (s) => `<span class="f">${s}</span>`, T = (s) => `<span class="t">${s}</span>`;
+        const code = [
+          `${K('import')} { useEffect, useState } ${K('from')} ${S("'react'")};`,
+          '',
+          `${K('type')} ${T('Theme')} = ${S("'light'")} | ${S("'dark'")};`,
+          '',
+          `${K('export function')} ${F('ThemeToggle')}() {`,
+          `  ${K('const')} [theme, setTheme] = ${F('useState')}&lt;${T('Theme')}&gt;(() =&gt;`,
+          `    (localStorage.${F('getItem')}(${S("'theme'")}) ${K('as')} ${T('Theme')})`,
+          `      ?? (${F('matchMedia')}(${S("'(prefers-color-scheme: dark)'")}).matches`,
+          `        ? ${S("'dark'")} : ${S("'light'")}));`,
+          '',
+          `  ${F('useEffect')}(() =&gt; {`,
+          `    document.documentElement.dataset.theme = theme;`,
+          `    localStorage.${F('setItem')}(${S("'theme'")}, theme);`,
+          `  }, [theme]);`,
+          '',
+          `  ${K('return')} &lt;${T('Toggle')} checked={theme === ${S("'dark'")}}`,
+          `    onChange={(on) =&gt; ${F('setTheme')}(on ? ${S("'dark'")} : ${S("'light'")})} /&gt;;`,
+          '}',
+        ];
+        const explorer = `<div class="f d">⌄ acme-web</div><div class="f d">&nbsp;&nbsp;⌄ src</div><div class="f d">&nbsp;&nbsp;&nbsp;&nbsp;⌄ settings</div>
+          <div class="f">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Page.tsx <b>M</b></div><div class="f sel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ThemeToggle.tsx <b>U</b></div>
+          <div class="f d">&nbsp;&nbsp;&nbsp;&nbsp;› components</div><div class="f">&nbsp;&nbsp;package.json</div><div class="f">&nbsp;&nbsp;README.md</div>`;
+        $('#pc').innerHTML = PP.vscode({ id: 'vsc', chat: 'picture', chatWidth: 480, title: 'ThemeToggle.tsx — acme-web', tabs: ['Page.tsx', '*ThemeToggle.tsx'], code, explorer });
+        $('#vsc-chat').insertAdjacentHTML('beforeend', PP.app('steer', 'vsc-chat'));
+        for (const n of [8, 9]) $(`#vsc-l${n}`).classList.add('add');
+        const screens = ['picture', 'steer', 'welcome', 'home'];
+        $('#phoneWrap').innerHTML = PP.phone({
+          id: 'phone',
+          content: screens.map((s) => `<div class="scr" id="p-${s}">${PP.app(s)}</div>`).join('')
+            + `<div class="scr" id="p-lock">${PP.lock({ id: 'lock', children: PP.notif({ id: 'nA', title: '✅ Add dark mode to the settings page', body: 'Done. The toggle follows the system theme and remembers your choice.' }) + PP.notif({ id: 'nB', title: '🔔 Pick a date library for the booking form', body: 'The agent has a question: which library should I add?', time: '1m ago' }) })}</div>`
+            + `<div class="ov" id="scan"><div class="feed"><img src="assets/img/vscode-sidebar.webp" alt="" /></div><div class="finder"><span></span><span class="ok"></span></div><div class="x">${PP.icon('plus', 'style="transform: rotate(45deg)"')}</div><div class="hint h1">Point your camera at the QR code on your PC</div><div class="hint h2">Pairing with Studio PC…</div></div>`
+            + `<div class="ov" id="sheet"><div class="sh"><div class="pk">${PP.icon('key')}</div><div class="t">Save a passkey for “Pocket Pilot”?</div><div class="s">It stays in your iCloud Keychain, protected by Face ID.</div><div class="acct">Pocket Pilot · Studio PC<small>mithawala.github.io</small></div><div class="go" id="goBtn">Continue</div></div></div>`
+            + `<div class="ov" id="fid"><div class="g">${PP.icon('face')}</div><div class="ok">${PP.icon('check')}</div><div class="lbl">Face ID</div></div>`
+            + PP.keyboard({ id: 'kb' }),
+        });
+        $('#nA').style.top = '262px';
+        $('#nB').style.top = '376px';
+        for (const a of $$('.vsc .pp-app')) a.style.setProperty('--app-h', `${a.parentElement.clientHeight}px`);
+        PP.settle();
+        for (const s of $$('#p-welcome .scroll, #p-home .scroll')) s.scrollTop = 0; // pages, not chats: show their top
+
+        // The steering message, typed on the phone.
+        const MSG = 'Also make the toggle remember the system theme';
+        const screenEl = $('#phone-screen');
+        const inScreen = (el) => {
+          const s = screenEl.getBoundingClientRect();
+          const r = el.getBoundingClientRect();
+          return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height, cx: r.left - s.left + r.width / 2, cy: r.top - s.top + r.height / 2 };
+        };
+        const KB = 300;
+        const phPic = $('#p-picture .pp-app');
+        const area = inScreen($('textarea', phPic));
+        const typed = document.createElement('div');
+        typed.className = 'typed';
+        // Sits on the composer while the keyboard is up, and grows upwards like it when the text wraps.
+        Object.assign(typed.style, { left: `${area.x}px`, bottom: `${844 - (area.y + area.h) + KB}px`, width: `${area.w}px`, minHeight: `${area.h}px`, background: getComputedStyle($('.composer', phPic)).backgroundColor });
+        typed.innerHTML = [...MSG].map((c) => `<span class="ch">${c}</span>`).join('') + '<i class="caret"></i>';
+        screenEl.appendChild(typed);
+        const chars = $$('.ch', typed);
+        const caret = $('.caret', typed);
+        const caretAt = [{ x: 12, y: 11 }, ...chars.map((c) => ({ x: c.offsetLeft + c.offsetWidth, y: c.offsetTop }))];
+        const sendPos = inScreen($('.send', phPic) || lastOf(phPic, '.cbar button'));
+        const phScroll = $('.scroll', phPic);
+        const phScroll0 = phScroll.scrollTop;
+
+        // The agent's answer to it, in both chats (hidden until it streams in).
+        const REPLY = 'Done — the toggle now follows your system theme until you pick one, and remembers your choice.';
+        const answer = (root) => {
+          const chat = $('.chat', root);
+          const lastTurn = lastOf(chat, '.turn');
+          const tools = document.createElement('div');
+          tools.className = 'tools';
+          const tool = $$('.tool', root).find((t) => t.textContent.includes('Created'));
+          const done = tool.cloneNode(true);
+          done.querySelector('.tt').innerHTML = 'Edited <a class="file-link">ThemeToggle.tsx</a>';
+          tools.appendChild(done);
+          const reply = document.createElement('div');
+          reply.className = 'assistant';
+          reply.innerHTML = `<div class="md"><p>${REPLY}</p></div>`;
+          const scroll = $('.scroll', root);
+          const s0 = scroll.scrollHeight - scroll.clientHeight;
+          lastTurn.append(tools, reply);
+          const s1 = scroll.scrollHeight - scroll.clientHeight;
+          scroll.scrollTop = s0;
+          hide(tools);
+          return { tools, words: PP.words(reply), scroll, s0, s1, pending: $('.pending-item', root) };
+        };
+        const phA = answer($('#p-steer .pp-app'));
+        const pcA = answer($('#vsc-chat .pp-app[data-screen="steer"]'));
+        const pcPic = $('#vsc-chat .pp-app[data-screen="picture"]');
+        const pcSteer = $('#vsc-chat .pp-app[data-screen="steer"]');
+
+        const welcomeScan = inScreen($$('#p-welcome .btn.primary').find((b) => b.textContent.includes('Scan')));
+        const goPos = inScreen($('#goBtn'));
+        const headlines = Object.fromEntries(['s1', 's2', 's3', 's4', 's5'].map((id) => [id, PP.words($(`#${id} .display`))]));
+        const steps = Object.fromEntries(['st1', 'st2', 'st3'].map((id) => [id, PP.words($(`#${id} .display`))]));
+        const tagWords = PP.words($('#title .tag'));
+        $('#root').insertAdjacentHTML('beforeend', PP.pointer({ id: 'ptr' }));
+        const ptrAt = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.55, y: r.top + r.height * 0.55 }; };
+        const installAt = ptrAt($('#market .inst'));
+        const allowAt = ptrAt($('#allowBtn'));
+        $('#ptr').style.opacity = '0';
+
+        // ---------------------------------------------------------------- the timeline
+        const tl = PP.timeline();
+        const inWords = (ws, t, stagger = 0.06) => tl.fromTo(ws, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.5, stagger }, t);
+        const inStep = (id, t) => {
+          tl.fromTo(`#${id} .display b`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.45, ease: 'back.out(2)' }, t);
+          inWords(steps[id], t + 0.1, 0.05);
+        };
+        const out = (el, t, d = 0.35) => tl.to(el, { opacity: 0, y: -20, duration: d, ease: 'power2.in' }, t);
+        const show = (el, t, d = 0.3) => tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: d, ease: 'power1.out' }, t);
+        const cut = (from, to, t, d = 0.3) => { tl.to(from, { opacity: 0, duration: d, ease: 'power1.inOut' }, t); show(to, t, d); };
+
+        tl.fromTo('#grid', { y: 0 }, { y: 64, duration: 40, ease: 'none' }, 0);
+        tl.fromTo('#fade', { opacity: 1 }, { opacity: 0, duration: 0.8, ease: 'power1.out' }, 0);
+
+        // 1 · title (0 – 3.4)
+        tl.fromTo('#title .logo', { opacity: 0, scale: 0.6, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: 'back.out(1.6)' }, 0.2);
+        tl.fromTo('#title .name', { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.8 }, 0.55);
+        show('#title .tag', 1.0, 0.01);
+        tl.fromTo(tagWords, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.07 }, 1.0);
+        tl.to('#title', { opacity: 0, y: -40, duration: 0.5, ease: 'power2.in' }, 3.0);
+
+        // 2 · in sync (3.4 – 16)
+        tl.fromTo('#pcCam', { opacity: 0, x: -140 }, { opacity: 1, x: 0, duration: 1.0 }, 3.3);
+        tl.fromTo('#pc', { rotationY: 14, rotationX: 4 }, { rotationY: 5, rotationX: 1, duration: 1.4, ease: 'power2.out' }, 3.3);
+        tl.fromTo('#phoneWrap', { y: 1100, rotation: 6, scale: 0.95 }, { y: 0, rotation: 0, scale: 0.95, duration: 1.1 }, 3.4);
+        tl.fromTo('#phone', { rotationY: -22 }, { rotationY: -8, duration: 1.4, ease: 'power2.out' }, 3.4);
+        inWords(headlines.s1, 3.8);
+        out('#s1', 5.35);
+        // the keyboard comes up, and the phone types
+        inWords(headlines.s2, 5.6, 0.08);
+        tl.fromTo('#kb', { y: KB }, { y: 0, duration: 0.35, ease: 'power3.out' }, 5.5);
+        tl.fromTo(phPic, { '--app-h': '844px' }, { '--app-h': `${844 - KB}px`, duration: 0.35, ease: 'power3.out' }, 5.5);
+        tl.fromTo(phScroll, { scrollTop: phScroll0 }, { scrollTop: phScroll0 + KB, duration: 0.35, ease: 'power3.out' }, 5.5);
+        show(typed, 5.8, 0.05);
+        const T0 = 5.95;
+        const PER = 0.046;
+        chars.forEach((c, i) => {
+          const t = T0 + i * PER;
+          tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: 'none' }, t);
+          tl.fromTo(caret, { x: caretAt[i].x, y: caretAt[i].y }, { x: caretAt[i + 1].x, y: caretAt[i + 1].y, duration: 0.01, ease: 'none' }, t);
+          const key = MSG[i] === ' ' ? $('#kb-space') : $(`#kb-${MSG[i].toLowerCase()}`);
+          if (key) tl.fromTo(key, { backgroundColor: '#8d8d93' }, { backgroundColor: '#5c5c60', duration: 0.14, ease: 'power1.out' }, t);
+        });
+        tl.fromTo(caret, { x: caretAt[0].x, y: caretAt[0].y }, { x: caretAt[0].x, y: caretAt[0].y, duration: 0.01 }, 5.8);
+        tl.fromTo(caret, { opacity: 1 }, { opacity: 0, duration: 0.2, repeat: 3, yoyo: true, ease: 'steps(1)' }, T0 + MSG.length * PER + 0.05);
+        const TS = 8.35; // send
+        PP.tap(tl, screenEl, sendPos.cx, sendPos.cy - KB, TS);
+        tl.to(typed, { opacity: 0, duration: 0.12 }, TS + 0.08);
+        tl.to('#kb', { y: KB, duration: 0.35, ease: 'power3.in' }, TS + 0.12);
+        tl.to(phPic, { '--app-h': '844px', duration: 0.35, ease: 'power3.in' }, TS + 0.12);
+        cut('#p-picture', '#p-steer', TS + 0.15, 0.25);
+        out('#s2', TS);
+        inWords(headlines.s3, TS + 0.3, 0.07);
+        // … and appears on the PC at once
+        tl.fromTo('#pulse', { attr: { cx: 1420, cy: 610 }, opacity: 1 }, { attr: { cx: 1290, cy: 640 }, opacity: 1, duration: 0.35, ease: 'power2.in' }, TS + 0.2);
+        tl.to('#pulse', { opacity: 0, duration: 0.15 }, TS + 0.55);
+        cut(pcPic, pcSteer, TS + 0.5, 0.2);
+        for (const a of [phA, pcA]) tl.fromTo(a.pending, { boxShadow: '0 0 0 0px rgba(97,175,239,0)' }, { boxShadow: '0 0 0 4px rgba(97,175,239,0.55)', duration: 0.4, repeat: 3, yoyo: true, ease: 'sine.inOut' }, TS + 0.7);
+        // the agent takes it: code changes on the PC, the answer streams to both
+        out('#s3', 11.0);
+        inWords(headlines.s4, 11.2, 0.07);
+        for (const a of [phA, pcA]) {
+          tl.to(a.pending, { opacity: 0, duration: 0.3 }, 10.4);
+          tl.fromTo(a.tools, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3 }, 10.9);
+          tl.fromTo(a.scroll, { scrollTop: a.s0 }, { scrollTop: a.s1, duration: 0.9, ease: 'power2.inOut' }, 10.9);
+          tl.fromTo(a.words, { opacity: 0 }, { opacity: 1, duration: 0.05, stagger: 0.075, ease: 'none' }, 11.3);
+        }
+        for (const [n, t] of [[8, 10.5], [9, 10.75]]) tl.fromTo(`#vsc-l${n}`, { height: 0, opacity: 0 }, { height: 23.8, opacity: 1, duration: 0.3, ease: 'power2.out' }, t);
+        out('#s4', 15.3);
+        tl.to('#pcCam', { x: -1500, opacity: 0, duration: 0.7, ease: 'power2.in' }, 15.5);
+
+        // 3 · set up in a minute (16 – 27)
+        cut('#p-steer', '#p-welcome', 15.9, 0.35);
+        tl.fromTo('#kick', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, 16.0);
+        // step 1: install
+        inStep('st1', 16.2);
+        show('#st1 .lede', 16.8, 0.5);
+        tl.fromTo('#market', { opacity: 0, x: -80 }, { opacity: 1, x: 0, duration: 0.6 }, 16.3);
+        tl.fromTo('#ptr', { opacity: 0, x: installAt.x + 260, y: installAt.y + 190 }, { opacity: 1, x: installAt.x + 200, y: installAt.y + 150, duration: 0.3 }, 16.9);
+        tl.to('#ptr', { x: installAt.x, y: installAt.y, duration: 0.6, ease: 'power2.inOut' }, 17.1);
+        PP.click(tl, $('#ptr'), 17.75);
+        cut('#market .inst .s1', '#market .inst .s2', 17.85, 0.15);
+        cut('#market .inst .s2', '#market .inst .s3', 18.5, 0.2);
+        tl.to('#ptr', { opacity: 0, duration: 0.3 }, 18.7);
+        out('#st1', 19.1);
+        tl.to('#market', { opacity: 0, x: -80, duration: 0.4, ease: 'power2.in' }, 19.1);
+        // step 2: scan
+        inStep('st2', 19.5);
+        show('#st2 .lede', 20.0, 0.5);
+        tl.fromTo('#panel', { opacity: 0, x: -80 }, { opacity: 1, x: 0, duration: 0.6 }, 19.5);
+        tl.fromTo('#panelNote', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5 }, 19.9);
+        PP.tap(tl, screenEl, welcomeScan.cx, welcomeScan.cy, 20.4);
+        tl.fromTo('#scan', { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.3 }, 20.6);
+        tl.fromTo('#scan .feed', { x: 70, y: 150, rotation: -9, scale: 0.46 }, { x: 0, y: -95, rotation: -3, scale: 0.58, duration: 1.4, ease: 'power2.out' }, 20.6);
+        tl.fromTo('#scan .feed', { x: 0, y: -95 }, { x: 4, y: -89, duration: 0.5, repeat: 2, yoyo: true, ease: 'sine.inOut' }, 22.0);
+        show('#scan .finder .ok', 21.95, 0.15);
+        tl.fromTo('#scan .finder', { scale: 1 }, { scale: 0.94, duration: 0.15, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 21.95);
+        cut('#scan .h1', '#scan .h2', 22.0, 0.2);
+        out('#st2', 22.9);
+        tl.to(['#panel', '#panelNote'], { opacity: 0, x: -80, duration: 0.4, ease: 'power2.in' }, 22.9);
+        // step 3: allow, then Face ID
+        inStep('st3', 23.3);
+        show('#st3 .lede', 23.8, 0.5);
+        tl.fromTo('#pcCam', { x: 0, opacity: 0 }, { x: 0, opacity: 0.3, duration: 0.4 }, 23.2);
+        tl.fromTo('#pc', { rotationY: 0, rotationX: 0 }, { rotationY: 0, rotationX: 0, duration: 0.01 }, 23.2);
+        tl.fromTo('#modal', { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(1.4)' }, 23.4);
+        tl.fromTo('#ptr', { opacity: 0, x: allowAt.x + 180, y: allowAt.y + 150 }, { opacity: 1, x: allowAt.x + 140, y: allowAt.y + 110, duration: 0.3 }, 23.8);
+        tl.to('#ptr', { x: allowAt.x, y: allowAt.y, duration: 0.5, ease: 'power2.inOut' }, 24.0);
+        PP.click(tl, $('#ptr'), 24.55);
+        tl.to(['#modal', '#ptr', '#pcCam'], { opacity: 0, duration: 0.3 }, 24.8);
+        tl.to('#scan', { opacity: 0, duration: 0.25 }, 24.7);
+        tl.fromTo('#sheet', { opacity: 1, y: 420 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 24.75);
+        PP.tap(tl, screenEl, goPos.cx, goPos.cy, 25.55);
+        tl.to('#sheet', { y: 420, duration: 0.35, ease: 'power3.in' }, 25.7);
+        tl.fromTo('#fid', { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.25 }, 25.75);
+        tl.fromTo('#fid .g', { scale: 1 }, { scale: 0.92, duration: 0.25, repeat: 1, yoyo: true, ease: 'sine.inOut' }, 25.95);
+        cut('#fid .g', '#fid .ok', 26.45, 0.2);
+        tl.to('#fid', { opacity: 0, scale: 0.9, duration: 0.25 }, 27.0);
+        cut('#p-welcome', '#p-home', 26.95, 0.3);
+        out(['#st3', '#kick'], 27.1);
+
+        // 4 · notifications (27.4 – 32)
+        tl.to('#phoneWrap', { x: -663, y: 30, scale: 1, duration: 0.8, ease: 'power3.inOut' }, 27.4);
+        tl.to('#phone', { rotationY: 0, duration: 0.8, ease: 'power3.inOut' }, 27.4);
+        cut('#p-home', '#p-lock', 27.8, 0.35);
+        inWords(headlines.s5, 27.8, 0.07);
+        tl.fromTo('#nA', { opacity: 0, y: -130, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: 'back.out(1.5)' }, 28.5);
+        tl.fromTo('#phone', { x: 0 }, { x: 8, duration: 0.07, repeat: 5, yoyo: true, ease: 'sine.inOut' }, 28.5);
+        tl.fromTo('#nB', { opacity: 0, y: -130, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: 'back.out(1.5)' }, 29.9);
+        tl.fromTo('#phone', { x: 0 }, { x: 8, duration: 0.07, repeat: 5, yoyo: true, ease: 'sine.inOut' }, 29.9);
+        out('#s5', 31.7);
+        tl.to('#phoneWrap', { y: 1100, duration: 0.6, ease: 'power3.in' }, 31.6);
+
+        // 5 · private by design (32.2 – 36)
+        tl.fromTo('#trustHl', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6 }, 32.2);
+        tl.fromTo('.tile', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.55, stagger: 0.3 }, 32.7);
+        tl.to(['#trustHl', '#tiles'], { opacity: 0, duration: 0.45, ease: 'power2.in' }, 35.6);
+
+        // 6 · the end card (36 – 40)
+        tl.fromTo('#end .logo', { opacity: 0, scale: 0.6, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: 'back.out(1.6)' }, 36.1);
+        tl.fromTo('#end .name', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8 }, 36.45);
+        tl.fromTo('#end .tag', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.7 }, 36.9);
+        tl.fromTo('#end .chips', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6 }, 37.3);
+        tl.fromTo('#end .url', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 37.8);
+        tl.to('#fade', { opacity: 1, duration: 0.6, ease: 'power1.in' }, 39.4);
+
+        window.__timelines['in-sync'] = tl;
+      });
+    </script>
+  </body>
+</html>

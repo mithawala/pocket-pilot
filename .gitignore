@@ -5,3 +5,9 @@ dist/
 *.tmp.mjs
 .DS_Store
 Thumbs.db
+
+# marketing/video: renders, snapshots, soundtracks and the selected composition are generated
+marketing/video/renders/
+marketing/video/snapshots/
+marketing/video/index.html
+marketing/video/assets/audio/

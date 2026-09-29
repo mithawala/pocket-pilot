@@ -127,6 +127,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Product videos
+
+The videos on the product page (`site/video/`) are made from the sources in `marketing/video/`.
+
+| Component | License | Where |
+|---|---|---|
+| [Inter](https://rsms.me/inter/) 4.1, by Rasmus Andersson | SIL Open Font License 1.1 (full text in `Inter-OFL.txt` next to it) | `marketing/video/assets/fonts/` |
+
+They're rendered with [HyperFrames](https://github.com/heygen-com/hyperframes) (Apache-2.0) and
+animated with [GSAP](https://gsap.com) (loaded from its CDN while rendering); neither is part of the
+repository. The soundtracks are synthesized by `marketing/video/tools/soundtrack.mjs` — no
+third-party audio.
+
 ## Not included
 
 [cloudflared](https://github.com/cloudflare/cloudflared), which runs the tunnel, isn't part of

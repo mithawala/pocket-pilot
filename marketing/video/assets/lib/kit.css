@@ -1,0 +1,139 @@
+/* Pocket Pilot marketing videos: shared look. Loaded after assets/ui/app.scoped.css.
+   Inter is declared in each composition (asset paths must be root-relative for HyperFrames). */
+
+:root {
+  --ink: #0a0c11;
+  --ink-2: #11141b;
+  --blue: #4f78ff;
+  --violet: #6d5dfc;
+  --sky: #61afef;
+  --green: #98c379;
+  --amber: #e5c07b;
+  --rose: #e06c75;
+  --paper: #f5f7ff;
+  --dim: rgba(214, 222, 240, 0.64);
+}
+
+html, body { margin: 0; width: 100%; height: 100%; background: var(--ink); overflow: hidden; }
+body { font-family: 'Inter', sans-serif; color: var(--paper); -webkit-font-smoothing: antialiased; }
+#root { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ink); }
+.layer { position: absolute; inset: 0; }
+.center { display: flex; align-items: center; justify-content: center; }
+
+/* ---------- the real app, inside a device or a window */
+.pp-app {
+  position: absolute; inset: 0; overflow: hidden;
+  transform: translateZ(0); /* containing block for the app's position: fixed layers */
+  --app-h: 844px; --vv-top: 0px; --safe-top: 47px; --safe-bottom: 30px;
+  --font: 'Inter', sans-serif;
+  font-family: var(--font); font-size: 15px; line-height: 1.5;
+  background: var(--bg); color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- iPhone */
+.iphone { position: absolute; width: 426px; height: 880px; }
+.iphone .frame {
+  position: absolute; inset: 0; border-radius: 68px; padding: 18px;
+  background: linear-gradient(145deg, #5b606b 0%, #2a2d34 18%, #1a1c22 50%, #3a3e47 82%, #6c717c 100%);
+  box-shadow: 0 60px 120px rgba(0, 0, 0, 0.55), 0 20px 40px rgba(0, 0, 0, 0.35), inset 0 0 0 1.5px rgba(255, 255, 255, 0.16), inset 0 0 0 4px #0b0c0f;
+}
+.iphone .bezel { position: absolute; inset: 7px; border-radius: 61px; background: #050506; }
+.iphone .screen { position: absolute; left: 18px; top: 18px; width: 390px; height: 844px; border-radius: 52px; overflow: hidden; background: #000; transform: translateZ(0); }
+.iphone .glare { position: absolute; inset: 0; border-radius: 52px; pointer-events: none; background: linear-gradient(115deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 34%, rgba(255, 255, 255, 0) 55%); z-index: 20; }
+.iphone .island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 30; }
+.iphone .home { position: absolute; left: 50%; bottom: 8px; width: 138px; height: 5px; margin-left: -69px; border-radius: 3px; background: rgba(255, 255, 255, 0.82); z-index: 30; }
+.iphone .status { position: absolute; left: 0; right: 0; top: 0; height: 50px; z-index: 25; display: flex; align-items: center; justify-content: space-between; padding: 4px 30px 0 44px; color: #fff; font: 600 16px/1 'Inter', sans-serif; letter-spacing: -0.2px; }
+.iphone .status svg { display: block; }
+.iphone .status .icons { display: flex; align-items: center; gap: 6px; }
+.iphone .side { position: absolute; width: 5px; border-radius: 3px; background: linear-gradient(90deg, #6c717c, #2a2d34); }
+.iphone .side.action { left: -3px; top: 150px; height: 34px; }
+.iphone .side.vol-up { left: -3px; top: 212px; height: 62px; }
+.iphone .side.vol-down { left: -3px; top: 290px; height: 62px; }
+.iphone .side.power { right: -3px; top: 250px; height: 96px; }
+
+/* ---------- iOS lock screen and notifications */
+.lock { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(520px 520px at 30% 18%, #3b5bdb 0%, rgba(59, 91, 219, 0) 70%), radial-gradient(480px 560px at 90% 80%, #7b3fe4 0%, rgba(123, 63, 228, 0) 70%), linear-gradient(170deg, #111633, #0a0c1b 55%, #140b26); }
+.lock .date { position: absolute; left: 0; right: 0; top: 92px; text-align: center; color: rgba(255, 255, 255, 0.9); font: 600 20px/1 'Inter', sans-serif; letter-spacing: 0.2px; }
+.lock .clock { position: absolute; left: 0; right: 0; top: 118px; text-align: center; color: rgba(255, 255, 255, 0.94); font: 700 104px/1 'Inter', sans-serif; letter-spacing: -3px; }
+.notif { position: absolute; left: 12px; right: 12px; display: flex; gap: 12px; align-items: flex-start; padding: 13px 14px 14px; border-radius: 24px; background: rgba(38, 40, 52, 0.72); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); color: #fff; font-family: 'Inter', sans-serif; }
+.notif img { width: 38px; height: 38px; border-radius: 9px; flex: none; margin-top: 2px; }
+.notif .txt { flex: 1; min-width: 0; }
+.notif .top { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255, 255, 255, 0.62); margin-bottom: 2px; }
+.notif .title { font-size: 15px; font-weight: 650; line-height: 1.3; }
+.notif .body { font-size: 15px; line-height: 1.32; color: rgba(255, 255, 255, 0.92); }
+
+/* ---------- touch feedback */
+.tap { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255, 255, 255, 0.34); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); pointer-events: none; z-index: 40; opacity: 0; }
+.finger { position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18) 60%, rgba(255, 255, 255, 0) 72%); border: 2px solid rgba(255, 255, 255, 0.5); pointer-events: none; z-index: 41; opacity: 0; }
+
+/* ---------- VS Code window */
+.vsc { position: absolute; display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; background: #282c34; box-shadow: 0 50px 110px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08); font-family: 'Inter', sans-serif; color: #abb2bf; }
+.vsc .titlebar { flex: none; height: 36px; display: flex; align-items: center; gap: 14px; padding: 0 12px; background: #21252b; border-bottom: 1px solid #181a1f; font-size: 13px; color: #9da5b4; }
+.vsc .titlebar .dots { display: flex; gap: 8px; }
+.vsc .titlebar .dots i { width: 12px; height: 12px; border-radius: 50%; background: #3e4451; }
+.vsc .titlebar .dots i:nth-child(1) { background: #e06c75; } .vsc .titlebar .dots i:nth-child(2) { background: #e5c07b; } .vsc .titlebar .dots i:nth-child(3) { background: #98c379; }
+.vsc .titlebar .name { flex: 1; text-align: center; margin-right: 60px; }
+.vsc .main { flex: 1; min-height: 0; display: flex; }
+.vsc .activity { flex: none; width: 50px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 8px; background: #21252b; }
+.vsc .activity .ic { position: relative; width: 50px; height: 46px; display: grid; place-items: center; color: #6b717d; }
+.vsc .activity .ic svg { width: 24px; height: 24px; }
+.vsc .activity .ic.on { color: #d7dae0; }
+.vsc .activity .ic.on::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: #d7dae0; }
+.vsc .explorer { flex: none; width: 210px; padding: 10px 0; background: #21252b; border-right: 1px solid #181a1f; font-size: 13px; }
+.vsc .explorer .h { padding: 4px 16px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: #7f848e; }
+.vsc .explorer .f { padding: 3px 16px; color: #abb2bf; white-space: nowrap; }
+.vsc .explorer .f.d { color: #d7dae0; }
+.vsc .explorer .f.sel { background: #2c313c; color: #d7dae0; }
+.vsc .explorer .f b { font-weight: 500; color: #e5c07b; }
+.vsc .editor { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #282c34; }
+.vsc .tabs { flex: none; height: 36px; display: flex; background: #21252b; font-size: 13px; }
+.vsc .tabs span { display: flex; align-items: center; padding: 0 16px; color: #7f848e; border-right: 1px solid #181a1f; }
+.vsc .tabs span.on { background: #282c34; color: #d7dae0; }
+.vsc .code { flex: 1; padding: 12px 0; font: 14px/1.7 Consolas, 'Cascadia Code', monospace; white-space: pre; color: #abb2bf; overflow: hidden; }
+.vsc .code .ln { display: inline-block; width: 44px; padding-right: 14px; text-align: right; color: #495162; }
+.vsc .code .k { color: #c678dd; } .vsc .code .s { color: #98c379; } .vsc .code .f { color: #61afef; } .vsc .code .t { color: #e5c07b; } .vsc .code .c { color: #7f848e; font-style: italic; } .vsc .code .n { color: #d19a66; }
+.vsc .chatpane { flex: none; position: relative; border-left: 1px solid #181a1f; background: #21252b; }
+.vsc .chatpane .ph { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12px; font-weight: 600; letter-spacing: 0.6px; color: #9da5b4; background: #21252b; border-bottom: 1px solid #181a1f; }
+.vsc .chatpane .body { position: absolute; left: 0; right: 0; top: 36px; bottom: 0; }
+.vsc .chatpane .pp-app { --safe-top: 0px; --safe-bottom: 0px; background: #21252b; }
+.vsc .chatpane .pp-app .topbar { display: none; }
+.vsc .statusbar { flex: none; height: 26px; display: flex; align-items: center; gap: 18px; padding: 0 12px; background: #21252b; border-top: 1px solid #181a1f; font-size: 12px; color: #9da5b4; }
+.vsc .statusbar .pp { display: flex; align-items: center; gap: 6px; color: #98c379; }
+.vsc .code .cl { position: relative; }
+.vsc .code .cl.add { background: rgba(152, 195, 121, 0.14); box-shadow: inset 3px 0 0 #98c379; }
+
+/* ---------- iOS keyboard (dark) and a mouse pointer */
+.kb { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; z-index: 22; padding: 0 3px; background: rgba(40, 40, 43, 0.97); font-family: 'Inter', sans-serif; color: #fff; }
+.kb-sugg { height: 44px; display: flex; align-items: center; justify-content: space-around; font-size: 16px; color: #e6e6ea; }
+.kb-sugg i { width: 1px; height: 24px; background: rgba(255, 255, 255, 0.18); }
+.kb-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 11px; }
+.kb-row.mid { padding: 0 18px; }
+.kb-key { flex: 0 0 33px; height: 42px; display: grid; place-items: center; border-radius: 6px; background: #5c5c60; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); font-size: 22px; line-height: 1; }
+.kb-key.fn { background: #3f3f43; font-size: 16px; }
+.kb-key.wide { flex-basis: 43px; }
+.kb-row:nth-of-type(3) .kb-key.wide:first-child { margin-right: 8px; }
+.kb-row:nth-of-type(3) .kb-key.wide:last-child { margin-left: 8px; }
+.kb-key.w123 { flex-basis: 43px; }
+.kb-key.emo { flex-basis: 43px; }
+.kb-key.space { flex: 1 1 auto; font-size: 16px; }
+.kb-key.ret { flex-basis: 88px; }
+.kb-bottom { display: flex; justify-content: space-between; padding: 2px 22px 0; color: #e6e6ea; }
+.pointer { position: absolute; left: 0; top: 0; width: 30px; height: 30px; z-index: 50; transform-origin: 5px 3px; }
+.pointer svg { position: relative; z-index: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+.pointer i { position: absolute; left: -17px; top: -19px; width: 44px; height: 44px; border-radius: 50%; background: rgba(97, 175, 239, 0.35); border: 2px solid rgba(97, 175, 239, 0.8); opacity: 0; }
+
+/* ---------- type */
+.kicker { font: 600 22px/1 'Inter', sans-serif; letter-spacing: 4px; text-transform: uppercase; color: var(--sky); }
+.display { font: 800 96px/1.02 'Inter', sans-serif; letter-spacing: -3px; color: #fff; }
+.grad { background: linear-gradient(95deg, #8fb2ff 0%, #b69cff 55%, #f09bd6 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lede { font: 500 34px/1.35 'Inter', sans-serif; letter-spacing: -0.4px; color: var(--dim); }
+.chip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 999px; font: 600 26px/1 'Inter', sans-serif; color: #fff; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); }
+.chip svg { width: 28px; height: 28px; }
+/* words() spans in headlines move as well as fade (transforms need a box) */
+.display .w, .lede .w, .kicker .w, .big .w { display: inline-block; }
+
+/* ---------- backgrounds */
+.bg-space { position: absolute; inset: 0; background: radial-gradient(1100px 700px at 78% 12%, rgba(79, 120, 255, 0.30), rgba(79, 120, 255, 0) 62%), radial-gradient(900px 700px at 8% 100%, rgba(109, 93, 252, 0.30), rgba(109, 93, 252, 0) 62%), var(--ink); }
+.bg-grid { position: absolute; inset: -200px; background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px); background-size: 64px 64px; mask-image: radial-gradient(closest-side, #000 30%, transparent 100%); -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent 100%); }
+.glow { position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none; }
