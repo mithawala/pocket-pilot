@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { FILES, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
 import { renderQrText } from './lib/qr.mjs';
+import { latestVersion, newer, updateInfo, updateText } from './lib/update.mjs';
 
 const { joinSession } = sdk;
 const EXT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -135,29 +136,11 @@ function setEnabled(enabled) {
 }
 
 const VERSION = readJson(fileURLToPath(new URL('./version.json', import.meta.url)), {})?.version || '0.0.0';
-const newer = (a, b) => {
-  const pa = String(a).split('.').map(Number);
-  const pb = String(b).split('.').map(Number);
-  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
-  return false;
-};
 
 /** The Copilot CLI only updates first-party plugins by itself: tell the user when this one is behind. */
 async function updateNote() {
-  let latest = settingsFile().update;
-  if (!latest || Date.now() - latest.checkedAt > 12 * 3600 * 1000) {
-    try {
-      const res = await fetch('https://raw.githubusercontent.com/mithawala/pocket-pilot/main/.github/plugin/marketplace.json', { signal: AbortSignal.timeout(5000) });
-      const version = (await res.json()).plugins?.find((p) => p.name === 'pocket-pilot')?.version;
-      latest = { checkedAt: Date.now(), version };
-      writeJson(FILES.state, { ...settingsFile(), update: latest });
-    } catch {
-      return '';
-    }
-  }
-  return latest?.version && newer(latest.version, VERSION)
-    ? `Update available: Pocket Pilot ${latest.version} (you have ${VERSION}). Quit VS Code and the GitHub Copilot app (on Windows they keep plugin folders in use), run \`copilot plugin update pocket-pilot@pocket-pilot\`, then start the app again.`
-    : '';
+  const info = updateInfo(await latestVersion().catch(() => ''), VERSION);
+  return info ? `Update available: ${updateText(info)}` : '';
 }
 const debug = process.env.POCKET_PILOT_DEBUG
   ? (m) => {
@@ -199,17 +182,32 @@ async function turnOnFromPage() {
   await connectHub({ start: true });
 }
 
+let tookOver = false;
 async function connectHub({ start }) {
   if (rpc && !rpc.ch.closed) return rpc;
   if (connecting) return connecting;
   connecting = (async () => {
     const hello = { pid: process.pid, canConfirm: !!session.capabilities?.ui?.elicitation };
+    let mayStart = start;
     for (let attempt = 0; attempt < 40; attempt++) {
       const info = readJson(FILES.hub);
       if (hubAlive(info)) {
         try {
           const ch = await connect(info.port, info.token, hello);
-          rpc = new Rpc(ch, { cmd: runCommand, confirm: ({ message, title }) => confirm(title, message) });
+          const r = new Rpc(ch, { cmd: runCommand, confirm: ({ message, title }) => confirm(title, message) });
+          // The plugin was updated while the app ran: this chat has the newer version, so it takes the
+          // hub over (same tunnel and address; paired devices reconnect by themselves). Older hubs
+          // don't know "handover" and simply keep running.
+          if (!tookOver && isEnabled() && newer(VERSION, info.version || '0')) {
+            tookOver = true;
+            if (await r.request('handover', {}, 5000).then(() => true, () => false)) {
+              ch.close();
+              mayStart = true;
+              for (let i = 0; i < 50 && hubAlive(readJson(FILES.hub)); i++) await new Promise((res) => setTimeout(res, 100));
+              continue;
+            }
+          }
+          rpc = r;
           ch.on('close', () => {
             rpc = null;
             attached = false;
@@ -220,7 +218,7 @@ async function connectHub({ start }) {
         } catch {
           /* the hub is starting or stopping; retry */
         }
-      } else if (!start) {
+      } else if (!mayStart) {
         return null;
       } else {
         await hostHub();
@@ -590,7 +588,7 @@ async function onCommand(ctx) {
 
 const tool = {
   name: 'pocket_pilot',
-  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone, tablet or another computer. Call with action "pair" when the user asks to connect, pair or use their phone or another device (it opens a pairing QR code on this PC for the user to scan), or "status" to report whether remote access is on and which devices are paired.',
+  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone, tablet or another computer: the same history, live replies, chat, tool approvals and questions, end-to-end encrypted. Call with action "pair" when the user asks to connect, pair or use their phone or another device (it opens a pairing QR code on this PC for the user to scan; never ask the user to share the link or the code with you), or "status" to report whether remote access is on and which devices are paired. The user can also type /pocket-pilot, /pocket-pilot status or /pocket-pilot off.',
   parameters: { type: 'object', properties: { action: { type: 'string', enum: ['pair', 'status'], description: 'pair = show the pairing QR code on this PC; status = report remote-access status' } }, required: ['action'] },
   handler: async (args) => {
     if (args?.action === 'status') {

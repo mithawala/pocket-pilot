@@ -97,6 +97,10 @@ export function toAhpModels(list) {
       ...(m.billing?.multiplier !== undefined ? { _meta: { multiplier: m.billing.multiplier } } : {}),
     });
   }
+  // Auto is a virtual model in the runtime: selectable (with its "Optimize for"), but not in the list.
+  if (out.length && !out.some((m) => m.id === 'auto')) {
+    out.unshift({ id: 'auto', provider: PROVIDER, name: 'Auto', description: 'Copilot picks the model for each request', configSchema: { type: 'object', properties: { tier: AUTO_TIER } } });
+  }
   return out;
 }
 

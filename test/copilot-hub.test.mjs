@@ -8,6 +8,7 @@ import path from 'node:path';
 // The hub keeps its state under POCKET_PILOT_HOME: use a throwaway one (set before the modules load).
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-hub-test-'));
 process.env.POCKET_PILOT_HOME = home;
+process.env.POCKET_PILOT_UPDATE_CHECK = 'off';
 fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'none', passkey: 'off', requireApproval: false } }));
 const lib = '../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib';
 const ipc = await import(`${lib}/ipc.mjs`);
@@ -153,4 +154,35 @@ test.after(async () => {
   const { closePageServer } = await import(`${lib}/hub.mjs`);
   closePageServer();
   fs.rmSync(home, { recursive: true, force: true, maxRetries: 3 });
+});
+
+test('hub: a chat with a newer version of the plugin takes over, and remote access stays on', async () => {
+  fs.rmSync(lockFile, { force: true });
+  const { startHub } = await import(`${lib}/hub.mjs`);
+  const hub = await startHub();
+  assert.ok(hub);
+  try {
+    const info = ipc.readJson(path.join(home, 'hub.json'));
+    const ch = await ipc.connect(info.port, info.token, { pid: process.pid });
+    assert.deepEqual(await new ipc.Rpc(ch, {}).request('handover'), { ok: true });
+    for (let i = 0; i < 60 && !hub.stopped; i++) await new Promise((r) => setTimeout(r, 50));
+    ch.close();
+    assert.equal(hub.stopped, true, 'the older hub steps down');
+    assert.equal(fs.existsSync(path.join(home, 'hub.json')), false, 'and frees the lock for the newer one');
+    assert.equal(ipc.readJson(path.join(home, 'state.json')).enabled, true, 'remote access stays on');
+  } finally {
+    await hub.stop();
+  }
+});
+
+test('hub: update notes say what to do', async () => {
+  const { newer, updateInfo, updateText } = await import(`${lib}/update.mjs`);
+  assert.equal(newer('0.7.1', '0.7.0'), true);
+  assert.equal(newer('0.10.0', '0.9.9'), true);
+  assert.equal(newer('0.7.0', '0.7.0'), false);
+  assert.equal(updateInfo('0.7.0', '0.7.1'), null);
+  const info = updateInfo('0.8.0', '0.7.1');
+  assert.deepEqual(info, { latest: '0.8.0', current: '0.7.1' });
+  assert.match(updateText(info), /Plugins page of the GitHub Copilot app/);
+  assert.match(updateText(info), /copilot plugin update pocket-pilot@pocket-pilot/);
 });

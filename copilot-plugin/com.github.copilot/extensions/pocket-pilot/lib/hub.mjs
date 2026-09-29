@@ -17,6 +17,7 @@ import { FILES, ensureHome, readJson, writeJson, newToken, serve, Rpc, takeLock,
 import { CopilotAgentHost } from './agent-host.mjs';
 import { pairingPage } from './pairing-page.mjs';
 import { renderQrSvg } from './qr.mjs';
+import { cachedLatest, latestVersion, updateInfo } from './update.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const vendor = path.join(here, '..', 'vendor');
@@ -129,7 +130,7 @@ async function whileOff(route, body) {
         if (moved) return { moved };
       }
       const devices = new DeviceStore(FILES.devices).list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: false, passkey: !!d.passkey, totp: !!d.totp }));
-      return { on: false, turningOn: page.turningOn, error: page.error, version: VERSION, hostName: HOST_NAME, devices };
+      return { on: false, turningOn: page.turningOn, error: page.error, version: VERSION, update: updateInfo(cachedLatest(), VERSION), hostName: HOST_NAME, devices };
     }
     case 'POST /pair/on':
       turnOn();
@@ -445,10 +446,19 @@ async function boot(log, cleanups) {
   const channels = new Set();
   await pageServer();
 
+  // A newer plugin version: the panel and `/pocket-pilot status` say how to update.
+  let latest = cachedLatest();
+  const checkUpdate = () => latestVersion().then((v) => { latest = v || latest; }, () => {});
+  checkUpdate();
+  const updateTimer = setInterval(checkUpdate, 6 * 3600 * 1000);
+  updateTimer.unref?.();
+  cleanups.push(() => clearInterval(updateTimer));
+
   function status() {
     const online = new Map(relay.activeConnections().map((c) => [c.deviceId, c]));
     return {
       version: VERSION,
+      update: updateInfo(latest, VERSION),
       hostName,
       hostPid: process.pid,
       fingerprint: identityLib.fingerprintText(identity.fingerprint),
@@ -503,6 +513,12 @@ async function boot(log, cleanups) {
       status: async () => status(),
       stop: async () => {
         setTimeout(() => stopRequested?.('stopped from a session'), 100);
+        return { ok: true };
+      },
+      // A chat running a newer version of the plugin (updated while the app ran) takes over: remote
+      // access stays on and the tunnel keeps its address, so paired devices reconnect by themselves.
+      handover: async () => {
+        setTimeout(() => stopRequested?.('a newer version takes over', { keepTunnel: true }), 100);
         return { ok: true };
       },
     });

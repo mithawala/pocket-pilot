@@ -23,8 +23,19 @@ paired devices; `/pocket-pilot off` or **Turn off remote access** in the panel c
 the panel.
 
 Remote access isn't tied to that chat: close or delete it and another open chat takes over within
-seconds, at the same address. On Windows, quit VS Code and the app before updating or uninstalling
-the plugin (VS Code keeps every plugin folder in use while it runs).
+seconds, at the same address.
+
+## Update
+
+Click **Update** on the Plugins page of the GitHub Copilot app, or run
+`copilot plugin update pocket-pilot@pocket-pilot`. It works while VS Code and the app are open; the
+new version takes over remote access by itself and paired devices reconnect within seconds. The
+Pocket Pilot panel says when there's a new version.
+
+Updating from 0.7.0 or older on Windows, the app may say *Failed to install plugin: Access is denied
+(os error 5)*: VS Code keeps the `skills` folder those versions have open, so Windows won't let the
+app move the plugin's folder. Quit VS Code (or delete that `skills` folder) and click **Update** again.
+Newer versions have no such folder.
 
 ## Security
 

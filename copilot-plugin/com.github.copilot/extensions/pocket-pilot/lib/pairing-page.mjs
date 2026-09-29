@@ -33,6 +33,7 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
 .state.off .dot{background:transparent;border:2px solid var(--muted)}.state.busy{color:var(--warn);border-color:rgba(229,192,123,.45)}.state.busy .dot{background:var(--warn)}
 .offcard{display:grid;gap:10px;padding:18px;border:1px solid var(--line);border-radius:10px;background:#1d2025}.offcard b{font-size:16px;color:var(--strong)}.offcard p{margin:0}
 .offcard button{justify-self:start;padding:9px 16px;font-size:14px}
+.update{grid-column:1/-1;display:grid;gap:4px;padding:12px 14px;border:1px solid rgba(97,175,239,.45);border-radius:8px;background:rgba(97,175,239,.08)}.update b{color:var(--strong)}
 button:disabled{opacity:.55;cursor:default;filter:none}.hide{display:none!important}
 </style></head>
 <body class="${embed ? 'embed' : ''}"><main class="card">
@@ -40,6 +41,7 @@ button:disabled{opacity:.55;cursor:default;filter:none}.hide{display:none!import
     <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pocket Pilot</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
     <span id="state" class="state busy"><span class="dot"></span><span id="stateText">Checking…</span></span>
   </header>
+  <div id="update" class="update hide"></div>
   <section>
     <div id="offcard" class="offcard hide">
       <b>Remote access is off</b>
@@ -91,6 +93,9 @@ function renderDevices(s) {
 }
 function render(s) {
   if (s.moved) { location.replace(s.moved + (EMBED ? '&embed=1' : '')); return; }
+  const u = s.update;
+  $('update').classList.toggle('hide', !u);
+  if (u) $('update').innerHTML = '<b>Pocket Pilot ' + esc(u.latest) + ' is available</b><span class="small">You have ' + esc(u.current) + '. Update it on the <b>Plugins</b> page of the GitHub Copilot app, or run <code>copilot plugin update pocket-pilot@pocket-pilot</code>. The new version takes over remote access by itself; paired devices reconnect within seconds.</span>';
   on = !!s.on;
   if (busy === 'off' && !on) busy = '';
   if (busy === 'on' && on) busy = '';

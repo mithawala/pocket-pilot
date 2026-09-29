@@ -84,10 +84,13 @@ async function until(fn, what, ms = 120000) {
 }
 
 let pendingPermission = null;
+// A copy of the plugin, so the test can "update" it while the runtime runs (see step 7b).
+const pluginDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-plugin-')), 'copilot-plugin');
+fs.cpSync(path.join(root, 'copilot-plugin'), pluginDir, { recursive: true });
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: cli }),
   workingDirectory: ws,
-  builtinPluginDirectories: [path.join(root, 'copilot-plugin')],
+  builtinPluginDirectories: [pluginDir],
   env: { ...process.env },
 });
 await client.start();
@@ -266,7 +269,22 @@ const moved = await until(() => {
 if (moved.relayPort !== hub.relayPort) fail(`the new hub listens on another port (${moved.relayPort} instead of ${hub.relayPort}): devices would lose the address`);
 await until(() => conn.state === 'online' && store.sessions.has(secondUri) && !store.sessions.has(uri), 'the phone to reconnect to the new hub', 90000);
 step(`deleted the chat that started remote access: chat ${second.sessionId.slice(0, 8)} took over (hub ${hub.pid} -> ${moved.pid}, same port ${moved.relayPort}); the phone reconnected in ${((Date.now() - deletedAt) / 1000).toFixed(1)}s without pairing again`);
-const hubAfter = moved;
+
+// 7b. The plugin is updated while the app runs: the next chat has the newer version and takes the hub
+//     over from the older one (same port and tunnel), so the phone moves to it by itself.
+const versionFile = path.join(pluginDir, 'com.github.copilot', 'extensions', 'pocket-pilot', 'version.json');
+fs.writeFileSync(versionFile, `${JSON.stringify({ version: '99.0.0' }, null, 2)}\n`);
+const updatedAt = Date.now();
+const newer = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
+await newer.sendAndWait({ prompt: 'Reply with just the word newer.' }, 120000);
+const upgraded = await until(() => {
+  const h = ipc.readJson(path.join(home, 'hub.json'));
+  return h && ipc.isAlive(h.pid) && h.version === '99.0.0' ? h : null;
+}, 'the newer version to take the hub over', 90000);
+if (upgraded.relayPort !== moved.relayPort) fail(`the newer hub listens on another port (${upgraded.relayPort} instead of ${moved.relayPort})`);
+await until(() => conn.state === 'online' && store.sessions.has(`copilotcli:/${newer.sessionId}`), 'the phone to reach the newer hub', 90000);
+step(`plugin updated while running: the newer version took over (hub ${moved.pid} -> ${upgraded.pid}, same port) and the phone followed in ${((Date.now() - updatedAt) / 1000).toFixed(1)}s`);
+const hubAfter = upgraded;
 
 // 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
 const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
@@ -285,6 +303,7 @@ await until(() => conn.state !== 'online', 'the phone to be disconnected', 20000
 step(`/pocket-pilot off from an unattached chat stopped the hub (pid ${hubAfter.pid}) and disconnected the phone`);
 await other.disconnect().catch(() => {});
 await second.disconnect().catch(() => {});
+await newer.disconnect().catch(() => {});
 
 store.dispose();
 conn.stop();
@@ -293,6 +312,6 @@ await client.stop().catch(() => {});
 await hubRpc.request('stop').catch(() => {});
 ch.close();
 clearTimeout(watchdog);
-for (const dir of [home, ws, copilotHome]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+for (const dir of [home, ws, copilotHome, path.dirname(pluginDir)]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 step('E2E OK');
 process.exit(0);

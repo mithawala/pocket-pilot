@@ -112,7 +112,7 @@ test('translator: helpers for labels, forms and phone answers', () => {
   assert.deepEqual(SessionTranslator.inputResolution({ kind: 'question', choices: ['Yes', 'No'] }, 'accept', { answer: { state: 'submitted', value: { kind: 'selected', value: 'No' } } }), { op: 'input', response: { answer: 'No', wasFreeform: false } });
   assert.deepEqual(SessionTranslator.inputResolution({ kind: 'plan' }, 'accept', { action: { state: 'submitted', value: { kind: 'selected', value: 'autopilot' } } }), { op: 'plan', response: { approved: true, selectedAction: 'autopilot' } });
   assert.deepEqual(SessionTranslator.permissionDecision(true, 'approve-session'), { kind: 'approve-for-session' });
-  assert.deepEqual(toAhpModels([{ id: 'gpt-5-mini', name: 'GPT-5 mini', supportedReasoningEfforts: ['low', 'high'], defaultReasoningEffort: 'low', policy: { state: 'enabled' } }])[0].configSchema.properties.thinkingLevel.enum, ['low', 'high']);
+  assert.deepEqual(toAhpModels([{ id: 'gpt-5-mini', name: 'GPT-5 mini', supportedReasoningEfforts: ['low', 'high'], defaultReasoningEffort: 'low', policy: { state: 'enabled' } }]).find((m) => m.id === 'gpt-5-mini').configSchema.properties.thinkingLevel.enum, ['low', 'high']);
 });
 
 test('copilot host: the phone lists, opens, chats, approves and answers through the real AHP client', async () => {
@@ -127,7 +127,7 @@ test('copilot host: the phone lists, opens, chats, approves and answers through 
     assert.equal(s.resource, 'copilotcli:/s1');
     assert.equal(s.title, 'List the files');
     assert.equal(s.project.displayName, 'pp-copilot-test');
-    assert.deepEqual(store.models('copilotcli').map((m) => m.id), ['gpt-5-mini']);
+    assert.deepEqual(store.models('copilotcli').map((m) => m.id), ['auto', 'gpt-5-mini']);
 
     const release = store.watchSession(s.resource);
     const chat = await until(() => store.chatFor(s.resource) && store.chatState.get(store.chatFor(s.resource)) && store.chatFor(s.resource));
@@ -307,6 +307,18 @@ test('copilot models: the same thinking level and context size options as VS Cod
   assert.deepEqual(toRuntime(models, { id: 'gpt-5.4', config: { thinkingLevel: 'high', contextSize: 922000 } }), { id: 'gpt-5.4', reasoningEffort: 'high', contextTier: 'long_context' });
   assert.deepEqual(toRuntime(models, { id: 'auto', config: { tier: 'intelligence' } }), { id: 'auto', autoTier: 'intelligence' });
   assert.deepEqual(toSelection(models, { id: 'claude-opus-5.5', reasoningEffort: 'max', contextTier: 'default' }), { id: 'claude-opus-5.5', config: { thinkingLevel: 'max', contextSize: 200000 } });
+});
+
+test('copilot models: Auto is on the phone even though the runtime lists it separately', () => {
+  // The Copilot app's runtime treats Auto as a virtual model: its list leaves it out.
+  const models = toAhpModels(RAW_MODELS.filter((m) => m.id !== 'auto'));
+  assert.equal(models[0].id, 'auto', 'first, as in the app and VS Code');
+  assert.equal(models[0].name, 'Auto');
+  assert.deepEqual(models[0].configSchema.properties.tier.enumLabels, ['Efficiency', 'Balance', 'Intelligence']);
+  assert.equal(models.filter((m) => m.id === 'auto').length, 1);
+  assert.deepEqual(toSelection(models, { id: 'auto', autoTier: 'intelligence' }), { id: 'auto', config: { tier: 'intelligence' } }, 'Auto picked in the app shows as Auto on the phone');
+  assert.deepEqual(toRuntime(models, { id: 'auto', config: { tier: 'efficiency' } }), { id: 'auto', autoTier: 'efficiency' }, 'and the phone can pick it');
+  assert.deepEqual(toAhpModels([]), [], 'no list, no Auto');
 });
 
 test('copilot host: the model choice syncs both ways with the runtime', async () => {

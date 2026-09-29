@@ -60,7 +60,7 @@ function describe(m) {
   const bits = [];
   if (m.maxContextWindow) bits.push(m.maxContextWindow >= 1e6 ? `${Math.round(m.maxContextWindow / 1e5) / 10}M context` : `${Math.round(m.maxContextWindow / 1000)}K context`);
   if (m.supportsVision) bits.push('vision');
-  return bits.join(' · ');
+  return bits.length ? bits.join(' · ') : m.description || '';
 }
 
 /** Pick a model: a tap selects it (keeping options it supports) and closes the list. */

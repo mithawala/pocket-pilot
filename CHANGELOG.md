@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1
+
+- **Auto in the GitHub Copilot app.** The model list on the phone now starts with **Auto** (Optimize for: Efficiency, Balance or Intelligence), like the app and VS Code. Picking it on the phone switches the chat to Auto, and Auto picked in the app shows as *Auto · Balance* instead of a bare "auto".
+- **Updating the Copilot app plugin works while VS Code and the app are open.** On Windows the app's **Update** failed with *Failed to install plugin: Access is denied (os error 5)*. That message comes from the app: Windows wouldn't let it move the plugin's folder because VS Code keeps the `skills` folder of every installed Copilot plugin open. Pocket Pilot no longer has a `skills` folder (its `pocket_pilot` tool and `/pocket-pilot` command do the same job), so the app can update it at any time. Updating from 0.7.0 or older still needs VS Code closed once, or that `skills` folder deleted.
+- **A new version takes over by itself.** After an update, the next chat running the new version takes remote access over from the old one on the same tunnel address. Paired devices reconnect within seconds, and the app doesn't need a restart.
+- **The Pocket Pilot panel says when there's an update** and how to install it, and so does `/pocket-pilot status`.
+
 ## 0.7.0
 
 - **Pictures in chats.** Screenshots pasted into a chat on your PC, in VS Code or the GitHub Copilot app, now show in the conversation on your phone, and so do the photos you send from it. Tap one to see it full screen: pinch or double-tap to zoom, swipe to the next one, and swipe down, tap **×** or press Escape to close. Queued and steering messages show their pictures instead of just "2 attachments", and so does a photo waiting to be sent. A picture the agent links to opens as a picture too. The phone needs Pocket Pilot 0.7 on your PC to read a chat's pictures; with an older version it says so.
