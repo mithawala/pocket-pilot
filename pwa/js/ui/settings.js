@@ -91,15 +91,17 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
       <div class="card stack small sec-list">
         <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this device and your PC (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
         <div class="row"><${Icon} name="key" /><span>This device’s private key never leaves it and cannot be exported. Your GitHub token never leaves your PC.</span></div>
-        <div class="row"><${Icon} name="shield" /><span>${current?.hostKind === 'copilot' ? 'Remove this device anytime on your PC: run /pocket-pilot in the GitHub Copilot app and use the pairing page' : 'Remove this device anytime in VS Code (Pocket Pilot panel)'} — it is disconnected immediately.</span></div>
+        <div class="row"><${Icon} name="shield" /><span>${current?.hostKind === 'copilot' ? 'Remove this device anytime in the Pocket Pilot panel on your PC (run /pocket-pilot in the GitHub Copilot app)' : 'Remove this device anytime in the Pocket Pilot panel in VS Code'} — it is disconnected immediately.</span></div>
       </div>
 
       <div class="section-title">About</div>
       <div class="set-group">
         <div class="set-row"><div class="ic"><${Icon} name="info" /></div><div class="grow">Pocket Pilot ${APP_VERSION}</div></div>
+        <a class="set-row" href="https://mithawala.github.io/pocket-pilot/" target="_blank" rel="noopener"><div class="ic"><${Icon} name="globe" /></div><div class="grow">Product page & help</div><${Icon} name="right" /></a>
         <a class="set-row" href="https://github.com/mithawala/pocket-pilot" target="_blank" rel="noopener noreferrer"><div class="ic"><${Icon} name="globe" /></div><div class="grow">Source code & docs</div><${Icon} name="right" /></a>
         ${app.installEvent && html`<button class="set-row" onClick=${() => app.install()}><div class="ic"><${Icon} name="phone" /></div><div class="grow">Install app</div><${Icon} name="right" /></button>`}
       </div>
+      <p class="made-by">Developed by <a href="https://mithawala.com" target="_blank" rel="noopener">Asif Mithawala</a></p>
     </div></div></div>
   </div>`;
 }

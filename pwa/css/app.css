@@ -455,6 +455,8 @@ button.set-row:active, a.set-row:active { background: var(--surface); }
 .set-row > svg { width: 16px; height: 16px; color: var(--dim); flex: none; }
 .sec-list .row { align-items: flex-start; }
 .sec-list .row svg { width: 16px; height: 16px; margin-top: 3px; flex: none; color: var(--muted); }
+.made-by { margin: 22px 0 8px; text-align: center; font-size: 12.5px; color: var(--muted); }
+.made-by a { color: var(--text-2); font-weight: 600; }
 
 /* ---------- onboarding & pairing */
 .hero { padding: 26px 8px 6px; text-align: center; }

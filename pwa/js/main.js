@@ -1,5 +1,6 @@
 import { html, render } from './lib/ui.js';
 import { App, AppController, applyTheme } from './ui/app.js';
+import { isPairingFragment } from './core/secure-channel.js';
 
 let savedTheme = null;
 try {
@@ -37,7 +38,7 @@ trackViewport();
 
 // Take the pairing token out of the address bar (and history) before anything else runs.
 let pendingFragment = null;
-if (/(?:^|[#&])pair=1\./.test(location.hash)) {
+if (isPairingFragment(location.hash)) {
   pendingFragment = location.hash;
   history.replaceState(null, '', `${location.pathname}${location.search}#/pair`);
 }

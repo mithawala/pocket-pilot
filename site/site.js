@@ -2,7 +2,7 @@
 (function () {
   // Pairing links from older builds pointed at the site root; forward them to the app.
   // The fragment never leaves the browser.
-  if (/^#pair=/.test(location.hash)) {
+  if (/^#pair(=|%3D)/i.test(location.hash)) {
     location.replace('./app/' + location.hash);
     return;
   }

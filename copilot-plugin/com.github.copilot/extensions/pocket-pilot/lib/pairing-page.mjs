@@ -3,7 +3,8 @@
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function pairingPage({ key, hostName, embed = false }) {
+export function pairingPage({ key, hostName, embed = false, appUrl = 'https://mithawala.github.io/pocket-pilot/app/' }) {
+  const appHost = String(appUrl).replace(/^https?:\/\//, '').replace(/\/$/, '');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
@@ -23,7 +24,7 @@ button{font:inherit;border:1px solid var(--line);background:#2c313a;color:var(--
 .approve{border:1px solid var(--warn);background:rgba(229,192,123,.08);border-radius:8px;padding:12px 14px;margin:12px 0}.approve b{color:var(--strong)}
 .dev{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #2c313a}.dev:first-child{border-top:none}
 code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--strong)}.link{word-break:break-all;font-size:11.5px;color:var(--muted);max-height:3.2em;overflow:hidden}
-.warn{color:var(--warn)}.err{color:var(--err)}
+.warn{color:var(--warn)}.err{color:var(--err)}.app-url{display:inline-block;max-width:100%;overflow-wrap:anywhere;color:var(--accent);user-select:all}
 .embed{padding:8px;place-items:start stretch}.embed .card{width:100%;background:transparent;border:none;box-shadow:none;padding:8px;grid-template-columns:1fr}.embed .qr{max-width:320px}
 .foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
 </style></head>
@@ -37,8 +38,8 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
     <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pair a device</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
     <div id="approvals"></div>
     <ol>
-      <li>Scan the code with your phone or tablet camera (on another computer, open the copied link).</li>
-      <li>Pocket Pilot opens in the browser — add it to your home screen.</li>
+      <li>On your phone or tablet, open <b class="app-url">${esc(appHost)}</b><span class="muted"> — on iPhone, add it to the Home Screen first (Share → Add to Home Screen) to get notifications.</span></li>
+      <li>Tap <b>Scan the QR code</b> in the app, or point your camera at the code. On another computer, open the copied link.</li>
       <li>Allow the device here, then confirm with Face ID, your fingerprint or Windows Hello.</li>
     </ol>
     <p class="small muted">The code works once and expires after 10 minutes. Everything between your device and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>

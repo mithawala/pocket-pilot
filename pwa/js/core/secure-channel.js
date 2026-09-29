@@ -379,8 +379,22 @@ export function encodePairingFragment({ url, token, hostFingerprint, name }) {
   return `pair=1.${b64u(utf8.encode(url))}.${b64u(token)}.${b64u(hostFingerprint)}.${b64u(utf8.encode(name || ''))}`;
 }
 
+/** A pairing link's fragment, decoded when something on the way percent-encoded it (`pair%3D1.`). */
+function plainFragment(fragment) {
+  try {
+    return decodeURIComponent(fragment || '');
+  } catch {
+    return fragment || '';
+  }
+}
+
+/** True if `hash` (e.g. `location.hash`) carries a pairing link. */
+export function isPairingFragment(hash) {
+  return /(?:^|[#&])pair=1\./.test(plainFragment(hash));
+}
+
 export function decodePairingFragment(fragment) {
-  const m = /(?:^|[#&])pair=1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]*)/.exec(fragment || '');
+  const m = /(?:^|[#&])pair=1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]*)/.exec(plainFragment(fragment));
   if (!m) return null;
   const url = utf8d.decode(unb64u(m[1]));
   const token = unb64u(m[2]);

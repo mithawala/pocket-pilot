@@ -427,7 +427,7 @@ async function boot(log, cleanups) {
         return {};
       }
     };
-    if (req.method === 'GET' && u.pathname === '/pair') return send(200, pairingPage({ key: pageKey, hostName, embed }), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && u.pathname === '/pair') return send(200, pairingPage({ key: pageKey, hostName, embed, appUrl: PWA_URL }), 'text/html; charset=utf-8');
     if (req.method === 'GET' && u.pathname === '/pair/state') {
       const s = status();
       return send(200, { ...s, pairing: pairingReady() ? { ...s.pairing, svg: state.pairing.svg } : null, approvals: [...approvals.values()].map(({ done, ...a }) => a) });

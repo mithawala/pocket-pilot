@@ -2,7 +2,7 @@
   "name": "pocket-pilot",
   "displayName": "Pocket Pilot",
   "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone, tablet or another computer. Free, end-to-end encrypted, passkey-protected. No servers.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "mithawala",
   "author": {
     "name": "Asif Mithawala",
@@ -84,7 +84,7 @@
       { "command": "pocketPilot.resetIdentity", "title": "Reset Identity (Invalidate Every Pairing)", "category": "Pocket Pilot" },
       { "command": "pocketPilot.signInRendezvous", "title": "Sign In to GitHub for Auto-Reconnect", "category": "Pocket Pilot" },
       { "command": "pocketPilot.takeOver", "title": "Run Pocket Pilot in This Window", "category": "Pocket Pilot" },
-      { "command": "pocketPilot.openLocalPwa", "title": "Open the Pocket Pilot App on This PC", "category": "Pocket Pilot" },
+      { "command": "pocketPilot.openLocalPwa", "title": "Open Pocket Pilot in This PC's Browser", "category": "Pocket Pilot" },
       { "command": "pocketPilot.showLogs", "title": "Show Logs", "category": "Pocket Pilot", "icon": "$(output)" },
       { "command": "pocketPilot.checkForUpdates", "title": "Check for Updates", "category": "Pocket Pilot" },
       { "command": "pocketPilot.installUpdate", "title": "Install the Latest Version", "category": "Pocket Pilot" }

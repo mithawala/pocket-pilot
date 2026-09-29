@@ -91,8 +91,10 @@ h1 { font-size: clamp(42px, 5.6vw, 72px); line-height: 1.03; letter-spacing: -0.
 .get-txt b { font-size: 16.5px; line-height: 1.2; white-space: nowrap; }
 .get-txt small { font-size: 13px; color: var(--muted); }
 .get-go { width: 19px; height: 19px; flex: none; color: var(--text-2); }
-.demo-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
-.demo-link .ic { width: 15px; height: 15px; }
+.hero-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 16px; }
+.hero-demo span { font-size: 14px; color: var(--muted); }
+.demo-btn { height: 42px; padding: 0 16px; font-size: 15px; border-radius: 12px; }
+.demo-btn .ic { width: 16px; height: 16px; color: #8fb0ff; }
 
 .hero-switch { position: absolute; z-index: 4; left: 0; top: -22px; display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(12, 15, 22, 0.82); border: 1px solid var(--line-2); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .hero-switch button { padding: 7px 13px; border: 0; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); background: none; cursor: pointer; }
@@ -200,7 +202,7 @@ h1 { font-size: clamp(42px, 5.6vw, 72px); line-height: 1.03; letter-spacing: -0.
 .section-head { text-align: center; max-width: 780px; margin: 0 auto 64px; }
 .section-head p { margin: 0; font-size: 18px; color: var(--text-2); }
 .kicker { display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
-h2 { font-size: clamp(32px, 4.2vw, 50px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 18px; font-weight: 800; }
+h2 { font-size: clamp(32px, 4.2vw, 50px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 18px; font-weight: 800; text-wrap: balance; }
 h3 { font-size: clamp(25px, 2.6vw, 34px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 14px; }
 h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 
@@ -224,7 +226,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .feature { padding: 24px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); transition: border-color 0.2s, transform 0.2s, background 0.2s; }
 .feature:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.05); border-color: var(--line-2); }
 .feature .ic { width: 42px; height: 42px; margin-bottom: 16px; padding: 10px; border-radius: 12px; color: #fff; background: var(--grad); box-shadow: 0 8px 22px rgba(79, 120, 255, 0.3); }
-.feature p, .sec p, .free p, .node p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
+.feature p, .sec p, .node p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--muted); }
 
 /* ---------- how it works */
 .diagram { display: flex; align-items: stretch; justify-content: center; max-width: 1060px; margin: 0 auto 48px; }
@@ -283,17 +285,13 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .open-app h3 { margin: 0 0 8px; font-size: 24px; }
 .open-app p { margin: 0 0 18px; color: var(--text-2); }
 
-/* ---------- security & free */
-.sec-grid, .free-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+/* ---------- security */
+.sec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .sec { padding: 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
 .sec .ic { width: 44px; height: 44px; margin-bottom: 16px; padding: 10px; border-radius: 12px; color: #7ee2a8; background: rgba(60, 207, 122, 0.1); border: 1px solid rgba(60, 207, 122, 0.28); }
 .center-link { margin: 34px 0 0; text-align: center; }
 .center-link a { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .center-link .ic { width: 18px; height: 18px; }
-.free-grid { max-width: 1000px; margin: 0 auto; }
-.free { padding: 30px 26px; text-align: center; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); }
-.price { margin-bottom: 8px; font-size: 52px; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.free h4 { font-size: 17px; }
 
 /* ---------- live demo */
 .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1020px; }
@@ -327,13 +325,15 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .cmp-note { max-width: 860px; margin: 28px auto 0; text-align: center; font-size: 15.5px; color: var(--text-2); }
 .cmp-src { max-width: 860px; margin: 14px auto 0; text-align: center; font-size: 13px; color: var(--muted); }
 
-/* ---------- FAQ */
-.faq { display: grid; gap: 12px; }
+/* ---------- FAQ: two independent columns, so opening a question never shifts the other column */
+.faq { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; align-items: start; }
+.faq-col { display: grid; gap: 12px; min-width: 0; }
 .faq details { padding: 0 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); transition: background 0.2s, border-color 0.2s; }
 .faq details[open] { background: rgba(255, 255, 255, 0.05); border-color: var(--line-2); }
-.faq summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 0; list-style: none; cursor: pointer; font-size: 17px; font-weight: 600; }
+.faq summary { position: relative; display: block; padding: 19px 36px 19px 0; list-style: none; cursor: pointer; font-size: 17px; font-weight: 600; }
+.faq summary code { white-space: nowrap; }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: '+'; flex: none; font-size: 24px; font-weight: 400; line-height: 1; color: var(--muted); transition: transform 0.2s; }
+.faq summary::after { content: '+'; position: absolute; right: 0; top: 50%; margin-top: -12px; font-size: 24px; font-weight: 400; line-height: 1; color: var(--muted); transition: transform 0.2s; }
 .faq details[open] summary::after { transform: rotate(45deg); }
 .faq p { margin: 0 0 20px; color: var(--text-2); }
 
@@ -348,6 +348,8 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .footer nav { display: flex; flex-wrap: wrap; gap: 22px; }
 .footer nav a { font-size: 14.5px; color: var(--text-2); }
 .footer p { flex-basis: 100%; margin: 0; font-size: 13.5px; color: var(--muted); }
+.footer .made-by { font-size: 14.5px; color: var(--text-2); }
+.footer .made-by a { font-weight: 600; color: var(--text); }
 
 /* ---------- scroll reveal (only when JS runs) */
 .js [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
@@ -360,6 +362,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   .lead { margin-left: auto; margin-right: auto; }
   .hero-copy .cta-row { justify-content: center; }
   .get { margin: 0 auto; }
+  .hero-demo { justify-content: center; }
   .hero-visual { width: 100%; max-width: 640px; margin: 0 auto; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .sec-grid { grid-template-columns: repeat(2, 1fr); }
@@ -380,7 +383,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   .step-media { grid-column: 2; }
   .sidebar-frame { max-width: 330px; }
   .phone-mini .phone { margin: 0; }
-  .free-grid { grid-template-columns: 1fr; max-width: 460px; }
+  .faq { grid-template-columns: 1fr; }
   .cmp-row { grid-template-columns: 1fr 1fr; }
   .cmp-row > div:first-child { grid-column: 1 / -1; padding-bottom: 2px; }
   .cmp-row > div + div { border-left: none; }
@@ -406,6 +409,7 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
   .hero-phone { position: relative; right: auto; bottom: auto; width: 262px; }
   .notif { right: auto; left: 50%; top: 58px; margin-left: -118px; width: 236px; }
   .hero-copy .btn-lg { width: 100%; }
+  .final .cta-row .btn { width: 100%; height: auto; min-height: 54px; padding-top: 12px; padding-bottom: 12px; white-space: normal; text-align: center; }
   .section { padding: 80px 0; }
   .section-head { margin-bottom: 44px; }
   .showcase { margin-bottom: 80px; }

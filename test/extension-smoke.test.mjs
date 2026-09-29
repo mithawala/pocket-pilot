@@ -15,7 +15,7 @@ const Module = require('module');
 
 function createVscodeMock(settings, answers) {
   const commands = new Map();
-  const calls = { warnings: [], infos: [], errors: [], sessions: [], context: [], posted: [] };
+  const calls = { warnings: [], infos: [], errors: [], sessions: [], context: [], posted: [], opened: [] };
   class EventEmitter {
     constructor() { this.listeners = new Set(); this.event = (fn) => { this.listeners.add(fn); return { dispose: () => this.listeners.delete(fn) }; }; }
     fire(v) { for (const l of this.listeners) l(v); }
@@ -69,7 +69,7 @@ function createVscodeMock(settings, answers) {
         // Never hand out a token: the live agent host would adopt it for every VS Code session.
         getSession: async (provider, scopes, opts) => { calls.sessions.push({ provider, scopes, opts }); return undefined; },
       },
-      env: { clipboard: { writeText: async () => {} }, openExternal: async () => true },
+      env: { clipboard: { writeText: async () => {} }, openExternal: async (target) => { calls.opened.push(target); return true; } },
     },
   };
 }
@@ -274,6 +274,35 @@ test('tunnel (network): a VS Code reload keeps the Cloudflare address; Stop ends
   });
   await new Promise((r) => setTimeout(r, 1500));
   assert.equal(alive(cf.pid), false, 'Stop ended cloudflared');
+});
+
+test('Open in browser: pairs this PC\'s browser with a one-time link, passed as a string so "#pair=" survives', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-open-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const mock = createVscodeMock({ 'tunnel.mode': 'none', 'security.passkey': 'off', 'rendezvous.enabled': false, pwaUrl: '' }, {});
+  const uninstall = installMock(mock.api);
+  let service;
+  try {
+    delete require.cache[require.resolve('../extension/extension.js')];
+    ({ service } = await require('../extension/extension.js').activate(makeContext(storage)));
+    service.userData = path.join(storage, 'no-vscode');
+    await mock.api.commands.executeCommand('pocketPilot.openLocalPwa');
+    assert.deepEqual(mock.calls.opened, [], 'nothing to open while remote access is off');
+    assert.match(mock.calls.errors.at(-1) || '', /Start remote access first/);
+
+    await service.start({ interactive: false });
+    for (let i = 0; i < 200 && service.state !== 'running'; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.equal(service.state, 'running', service.error || '');
+    await mock.api.commands.executeCommand('pocketPilot.openLocalPwa');
+    assert.equal(mock.calls.opened.length, 1);
+    const [target] = mock.calls.opened;
+    assert.equal(typeof target, 'string', 'a Uri would be re-encoded to "#pair%3D…"');
+    assert.equal(target, service.viewState().pairing.link);
+    assert.match(target, /^http:\/\/127\.0\.0\.1:\d+\/#pair=1\./);
+  } finally {
+    await service?.stop().catch(() => {});
+    await service?.dispose().catch(() => {});
+    uninstall();
+  }
 });
 
 test('settings: pairing links always open the hosted app, even with an old or unreachable app URL', async () => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   generateKeyPair, exportPublicKey, exportPrivateJwk, keyPairFromJwk, fingerprint, pairingTokenId,
   createClientHello, acceptClientHello, parseClientHello, SecureMessenger, HandshakeError,
-  encodePairingFragment, decodePairingFragment,
+  encodePairingFragment, decodePairingFragment, isPairingFragment,
 } from '../pwa/js/core/secure-channel.js';
 import { randomBytes, b64u } from '../pwa/js/core/bytes.js';
 
@@ -162,4 +162,20 @@ test('pairing fragment round trip and validation', async () => {
   assert.equal(decodePairingFragment(encodePairingFragment({ url: 'https://x.trycloudflare.com/path?q', token, hostFingerprint: fp, name: '' })), null);
   assert.ok(decodePairingFragment(encodePairingFragment({ url: 'http://127.0.0.1:8787', token, hostFingerprint: fp, name: '' })));
   assert.equal(decodePairingFragment('#nothing'), null);
+});
+
+test('pairing links survive a browser or VS Code percent-encoding the fragment', () => {
+  const token = randomBytes(16);
+  const fp = randomBytes(16);
+  const frag = encodePairingFragment({ url: 'https://abc-def.trycloudflare.com', token, hostFingerprint: fp, name: 'Asif’s PC' });
+  const encoded = '#' + frag.replace('=', '%3D');
+  assert.ok(isPairingFragment('#' + frag));
+  assert.ok(isPairingFragment(encoded));
+  const parsed = decodePairingFragment(encoded);
+  assert.equal(parsed.url, 'https://abc-def.trycloudflare.com');
+  assert.deepEqual(parsed.token, token);
+  assert.equal(parsed.name, 'Asif’s PC');
+  assert.equal(isPairingFragment('#nothing'), false);
+  assert.equal(isPairingFragment('#%E0%A4%A'), false);
+  assert.equal(isPairingFragment(''), false);
 });

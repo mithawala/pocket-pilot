@@ -10,6 +10,7 @@ import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
 import { SettingsScreen, NotificationSetup } from './settings.js';
 import { QrScanner } from './scanner.js';
+import { isPairingFragment } from '../core/secure-channel.js';
 
 function parseRoute() {
   const h = location.hash.replace(/^#/, '');
@@ -263,7 +264,7 @@ export function App({ app }) {
   };
   useEffect(() => {
     const onHash = () => {
-      if (/(?:^|[#&])pair=1\./.test(location.hash)) {
+      if (isPairingFragment(location.hash)) {
         app.pendingFragment = location.hash;
         history.replaceState(null, '', `${location.pathname}${location.search}#/pair`);
         setRoute({ name: 'pair' });

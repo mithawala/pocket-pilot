@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.2
+
+- **The Pocket Pilot panel tells you where the app is**, in VS Code and in the GitHub Copilot app. Pairing is now three numbered steps: open **mithawala.github.io/pocket-pilot/app** on your device (with a tip to add it to the iPhone Home Screen first), scan the QR code in the app or with the camera, and click **Allow** on the PC.
+- **Open in browser** (formerly *Open app here*) opens the app in this PC's browser with a one-time pairing link, so a computer pairs like any other device (you approve it in VS Code). Pairing links that a browser or VS Code percent-encoded (`#pair%3D…`) now work too.
+- **App settings:** *Developed by Asif Mithawala* and a link to the product page and help; the note about removing a device now points to the Pocket Pilot panel in VS Code or the GitHub Copilot app.
+- **Product page:**
+  - a **Try the live demo** button in the hero;
+  - VS Code and the GitHub Copilot app are equal choices all the way down (menu, final buttons, comparison and FAQ answers);
+  - a friendlier security headline (*Private by design*);
+  - the FAQ in two columns;
+  - no pricing section (Pocket Pilot is free and open source, as the page already says);
+  - *Developed by Asif Mithawala* in the footer.
+
 ## 0.4.1
 
 - **The tunnel keeps its address when VS Code restarts.** `cloudflared` now keeps running when a window reloads, VS Code quits or another window takes over, and the next start listens on the same local port, so the address stays the same and paired devices reconnect within seconds. It changes only after a reboot, **New tunnel** or **Stop** (Stop ends it). The panel shows the tunnel as *Online ✓* instead of its address, which is only the PC's end of the connection: devices always open the app at `mithawala.github.io/pocket-pilot/app/`.

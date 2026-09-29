@@ -796,10 +796,12 @@ class PocketPilotService {
     return { path: file, uri: pathToFileURL(file).href };
   }
 
-  openLocalPwa() {
-    const url = this.state === 'standby' ? this.mirror?.view?.localUrl : this.relay && `http://127.0.0.1:${this.relay.port}/`;
-    if (!url) throw new Error('Start remote access first.');
-    vscode.env.openExternal(vscode.Uri.parse(url));
+  /** Opens the app in this PC's browser with a one-time pairing link (you approve it like any device). */
+  async openLocalPwa() {
+    const pairing = this.state === 'standby' ? this.mirror?.view?.pairing : (this.pairing || (await this.newPairingCode(), this.pairing));
+    if (!pairing?.link) throw new Error(this.state === 'stopped' ? 'Start remote access first.' : "The pairing code isn't ready yet. Try again in a moment.");
+    // As a string, so the "#pair=…" part isn't re-encoded on the way to the browser.
+    await vscode.env.openExternal(pairing.link);
   }
 
   // ------------------------------------------------------------------ notifications

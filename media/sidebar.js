@@ -76,12 +76,19 @@
       const qrOpen = showQr || devices.length === 0;
       if (qrOpen) {
         if (st.pairing) {
+          // The app lives at a fixed address; the QR code opens it with a one-time pairing code.
+          const appUrl = st.settings?.pwaUrl && !st.settings?.pwaFallback ? st.settings.pwaUrl : null;
+          const appHost = appUrl ? appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
           body += `<section class="card qr-card">
             <h2>Pair a device</h2>
+            ${appUrl ? `<ol class="pair-steps">
+              <li>On your phone or tablet, open <a href="#" data-a="openUrl" data-url="${esc(appUrl)}">${esc(appHost)}</a><span class="muted"> — on iPhone, add it to the Home Screen first (Share → Add to Home Screen) to get notifications</span></li>
+              <li>Tap <b>Scan the QR code</b> in the app, or point your camera at it:</li>
+            </ol>` : '<p class="scan">Scan with your phone or tablet camera</p>'}
             <div class="qr">${st.pairing.svg}</div>
-            <p class="scan">Scan with your phone or tablet camera</p>
             <p class="muted small">Single use · expires in <b id="cd">${countdown(st.pairing.expiresAt)}</b></p>
             <div class="btns"><button class="secondary" data-a="newCode">New code</button><button class="secondary" data-a="copyLink">Copy link</button></div>
+            ${appUrl ? '<ol class="pair-steps" start="3"><li>Click <b>Allow</b> when VS Code asks, then confirm with Face ID or your fingerprint.</li></ol>' : ''}
             <p class="muted small">Another computer? Open the copied link there.</p>
             <p class="muted small fp">PC fingerprint <code>${esc(st.fingerprint)}</code></p>
             ${st.settings?.pwaFallback ? `<p class="warn small">The Pocket Pilot app isn't published at ${esc(st.settings.pwaUrl)} yet — this code uses the copy served through the tunnel (re-pair after VS Code restarts).</p>` : ''}
@@ -126,7 +133,7 @@
       body += `<div class="footer">
         <button class="secondary" data-a="stop">Stop</button>
         <button class="secondary" data-a="restartTunnel" ${t.mode !== 'quick' ? 'disabled' : ''} title="Get a new tunnel address. Paired devices find it through auto-reconnect.">New tunnel</button>
-        <button class="secondary" data-a="openLocal">Open app here</button>
+        <button class="secondary" data-a="openLocal" title="Open Pocket Pilot in this PC's browser, paired with a one-time link">Open in browser</button>
       </div>`;
     }
     body += `<div class="links"><button class="link" data-a="settings">Settings</button> · <button class="link" data-a="logs">Logs</button></div>`;
