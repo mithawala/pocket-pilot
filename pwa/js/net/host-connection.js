@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.1';
+export const APP_VERSION = '0.7.2';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 
@@ -317,7 +317,7 @@ export class HostConnection extends EventTarget {
       this._code = null;
       this.failures = 0;
       this.attempt = 0;
-      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey, factor: welcome.factor || this.record.factor || (welcome.passkey ? 'passkey' : null), hostKind: welcome.hostKind || this.record.hostKind || 'vscode' });
+      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey, factor: welcome.factor || this.record.factor || (welcome.passkey ? 'passkey' : null), hostKind: welcome.hostKind || this.record.hostKind || 'vscode', canCreateSessions: !!welcome.canCreateSessions });
       const transport = new SecureAhpTransport((text) => ch.messenger.send(text), () => sock.close(1000, 'client closed'));
       this.transport = transport;
       sock.onclose = (e) => this._onClosed(e);

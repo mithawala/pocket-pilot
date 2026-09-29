@@ -18,6 +18,7 @@ import { CopilotAgentHost } from './agent-host.mjs';
 import { pairingPage } from './pairing-page.mjs';
 import { renderQrSvg } from './qr.mjs';
 import { cachedLatest, latestVersion, updateInfo } from './update.mjs';
+import { PhoneRuntime } from './phone-runtime.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const vendor = path.join(here, '..', 'vendor');
@@ -264,8 +265,14 @@ async function boot(log, cleanups) {
   log('info', `Pocket Pilot hub ${VERSION} starting in pid ${process.pid}; host "${hostName}" ${identityLib.fingerprintText(identity.fingerprint)}`);
 
   // ---------------------------------------------------------------- agent host + relay
-  const host = new CopilotAgentHost({ reducers: ahpTypes, supportedVersions: [...ahpTypes.SUPPORTED_PROTOCOL_VERSIONS], defaultDirectory: pathToFileURL(os.homedir()).href, log });
+  // Sessions started from a paired device run in a Copilot runtime of the hub's own (lib/phone-runtime.mjs).
+  const phone = new PhoneRuntime({ log, pluginDir: path.resolve(here, '..', '..', '..', '..') });
+  const host = new CopilotAgentHost({
+    reducers: ahpTypes, supportedVersions: [...ahpTypes.SUPPORTED_PROTOCOL_VERSIONS], defaultDirectory: pathToFileURL(os.homedir()).href, log,
+    createSession: (req) => phone.create(req),
+  });
   cleanups.push(() => host.closeAll());
+  cleanups.push(() => phone.stop());
   const ENDPOINT = { type: 'copilot-hub', protocolVersion: ahpTypes.SUPPORTED_PROTOCOL_VERSIONS[0] };
   const state = { publicUrl: null, reachable: false, pairing: null, pairingTimer: null, tunnelError: null, lastPairRequester: null };
   const approvals = new Map();
@@ -333,7 +340,7 @@ async function boot(log, cleanups) {
       const s = settings();
       return { requireApproval: s.requireApproval !== false, passkey: s.passkey, passkeyGraceHours: 12, allowTotp: s.authenticatorApp !== false };
     },
-    welcomeExtras: (device) => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvousFor(device), pwaUrl: PWA_URL, hostKind: 'copilot' }),
+    welcomeExtras: (device) => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvousFor(device), pwaUrl: PWA_URL, hostKind: 'copilot', canCreateSessions: true }),
     isReadAllowed,
     adjustSummary: (s) => (monitorRef.current ? monitorRef.current.adjustSummary(s) : s),
     saveUpload,
@@ -585,6 +592,8 @@ async function boot(log, cleanups) {
   writeJson(FILES.hub, { pid: process.pid, port: ipcServer.address().port, token: ipcToken, version: VERSION, relayPort: relay.port, startedAt: new Date().toISOString() });
   log('info', `Hub ready: relay 127.0.0.1:${relay.port}, sessions port ${ipcServer.address().port}`);
   startTunnel();
+  // Sessions begun on a device recently are on the phone again after the hub moved or restarted.
+  phone.resumeRecent().catch((err) => log('warn', `Resuming sessions begun on a device: ${err.message}`));
 
   // ---------------------------------------------------------------- lifecycle
   let stopped = false;
@@ -594,7 +603,10 @@ async function boot(log, cleanups) {
   };
   // The runtime ends extension processes when their chat is closed or deleted: free the hub lock at
   // once so another chat takes over. The tunnel stays up for it (same address for paired devices).
-  const onExit = () => releaseFiles();
+  const onExit = () => {
+    releaseFiles();
+    phone.kill();
+  };
   process.on('exit', onExit);
   const onSignal = () => {
     onExit();

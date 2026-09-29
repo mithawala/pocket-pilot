@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2
+
+- **Start new sessions from your phone with the GitHub Copilot app too.** **New session** now works when your phone is paired with the Copilot app or CLI: pick a folder on your PC (recent ones, or browse), the model, mode and approvals, and say what to do. The app itself only opens a chat from outside after someone clicks *Allow* on the PC, so Pocket Pilot runs these sessions in the background on your PC instead. It uses a Copilot runtime of its own, the same one the app uses, with your sign-in, models, tools and plugins. You follow and control them from your phone like any chat: replies, approvals, questions, model and mode. They keep going when the chat that runs remote access is closed, and come back after an update. They don't open in the app window.
+- With an older Pocket Pilot on the PC, the phone still says to start chats in the app, and that updating Pocket Pilot on the PC lets you start them from the phone.
+
 ## 0.7.1
 
 - **Auto in the GitHub Copilot app.** The model list on the phone now starts with **Auto** (Optimize for: Efficiency, Balance or Intelligence), like the app and VS Code. Picking it on the phone switches the chat to Auto, and Auto picked in the app shows as *Auto · Balance* instead of a bare "auto".

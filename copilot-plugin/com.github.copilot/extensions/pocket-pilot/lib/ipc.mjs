@@ -19,7 +19,14 @@ export const FILES = {
   lock: path.join(HOME, 'hub.lock'),
   tunnel: path.join(HOME, 'tunnel'),
   uploads: path.join(HOME, 'uploads'),
+  // Sessions started from a paired device (lib/phone-runtime.mjs): the list, and a marker per new
+  // session so its extension attaches before the first message.
+  phoneSessions: path.join(HOME, 'phone-sessions.json'),
+  expect: path.join(HOME, 'expect'),
 };
+
+/** Env var set on the Copilot runtime the hub starts for sessions begun on a paired device. */
+export const PHONE_RUNTIME_ENV = 'POCKET_PILOT_PHONE_RUNTIME';
 
 export function ensureHome() {
   fs.mkdirSync(HOME, { recursive: true, mode: 0o700 });

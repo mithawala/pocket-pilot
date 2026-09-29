@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "pocket-pilot",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Control your GitHub Copilot app and CLI sessions from your phone: same history, live replies, chat, approvals and questions — end-to-end encrypted through a free Cloudflare quick tunnel, with passkeys and push notifications.",
   "author": {
     "name": "Asif Mithawala",

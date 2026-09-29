@@ -296,7 +296,24 @@ export class CopilotAgentHost extends EventEmitter {
     this._broadcastRoot('root/sessionAdded', { channel: ROOT, summary: entry.summary });
     this._dispatch(ROOT, { type: 'root/activeSessionsChanged', activeSessions: this.sessions.size });
     this.emit('sessions');
+    this.emit('attached', uri);
     return entry;
+  }
+
+  /** Resolves once the session is attached (its extension connected), or rejects after `ms`. */
+  waitForSession(uri, ms) {
+    if (this.sessions.has(uri)) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const done = (err) => {
+        clearTimeout(timer);
+        this.off('attached', on);
+        if (err) reject(err);
+        else resolve();
+      };
+      const on = (u) => u === uri && done();
+      const timer = setTimeout(() => done(new RpcError(RPC.Internal, 'The new session did not start on your PC in time. Check the GitHub Copilot app, then try again.')), ms);
+      this.on('attached', on);
+    });
   }
 
   detach(sessionId, { quiet = false } = {}) {
@@ -545,11 +562,56 @@ export class CopilotAgentHost extends EventEmitter {
         return this._clientAction(conn, p.channel, p.action, p.clientSeq);
       case 'resourceRead':
         return this._read(p.uri, p.encoding);
+      case 'resourceList':
+        return this._list(p.uri);
       case 'createSession':
-        throw new RpcError(RPC.MethodNotFound, 'Start new sessions in the GitHub Copilot app or CLI on your PC; they appear here right away.');
+        return this._create(p);
       default:
         throw new RpcError(RPC.MethodNotFound, `"${method}" is not supported for GitHub Copilot app sessions`);
     }
+  }
+
+  /**
+   * A new session from a paired device: `o.createSession` (the hub) starts it on this PC, and the
+   * device gets its answer once the session's extension has attached it here.
+   */
+  async _create(p) {
+    if (!this.o.createSession) throw new RpcError(RPC.MethodNotFound, 'Start new sessions in the GitHub Copilot app or CLI on your PC; they appear here right away.');
+    const m = /^copilotcli:\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(String(p.channel || ''));
+    if (!m) throw new RpcError(RPC.InvalidParams, 'Invalid session address');
+    if (this.sessions.has(p.channel)) throw new RpcError(RPC.InvalidParams, 'That session already exists');
+    let cwd;
+    try {
+      cwd = fileURLToPath(String(p.workingDirectories?.[0] || ''));
+    } catch {
+      throw new RpcError(RPC.InvalidParams, 'Choose a folder on your PC for the new session');
+    }
+    const model = p.model?.id ? toRuntime(this.models, p.model) : undefined;
+    try {
+      await this.o.createSession({ sessionId: m[1], cwd, config: p.config || {}, model });
+    } catch (err) {
+      throw new RpcError(RPC.Internal, err?.message || String(err));
+    }
+    await this.waitForSession(p.channel, this.o.createTimeoutMs || 40000);
+    return {};
+  }
+
+  /** The folder browser of the New session sheet: subfolders only, without hidden ones. */
+  _list(uri) {
+    let dir;
+    try {
+      dir = fileURLToPath(String(uri));
+    } catch {
+      throw new RpcError(RPC.InvalidParams, 'Only local folders can be listed');
+    }
+    let items;
+    try {
+      items = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (err) {
+      throw new RpcError(RPC.InvalidParams, err.code === 'ENOENT' ? 'That folder no longer exists' : `The folder can't be opened (${err.code || err.message})`);
+    }
+    const entries = items.filter((e) => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('$')).slice(0, 1000).map((e) => ({ name: e.name, type: 'directory' }));
+    return { entries };
   }
 
   _read(uri, encoding) {

@@ -25,6 +25,11 @@ the panel.
 Remote access isn't tied to that chat: close or delete it and another open chat takes over within
 seconds, at the same address.
 
+**New sessions from your phone.** Tap **New session**, pick a folder on your PC, the model, mode and
+approvals, and say what to do. The session runs on your PC in the background, in a Copilot runtime
+Pocket Pilot starts with your sign-in, models, tools and plugins. It doesn't open in the app window,
+because the app only opens chats from outside after you click **Allow** on the PC.
+
 ## Update
 
 Click **Update** on the Plugins page of the GitHub Copilot app, or run

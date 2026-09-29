@@ -128,10 +128,11 @@ function FolderBrowser({ store, start, onPick, onClose }) {
   </${Sheet}>`;
 }
 
-function NewSession({ store, open, onClose, onCreated }) {
+function NewSession({ store, open, onClose, onCreated, copilotHost = false }) {
   const agents = store.agents();
   const [provider, setProvider] = useState(agents[0]?.provider || 'copilotcli');
-  const folders = store.recentFolders();
+  // The GitHub Copilot app keeps a scratch folder per chat without a project: not a place for new work.
+  const folders = store.recentFolders().filter((f) => !copilotHost || !/\/\.copilot\/(chats|session-state)\//i.test(f));
   const [folder, setFolder] = useState(folders[0] || store.defaultDirectory || '');
   const [browse, setBrowse] = useState(false);
   const [text, setText] = useState('');
@@ -161,7 +162,9 @@ function NewSession({ store, open, onClose, onCreated }) {
         folder,
         text: text.trim(),
         model: chosenModel || undefined,
-        config: { mode, autoApprove: approve, isolation },
+        // The Copilot app plugin starts the session with the model right away (no switch in the chat).
+        modelAtStart: copilotHost,
+        config: copilotHost ? { mode, autoApprove: approve } : { mode, autoApprove: approve, isolation },
       });
       if (chosenModel) localStorage.setItem('pp:newSessionModel', JSON.stringify(chosenModel));
       setText('');
@@ -195,10 +198,11 @@ function NewSession({ store, open, onClose, onCreated }) {
       <div class="field"><label>Tool approvals</label>
         <div class="seg">${[['default', 'Ask me'], ['assisted', 'Assisted'], ['autoApprove', 'Allow all']].map(([v, l]) => html`<button class=${approve === v ? 'on' : ''} onClick=${() => setApprove(v)}>${l}</button>`)}</div>
       </div>
-      <div class="field"><label>Where changes go</label>
+      ${!copilotHost && html`<div class="field"><label>Where changes go</label>
         <div class="seg">${[['folder', 'This folder'], ['worktree', 'New worktree']].map(([v, l]) => html`<button class=${isolation === v ? 'on' : ''} onClick=${() => setIsolation(v)}>${l}</button>`)}</div>
-      </div>
+      </div>`}
       <button class="btn primary block" disabled=${busy || !folder} onClick=${create}>${busy ? html`<${Spinner} /> Starting…` : 'Start session'}</button>
+      ${copilotHost && html`<p class="muted small new-note"><${Icon} name="info" size="15" /><span>Runs on your PC in the background, with your GitHub Copilot sign-in, models, tools and plugins, like a Copilot CLI session. It doesn't open in the app window: follow and control it here.</span></p>`}
     </div>
     ${browse && html`<${FolderBrowser} store=${store} start=${folder || store.defaultDirectory} onPick=${setFolder} onClose=${() => setBrowse(false)} />`}
     <${ModelSheet} open=${modelOpen === 'model'} onClose=${() => setModelOpen(null)} models=${models} value=${chosenModel} onChange=${setModelSel} />
@@ -252,6 +256,8 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
   const folders = groupBy === 'folder' ? folderGroups(filtered) : [];
   const online = conn.state === 'online';
   const copilotHost = host?.hostKind === 'copilot';
+  // Copilot app plugins before 0.7.2 can't start sessions: chats are started in the app there.
+  const canCreate = !copilotHost || !!host?.canCreateSessions;
   return html`<div class="screen">
     <div class="topbar">
       <img class="brand" src="./icons/icon.svg" alt="" />
@@ -277,16 +283,16 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
             ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}
           </div>`)}
           ${folders.map((g) => html`<${FolderGroup} key=${g.key} g=${g} closed=${!q && collapsed.has(g.key)} onToggle=${() => toggleFolder(g.key)} onOpen=${onOpen} selected=${selected} />`)}
-          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? 'No open chats yet. Chats you use in the GitHub Copilot app or CLI on this PC show up here.' : 'No sessions yet. Start one below.'}</div>`}
+          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? `No open chats yet. Chats you use in the GitHub Copilot app or CLI on this PC show up here${canCreate ? ', or start one below.' : '.'}` : 'No sessions yet. Start one below.'}</div>`}
         </div>
       </div>
     </div>
-    ${store.online && (copilotHost
-      ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your PC — they appear here after the first message.</span></div></div>`
+    ${store.online && (!canCreate
+      ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your PC — they appear here after the first message. Update Pocket Pilot on your PC to start them from here.</span></div></div>`
       : html`<div class="bottom-bar">
       <button class="newbar" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
     </div>`)}
-    ${store.online && !copilotHost && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} />`}
+    ${store.online && canCreate && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} copilotHost=${copilotHost} />`}
   </div>`;
 }
 
@@ -297,12 +303,13 @@ export function DesktopHome({ store, host, onNew }) {
   const waiting = list.filter((s) => has(s.status, S.Input)).length;
   const running = list.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress)).length;
   const copilotHost = host?.hostKind === 'copilot';
+  const canCreate = !copilotHost || !!host?.canCreateSessions;
   return html`<div class="screen">
     <div class="scroll-wrap"><div class="scroll"><div class="chat"><div class="chat-empty">
       <div class="big"><${Icon} name="sparkle" /></div>
-      <h2>${copilotHost ? 'Open a chat' : 'Open a session, or start a new one'}</h2>
+      <h2>${canCreate ? 'Open a session, or start a new one' : 'Open a chat'}</h2>
       <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${host.hostName}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in ${hostApp(host)} on your PC.</p>
-      ${store.online && !copilotHost && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
+      ${store.online && canCreate && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
     </div></div></div></div>
   </div>`;
 }

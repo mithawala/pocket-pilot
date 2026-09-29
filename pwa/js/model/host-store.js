@@ -528,11 +528,14 @@ export class HostStore extends EventTarget {
     return this.client.request('resourceRead', { channel: ROOT, uri, encoding: 'base64' });
   }
 
-  /** Creates a session, waits until it is ready and sends the first message. */
-  async createSession({ provider, folder, config, text, model, attachments }) {
+  /**
+   * Creates a session, waits until it is ready and sends the first message. `modelAtStart` also sends
+   * the model with the request, for hosts that start the session with it (the Copilot app plugin).
+   */
+  async createSession({ provider, folder, config, text, model, attachments, modelAtStart = false }) {
     if (!this.client) throw new Error('Not connected to your PC');
     const uri = `${provider}:/${uuid()}`;
-    await this.client.request('createSession', { channel: uri, provider, workingDirectories: [folder], ...(config ? { config } : {}) });
+    await this.client.request('createSession', { channel: uri, provider, workingDirectories: [folder], ...(config ? { config } : {}), ...(modelAtStart && model ? { model } : {}) });
     const stop = this.watchSession(uri);
     try {
       const chat = await new Promise((resolve, reject) => {

@@ -9,9 +9,10 @@ import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { FILES, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
+import { FILES, PHONE_RUNTIME_ENV, readJson, writeJson, hubAlive, connect, Rpc } from './lib/ipc.mjs';
 import { renderQrText } from './lib/qr.mjs';
 import { latestVersion, newer, updateInfo, updateText } from './lib/update.mjs';
+import { takeExpected } from './lib/phone-runtime.mjs';
 
 const { joinSession } = sdk;
 const EXT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -183,12 +184,15 @@ async function turnOnFromPage() {
 }
 
 let tookOver = false;
+// Sessions begun on a paired device run in a runtime the hub started (lib/phone-runtime.mjs): nobody
+// sees their UI on the PC, and they end with the hub, so they never ask for confirmations or host it.
+const inPhoneRuntime = !!process.env[PHONE_RUNTIME_ENV];
 async function connectHub({ start }) {
   if (rpc && !rpc.ch.closed) return rpc;
   if (connecting) return connecting;
   connecting = (async () => {
-    const hello = { pid: process.pid, canConfirm: !!session.capabilities?.ui?.elicitation };
-    let mayStart = start;
+    const hello = { pid: process.pid, canConfirm: !inPhoneRuntime && !!session.capabilities?.ui?.elicitation };
+    let mayStart = start && !inPhoneRuntime;
     for (let attempt = 0; attempt < 40; attempt++) {
       const info = readJson(FILES.hub);
       if (hubAlive(info)) {
@@ -198,7 +202,7 @@ async function connectHub({ start }) {
           // The plugin was updated while the app ran: this chat has the newer version, so it takes the
           // hub over (same tunnel and address; paired devices reconnect by themselves). Older hubs
           // don't know "handover" and simply keep running.
-          if (!tookOver && isEnabled() && newer(VERSION, info.version || '0')) {
+          if (!tookOver && !inPhoneRuntime && isEnabled() && newer(VERSION, info.version || '0')) {
             tookOver = true;
             if (await r.request('handover', {}, 5000).then(() => true, () => false)) {
               ch.close();
@@ -622,7 +626,9 @@ if (process.env.POCKET_PILOT_DISABLE) {
   });
   session.on((e) => forward(e));
   checkReal().then((isReal) => {
-    if (isReal && isEnabled()) connectHub({ start: true }).catch(() => watchHub());
+    // Started from a paired device: on the device at once, before its first message.
+    if (!isReal && takeExpected(session.sessionId)) real = true;
+    if (real && isEnabled()) connectHub({ start: true }).catch(() => watchHub());
     else watchHub();
   });
 }

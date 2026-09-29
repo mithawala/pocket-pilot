@@ -196,6 +196,25 @@ if (read.encoding !== 'base64' || !Buffer.from(read.data, 'base64').equals(PNG))
 step(`PC picture on the phone: ${picture.label} (${read.contentType}, ${PNG.length} bytes read through the relay)`);
 fs.rmSync(shotDir, { recursive: true, force: true });
 
+// 2c. A new session started on the phone: the hub runs it in a Copilot runtime of its own (the app
+//     only opens chats from outside after a click on the PC), in a folder picked in the phone's browser.
+const folders = await store.listDirectory(pathToFileURL(path.dirname(ws)).href);
+if (!folders.includes(path.basename(ws))) fail(`the folder browser did not list ${path.basename(ws)}: ${folders.slice(0, 20)}`);
+const newAt = Date.now();
+const phoneUri = await store.createSession({ provider: 'copilotcli', folder: pathToFileURL(ws).href, text: 'Reply with just the word fresh.', model: { id: model }, modelAtStart: true, config: { mode: 'interactive', autoApprove: 'default' } });
+const phoneRelease = store.watchSession(phoneUri);
+const phoneChat = await until(() => store.chatFor(phoneUri) && store.chatState.get(store.chatFor(phoneUri)) && store.chatFor(phoneUri), 'the new session\'s chat', 60000);
+const fresh = await until(() => {
+  const cs = store.chatState.get(phoneChat);
+  const last = cs?.turns?.[cs.turns.length - 1];
+  return !cs?.activeTurn && last && /fresh/i.test(last.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ')) ? last : null;
+}, 'the reply in the session started on the phone', 180000);
+const phoneSummary = store.sessions.get(phoneUri);
+const sameDir = (a, b) => (process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b));
+if (!sameDir(fileURLToPath(phoneSummary.workingDirectories[0]), ws)) fail(`the new session runs in ${phoneSummary.workingDirectories[0]}, not ${ws}`);
+step(`session started on the phone: ${phoneUri.slice(12, 20)} in ${path.basename(ws)} answered "${fresh.message.text}" -> ${fresh.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ').trim().slice(0, 40)} (${((Date.now() - newAt) / 1000).toFixed(1)}s)`);
+phoneRelease();
+
 // 3. The agent asks a question; the phone answers it.
 store.sendMessage(uri, { text: 'Use the ask_user tool to ask me whether I prefer tabs or spaces, with the two choices "Tabs" and "Spaces". After I answer, reply with one sentence that repeats my choice.' });
 const ask = await until(() => store.chatState.get(chat).activeTurn?.responseParts.find((p) => p.kind === 'inputRequest' && !p.response), 'the question on the phone', 180000);
@@ -269,6 +288,8 @@ const moved = await until(() => {
 if (moved.relayPort !== hub.relayPort) fail(`the new hub listens on another port (${moved.relayPort} instead of ${hub.relayPort}): devices would lose the address`);
 await until(() => conn.state === 'online' && store.sessions.has(secondUri) && !store.sessions.has(uri), 'the phone to reconnect to the new hub', 90000);
 step(`deleted the chat that started remote access: chat ${second.sessionId.slice(0, 8)} took over (hub ${hub.pid} -> ${moved.pid}, same port ${moved.relayPort}); the phone reconnected in ${((Date.now() - deletedAt) / 1000).toFixed(1)}s without pairing again`);
+await until(() => store.sessions.has(phoneUri), 'the session started on the phone to be back after the hub moved', 120000);
+step(`the session started on the phone is back on it after the hub moved (resumed by hub ${moved.pid}) in ${((Date.now() - deletedAt) / 1000).toFixed(1)}s`);
 
 // 7b. The plugin is updated while the app runs: the next chat has the newer version and takes the hub
 //     over from the older one (same port and tunnel), so the phone moves to it by itself.
@@ -284,6 +305,8 @@ const upgraded = await until(() => {
 if (upgraded.relayPort !== moved.relayPort) fail(`the newer hub listens on another port (${upgraded.relayPort} instead of ${moved.relayPort})`);
 await until(() => conn.state === 'online' && store.sessions.has(`copilotcli:/${newer.sessionId}`), 'the phone to reach the newer hub', 90000);
 step(`plugin updated while running: the newer version took over (hub ${moved.pid} -> ${upgraded.pid}, same port) and the phone followed in ${((Date.now() - updatedAt) / 1000).toFixed(1)}s`);
+await until(() => store.sessions.has(phoneUri), 'the session started on the phone after the update', 120000);
+step('the session started on the phone is there with the newer version too');
 const hubAfter = upgraded;
 
 // 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
