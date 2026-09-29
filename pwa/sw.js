@@ -1,10 +1,11 @@
 /* Pocket Pilot service worker: offline app shell, push notifications, notification clicks. */
 const VERSION = 'pp-v1';
 const DEV = ['localhost', '127.0.0.1'].includes(self.location.hostname);
-const SHELL = ['./', './index.html', './css/app.css', './js/main.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/badge-96.png'];
+const SHELL = ['./', './index.html', './css/app.css', './js/boot.js', './js/main.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/badge-96.png'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // Straight from the server: the browser's HTTP cache may still hold the previous release's files.
+  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -14,6 +15,11 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+// A starting page asks which release this worker serves (js/boot.js), to catch up if it's an older one.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'pp-version' && event.ports?.[0]) event.ports[0].postMessage({ version: VERSION });
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -21,25 +27,28 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.endsWith('/health')) return;
   const isDoc = req.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/');
-  if (isDoc || DEV) {
-    // Network first for the document (and everything during local development) so new releases show up immediately.
+  const isBoot = url.pathname.endsWith('/js/boot.js');
+  if (isDoc || isBoot || DEV) {
+    // Network first for the document and the boot script (and everything during local development) so new
+    // releases show up immediately.
     event.respondWith((async () => {
       try {
-        const res = await fetch(req);
+        const res = await fetch(req, isDoc || isBoot ? { cache: 'no-cache' } : undefined);
         const cache = await caches.open(VERSION);
-        if (res.ok) cache.put(isDoc ? './index.html' : req, res.clone());
+        if (res.ok) cache.put(isDoc ? './index.html' : isBoot ? './js/boot.js' : req, res.clone());
         return res;
       } catch {
-        return (await caches.match(isDoc ? './index.html' : req)) || Response.error();
+        return (await caches.match(isDoc ? './index.html' : isBoot ? './js/boot.js' : req)) || Response.error();
       }
     })());
     return;
   }
-  // Stale-while-revalidate for everything else (scripts, styles, icons, vendored libraries).
+  // Stale-while-revalidate for everything else (scripts, styles, icons, vendored libraries). The refresh asks
+  // the server (`no-cache`), not the HTTP cache, so a new release never takes files from the one before.
   event.respondWith((async () => {
     const cache = await caches.open(VERSION);
     const cached = await cache.match(req);
-    const network = fetch(req).then((res) => {
+    const network = fetch(req, { cache: 'no-cache' }).then((res) => {
       if (res.ok) cache.put(req, res.clone());
       return res;
     }).catch(() => cached);

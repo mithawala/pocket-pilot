@@ -223,6 +223,9 @@ test('ui modules all parse (catches syntax errors in components the other tests 
   const { execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'pwa', 'js');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+    assert.doesNotThrow(() => execFileSync(process.execPath, ['--check', path.join(dir, f)], { stdio: 'pipe' }), f);
+  }
   for (const sub of ['ui', 'lib', 'model', 'net', 'demo', 'core']) {
     for (const f of fs.readdirSync(path.join(dir, sub)).filter((x) => x.endsWith('.js'))) {
       assert.doesNotThrow(() => execFileSync(process.execPath, ['--check', path.join(dir, sub, f)], { stdio: 'pipe' }), `${sub}/${f}`);

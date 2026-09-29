@@ -510,6 +510,21 @@ button.set-row:active, a.set-row:active { background: var(--surface); }
 .authn-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
 .authn-ready { display: flex; align-items: center; gap: 8px; padding: 9px 11px; font-size: 13.5px; color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line-2)); border-radius: 6px; }
 .authn-ready svg { width: 16px; height: 16px; flex: none; }
+.authn-warn { padding: 9px 11px; font-size: 13px; color: var(--text-2); background: color-mix(in srgb, var(--warn) 9%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line-2)); border-radius: 6px; }
+.authn-apps { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--text-2); }
+.authn-apps b { color: var(--strong); font-weight: 600; }
+.choice { display: grid; gap: 8px; }
+.choice-opt { display: flex; align-items: center; gap: 11px; width: 100%; padding: 11px 12px; text-align: left; color: var(--text); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 8px; }
+.choice-opt > svg { width: 19px; height: 19px; flex: none; color: var(--muted); }
+.choice-opt b { display: block; font-size: 14.5px; font-weight: 600; color: var(--strong); }
+.choice-opt small { display: block; margin-top: 1px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.choice-opt.on { border-color: var(--focus); background: color-mix(in srgb, var(--accent) 9%, var(--bg-3)); }
+.choice-opt.on > svg { color: var(--accent); }
+.choice-dot { width: 18px; height: 18px; flex: none; border: 2px solid var(--muted); border-radius: 50%; }
+.choice-opt.on .choice-dot { border-color: var(--focus); box-shadow: inset 0 0 0 4px var(--bg-3); background: var(--focus); }
+.choice-note { margin: 8px 2px 0; }
+.pair-actions { margin-top: 12px; }
+.pair-actions p { margin: 4px 0 0; }
 .code-row { display: flex; gap: 8px; }
 .code-input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 20px !important; letter-spacing: 0.3em; text-align: center; }
 details.card > summary { cursor: pointer; }

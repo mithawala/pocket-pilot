@@ -2,11 +2,11 @@ import { html, useState, useEffect, useRef } from '../lib/ui.js';
 import { Icon, Spinner } from './common.js';
 import { decodePairingFragment } from '../core/secure-channel.js';
 import { codeAt, stepAt } from '../core/totp.js';
-import { pairWithHost } from '../net/host-connection.js';
+import { pairWithHost, APP_VERSION } from '../net/host-connection.js';
 import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { deviceDescription } from '../lib/format.js';
 import { isIos, isStandalone, appleDevice, pairInHomeScreenApp } from '../lib/push.js';
-import { AuthenticatorSetup, FactorChooser, loadSetup, clearSetup } from './authenticator.js';
+import { AuthenticatorSetup, FactorChooser, loadSetup, clearSetup, passkeyHint } from './authenticator.js';
 
 // The product page sits one level above the app on GitHub Pages (…/pocket-pilot/app/ → …/pocket-pilot/).
 const PRODUCT_URL = /\/app\/$/.test(location.pathname) ? new URL('../', location.href).href : 'https://mithawala.github.io/pocket-pilot/';
@@ -73,6 +73,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
         <button class="btn primary" onClick=${submit} disabled=${!link}>Continue</button>
       </div>
     </details>
+    <p class="muted small center" style="margin-top:14px">Pocket Pilot ${APP_VERSION}</p>
   </div>`;
 }
 
@@ -122,21 +123,27 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
   });
   const factor = async (req) => {
     const allowTotp = req.alternatives.includes('totp');
+    // PCs before 0.6 don't offer alternatives at all: they only know passkeys.
+    const oldPc = !req.hostKnowsTotp;
     const canPasskey = await passkeysAvailable();
     const wantsTotp = live.current.method === 'totp';
     const ready = live.current.setup;
     if (wantsTotp && allowTotp && ready?.verified) return { totp: { secret: ready.secret, code: await codeAt(ready.secret, stepAt()) } };
-    if (!canPasskey && !allowTotp) throw new Error(wantsTotp ? 'Your PC only accepts passkeys, and this device has no Face ID, fingerprint or screen lock.' : 'No Face ID / fingerprint / screen lock is set up on this device');
+    const onlyPasskeys = oldPc
+      ? 'Pocket Pilot on your PC is older than 0.6 and only accepts passkeys. Update it there to use an authenticator app.'
+      : 'Your PC only accepts passkeys.';
+    if (!canPasskey && !allowTotp) throw new Error(`${onlyPasskeys} This device has no Face ID, fingerprint or screen lock.`);
     let error = null;
-    if (canPasskey && !(wantsTotp && allowTotp)) {
-      // Straight away where the browser allows it; older iPhones need the tap on the card below.
+    if (canPasskey && !wantsTotp) {
+      // Chosen before pairing: straight to the passkey sheet where the browser allows it (older iPhones
+      // need the tap on the card below).
       try {
         return { credential: await webauthn.register(req) };
       } catch (err) {
         error = err;
       }
     }
-    return request({ kind: 'factor', req, error, allowTotp, canPasskey, startWithTotp: (wantsTotp || !canPasskey) && allowTotp, intro: wantsTotp && !allowTotp ? 'Your PC only accepts passkeys, so save one here.' : '' });
+    return request({ kind: 'factor', req, error, allowTotp, canPasskey, startWithTotp: (wantsTotp || !canPasskey) && allowTotp, intro: wantsTotp && !allowTotp ? `${onlyPasskeys} Save a passkey here to finish.` : '' });
   };
   const start = async () => {
     setError(null);
@@ -170,7 +177,11 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     </div>`;
   }
   const totpSetup = (props) => html`<${AuthenticatorSetup} storageKey=${setupKey} hostName=${info.name || 'PC'} deviceName=${name.trim() || dev.name} ...${props} />`;
-  const factorNote = method === 'totp' ? 'Using codes from your authenticator app.' : 'Confirm with Face ID, Touch ID or your fingerprint.';
+  const factorNote = method === 'totp' ? 'Using the code from your authenticator app.' : passkeyHint();
+  const needsSetup = method === 'totp' && !setup?.verified;
+  const choice = (value, icon, title, sub) => html`<button type="button" role="radio" aria-checked=${method === value} class=${`choice-opt ${method === value ? 'on' : ''}`} onClick=${() => setMethod(value)}>
+    <span class="choice-dot"></span><${Icon} name=${icon} /><span><b>${title}</b><small>${sub}</small></span>
+  </button>`;
   return html`<div class="page safe">
     <div class="hero" style="padding-top:12px">
       <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
@@ -180,20 +191,26 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     </div>
     ${!phase && html`<div class="card stack">
       <div class="field"><label>Name this device</label><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} maxlength="60" /></div>
+      ${canPasskey
+        ? html`<div class="field"><label>Confirm it's you with</label>
+          <div class="choice" role="radiogroup" aria-label="Confirm it's you with">
+            ${choice('passkey', 'lock', 'Face ID or fingerprint', `A passkey, saved in ${isIos() ? 'the Passwords app' : 'your password manager'}`)}
+            ${choice('totp', 'key', 'A code from an authenticator app', 'Microsoft Authenticator, Google Authenticator or similar')}
+          </div>
+          ${method === 'passkey' && html`<p class="muted small choice-note">Want to use Microsoft Authenticator? Choose <b>A code from an authenticator app</b>: it can't keep passkeys for Pocket Pilot.</p>`}
+        </div>`
+        : html`<p class="muted small">This device can't save passkeys (no Face ID, fingerprint or screen lock), so it uses a code from an authenticator app.</p>`}
+      ${method === 'totp' && setup?.verified && html`<div class="authn-ready"><${Icon} name="check" /> Your authenticator app is set up.</div>`}
+    </div>`}
+    ${!phase && needsSetup && totpSetup({ note: null, onReady: (s) => setSetup(s) })}
+    ${!phase && html`<div class="stack pair-actions">
       ${error && html`<div class="errpart">${error}${spent ? ' To pair, click New code on your PC and scan the new QR code.' : ''}</div>`}
-      ${method === 'totp' && setup?.verified && html`<div class="authn-ready"><${Icon} name="check" /> Your authenticator app is set up. Pair to finish.</div>`}
       ${spent
         ? html`${onRescan && html`<button class="btn primary block" onClick=${onRescan}><${Icon} name="phone" /> Scan a new QR code</button>`}`
-        : html`<button class="btn primary block" disabled=${method === 'totp' && !setup?.verified} onClick=${start}><${Icon} name="lock" /> Pair securely</button>`}
+        : html`<button class="btn primary block" disabled=${needsSetup} onClick=${start}><${Icon} name="lock" /> ${needsSetup ? 'Set up the app above to pair' : 'Pair securely'}</button>`}
       <button class="btn block" onClick=${onCancel}>Cancel</button>
-      ${method === 'passkey'
-        ? html`<button class="btn block ghost" onClick=${() => setMethod('totp')}>No Face ID or passkey? Use an authenticator app</button>`
-        : canPasskey && !setup?.verified && html`<button class="btn block ghost" onClick=${() => setMethod('passkey')}>Use Face ID or a passkey instead</button>`}
+      <p class="muted small center">Pocket Pilot ${APP_VERSION}</p>
     </div>`}
-    ${!phase && method === 'totp' && !setup?.verified && totpSetup({
-      note: canPasskey ? 'Instead of Face ID, your PC will ask for a code from your authenticator app now and then.' : "This device can't save passkeys, so your PC will ask for a code from your authenticator app now and then.",
-      onReady: (s) => setSetup(s),
-    })}
     ${phase && html`<div class="progress-steps">
       ${STEPS.map(([k, label], i) => html`<div class=${`ps ${i === idx ? 'active' : i < idx || phase === 'done' ? 'done' : ''}`}>
         ${i === idx && phase !== 'done' ? html`<${Spinner} />` : i < idx || phase === 'done' ? html`<${Icon} name="check" size="18" />` : html`<span class="dot"></span>`}

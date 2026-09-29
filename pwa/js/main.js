@@ -2,6 +2,7 @@ import { html, render } from './lib/ui.js';
 import { App, AppController, applyTheme } from './ui/app.js';
 import { isPairingFragment } from './core/secure-channel.js';
 import { trackViewport } from './lib/viewport.js';
+import { keepCurrent, restorePairing } from './lib/app-update.js';
 
 let savedTheme = null;
 try {
@@ -21,22 +22,15 @@ trackViewport(window);
 let pendingFragment = null;
 if (isPairingFragment(location.hash)) {
   pendingFragment = location.hash;
-  history.replaceState(null, '', `${location.pathname}${location.search}#/pair`);
+} else {
+  // A pairing link carried across a reload into a new release.
+  pendingFragment = restorePairing();
 }
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' }).catch((err) => console.warn('Service worker registration failed', err));
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading || !sessionStorage.getItem('pp-sw-updated')) return;
-    reloading = true;
-    sessionStorage.removeItem('pp-sw-updated');
-    location.reload();
-  });
-}
+if (pendingFragment) history.replaceState(null, '', `${location.pathname}${location.search}#/pair`);
 
 const demo = new URLSearchParams(location.search).has('demo');
 const app = new AppController({ pendingFragment: demo ? null : pendingFragment, demo });
 if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__pocketPilot = app;
 render(html`<${App} app=${app} />`, document.getElementById('app'));
 app.init();
+keepCurrent({ app });

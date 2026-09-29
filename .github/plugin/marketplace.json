@@ -11,7 +11,7 @@
     {
       "name": "pocket-pilot",
       "description": "Control your GitHub Copilot app and CLI sessions from your phone: same history, live replies, chat, approvals and questions — end-to-end encrypted, free, with passkeys and push notifications.",
-      "version": "0.6.2",
+      "version": "0.6.3",
       "source": "./copilot-plugin"
     }
   ]

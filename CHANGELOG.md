@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3
+
+- **Choose Face ID or an authenticator app before pairing.** The passkey sheet used to open by itself, and on an iPhone it offers every app that is turned on for passwords, Microsoft Authenticator included, which can only keep passkeys for work accounts and then says it failed. Now the pairing screen asks first: **Face ID or fingerprint** (a passkey, with a note to save it in Passwords) or **A code from an authenticator app** (Microsoft Authenticator, Google Authenticator or similar). The authenticator app is set up before the phone connects, so switching apps can't break the pairing.
+- **Clear steps for Microsoft and Google Authenticator.** On a phone you now copy the setup key and add it in the app, with the exact steps (Microsoft Authenticator: **+** → **Other (Google, Facebook, etc.)** → **Or enter code manually**). The *Add to authenticator app* button went: on an iPhone every authenticator link opens Apple Passwords, never Microsoft or Google Authenticator. It's still there as *Or use Apple Passwords*. On a computer, the phone's app scans a QR code. If a passkey still fails, **Use an authenticator app** comes first.
+- **The phone app switches to new releases by itself.** It used to keep running the release it had loaded until it was fully closed and opened twice, so on iPhones, which keep apps and tabs suspended, fixes could take days to arrive. Now opening the app (a pairing link included) always starts the newest release, and an open app moves to a new release when it comes back to the screen, never in the middle of pairing, a confirmation or a message you are typing. The version shows on the start and pairing screens.
+- If your PC runs Pocket Pilot older than 0.6, the app says that authenticator codes need an update on the PC.
+
 ## 0.6.2
 
 - **The README shows where Pocket Pilot is instead of a button.** VS Code's extension page only allows web links, so the *Open Pocket Pilot in VS Code* button had to go through a web page and back to VS Code. It's gone, along with that page on the product site. The top of the README now shows the robot icon in the Activity Bar, on the far left of VS Code. The panel still opens by itself right after you install the extension.

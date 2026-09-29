@@ -65,16 +65,21 @@ function versionIcons(file) {
 }
 for (const f of ['index.html', '404.html', 'app/index.html']) versionIcons(path.join(out, f));
 
-// Content-based cache version: every release changes sw.js, so installed apps update themselves.
+// Content-based release name: every release changes sw.js, so installed apps update themselves, and boot.js
+// (loaded fresh from index.html) checks that the service worker serves this release before the app starts.
 const appDir = path.join(out, 'app');
 const hash = crypto.createHash('sha256');
 for (const rel of listFiles(appDir).sort()) hash.update(rel).update(fs.readFileSync(path.join(appDir, rel)));
-const swPath = path.join(appDir, 'sw.js');
-const marker = "const VERSION = 'pp-v1';";
-const sw = fs.readFileSync(swPath, 'utf8');
-if (!sw.includes(marker)) throw new Error('sw.js VERSION marker not found');
 const cacheVersion = `pp-${hash.digest('hex').slice(0, 12)}`;
-fs.writeFileSync(swPath, sw.replace(marker, `const VERSION = '${cacheVersion}';`));
+const stamp = (rel, marker, value) => {
+  const p = path.join(appDir, rel);
+  const src = fs.readFileSync(p, 'utf8');
+  if (!src.includes(marker)) throw new Error(`${rel}: marker ${marker} not found`);
+  fs.writeFileSync(p, src.replace(marker, value));
+};
+stamp('sw.js', "const VERSION = 'pp-v1';", `const VERSION = '${cacheVersion}';`);
+stamp('js/boot.js', "const BUILD = 'pp-v1';", `const BUILD = '${cacheVersion}';`);
+stamp('index.html', 'src="./js/boot.js"', `src="./js/boot.js?v=${cacheVersion}"`);
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 
 console.log(`Built ${listFiles(out).length} files into ${out} (v${version}, app cache ${cacheVersion})`);

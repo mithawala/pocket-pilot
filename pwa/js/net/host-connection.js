@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.6.2';
+export const APP_VERSION = '0.6.3';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 
@@ -103,7 +103,7 @@ export async function pairWithHost({ fragment, deviceName, platform, webauthn, f
         onStatus('passkey');
         let reply;
         try {
-          const r = await answer({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'PC'} · Pocket Pilot`, displayName: deviceName, hostName: p.name || 'your PC', alternatives: Array.isArray(m.alternatives) ? m.alternatives : [] });
+          const r = await answer({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'PC'} · Pocket Pilot`, displayName: deviceName, hostName: p.name || 'your PC', alternatives: Array.isArray(m.alternatives) ? m.alternatives : [], hostKnowsTotp: Array.isArray(m.alternatives) });
           reply = r.totp ? { t: 'totp.enroll', secret: r.totp.secret, code: r.totp.code } : { t: 'passkey.registered', credential: r.credential };
           factorKind = r.totp ? 'totp' : 'passkey';
         } catch (err) {
