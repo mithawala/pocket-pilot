@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.4
+
+- **Turning remote access off and on in the GitHub Copilot app panel.** After **Turn off remote access**, the panel kept showing *Tunnel online*, the code buttons and the same button. The panel now shows the state at the top (*Remote access on* in green, *Remote access off* in grey, like the Pocket Pilot panel in VS Code). When it's off, a card says so and offers **Turn on remote access**, which starts it again right there; the panel stays open and shows the new QR code, and you can still remove paired devices meanwhile. It also follows along when remote access is turned off or on from a chat (`/pocket-pilot off`, `/pocket-pilot`), and moves to another chat's panel when that chat takes over.
+
 ## 0.6.3
 
 - **Choose Face ID or an authenticator app before pairing.** The passkey sheet used to open by itself, and on an iPhone it offers every app that is turned on for passwords, Microsoft Authenticator included, which can only keep passkeys for work accounts and then says it failed. Now the pairing screen asks first: **Face ID or fingerprint** (a passkey, with a note to save it in Passwords) or **A code from an authenticator app** (Microsoft Authenticator, Google Authenticator or similar). The authenticator app is set up before the phone connects, so switching apps can't break the pairing.

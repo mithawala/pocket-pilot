@@ -174,13 +174,19 @@ async function hostHub() {
   if (hub && !hub.stopped) return hub;
   try {
     const { startHub } = await import('./lib/hub.mjs');
-    hub = await startHub();
+    hub = await startHub({ onTurnOn: turnOnFromPage });
     hubError = null;
   } catch (err) {
     hubError = err;
     hub = null;
   }
   return hub;
+}
+
+/** "Turn on remote access" on the pairing page: the hub starts again in this process (same page). */
+async function turnOnFromPage() {
+  setEnabled(true);
+  await connectHub({ start: true });
 }
 
 async function connectHub({ start }) {

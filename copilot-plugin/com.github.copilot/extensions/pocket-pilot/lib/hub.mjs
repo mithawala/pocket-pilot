@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { FILES, ensureHome, readJson, writeJson, newToken, serve, Rpc, takeLock, touchLock, releaseLock } from './ipc.mjs';
+import { FILES, ensureHome, readJson, writeJson, newToken, serve, Rpc, takeLock, touchLock, releaseLock, connect, hubAlive } from './ipc.mjs';
 import { CopilotAgentHost, isInside } from './agent-host.mjs';
 import { pairingPage } from './pairing-page.mjs';
 import { renderQrSvg } from './qr.mjs';
@@ -41,9 +41,149 @@ export function hubLog(level, msg) {
 }
 
 const settings = () => ({ passkey: 'required', authenticatorApp: true, requireApproval: true, tunnel: 'quick', customUrl: '', notify: { input: true, done: true, error: true }, ...readJson(FILES.state, {})?.settings });
+const HOST_NAME = `${os.hostname()} · Copilot`;
 
-/** Starts the hub in this process. Resolves to null if another process already hosts it. */
-export async function startHub() {
+// ---------------------------------------------------------------- the pairing page's server
+// One per process, and it outlives the hub: when remote access is turned off, the Pocket Pilot panel stays
+// connected, shows that remote access is off and can turn it on again. While a hub runs, it answers.
+const page = { server: null, key: null, handler: null, turningOn: false, error: null };
+let hubOptions = {};
+
+async function pageServer() {
+  if (page.server) return page;
+  page.key = newToken();
+  page.server = http.createServer((req, res) => {
+    servePage(req, res).catch((err) => {
+      hubLog('warn', `Pairing page: ${err.message}`);
+      if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
+      res.end();
+    });
+  });
+  await new Promise((r) => page.server.listen(0, '127.0.0.1', r));
+  page.server.unref();
+  return page;
+}
+
+const pageUrl = () => `http://127.0.0.1:${page.server.address().port}/pair?k=${page.key}`;
+
+/** Closes the page server (when the process is done with Pocket Pilot, and in tests). */
+export function closePageServer() {
+  page.server?.closeAllConnections?.();
+  page.server?.close();
+  Object.assign(page, { server: null, key: null, handler: null });
+}
+
+async function servePage(req, res) {
+  let u;
+  try {
+    u = new URL(req.url || '/', 'http://127.0.0.1');
+  } catch {
+    res.writeHead(400);
+    return res.end();
+  }
+  const port = page.server.address().port;
+  // `embed=1`: shown as a panel (canvas) in the GitHub Copilot app, which may frame it.
+  const embed = u.searchParams.get('embed') === '1';
+  const send = (code, body, type = 'application/json') => {
+    res.writeHead(code, {
+      'content-type': type,
+      'cache-control': 'no-store',
+      ...(embed ? {} : { 'x-frame-options': 'DENY' }),
+      'referrer-policy': 'no-referrer',
+      'content-security-policy': "default-src 'none'; img-src https://mithawala.github.io data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
+    });
+    res.end(typeof body === 'string' ? body : JSON.stringify(body));
+  };
+  // Only this machine, only with the key the extensions received, and no DNS-rebinding host names.
+  if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(req.headers.host)) return send(403, 'Forbidden', 'text/plain');
+  const k = Buffer.from(u.searchParams.get('k') || '');
+  const want = Buffer.from(page.key);
+  if (k.length !== want.length || !crypto.timingSafeEqual(k, want)) return send(403, 'Forbidden', 'text/plain');
+  const body = async () => {
+    let raw = '';
+    for await (const c of req) {
+      raw += c;
+      if (raw.length > 10000) break;
+    }
+    try {
+      return JSON.parse(raw || '{}');
+    } catch {
+      return {};
+    }
+  };
+  const route = `${req.method} ${u.pathname}`;
+  if (route === 'GET /pair') return send(200, pairingPage({ key: page.key, hostName: HOST_NAME, embed, appUrl: PWA_URL }), 'text/html; charset=utf-8');
+  const out = await (page.handler || whileOff)(route, body);
+  return out === undefined ? send(404, 'Not found', 'text/plain') : send(200, out);
+}
+
+/** The page's requests while remote access is off (or while another chat's process runs the hub). */
+async function whileOff(route, body) {
+  const { DeviceStore } = core('store');
+  switch (route) {
+    case 'GET /pair/state': {
+      // Turned on meanwhile, and another chat's process runs the hub: the panel moves to its page.
+      const info = readJson(FILES.hub);
+      if (hubAlive(info) && info.pid !== process.pid) {
+        const moved = await otherPage(info).catch(() => null);
+        if (moved) return { moved };
+      }
+      const devices = new DeviceStore(FILES.devices).list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: false, passkey: !!d.passkey, totp: !!d.totp }));
+      return { on: false, turningOn: page.turningOn, error: page.error, version: VERSION, hostName: HOST_NAME, devices };
+    }
+    case 'POST /pair/on':
+      turnOn();
+      return { ok: true };
+    case 'POST /pair/off':
+      return { ok: true };
+    case 'POST /pair/remove': {
+      const b = await body();
+      const store = new DeviceStore(FILES.devices);
+      const d = store.get(String(b.id || ''));
+      if (d) {
+        store.remove(d.id);
+        hubLog('info', `Removed device "${d.name}"`);
+      }
+      return { ok: !!d };
+    }
+    default:
+      return undefined;
+  }
+}
+
+async function otherPage(info) {
+  const ch = await connect(info.port, info.token, { pid: process.pid });
+  try {
+    return (await new Rpc(ch, {}).request('status', {}, 5000))?.pageUrl || null;
+  } finally {
+    ch.close();
+  }
+}
+
+/** Turns remote access on from the page: the chat hosting this process starts the hub again. */
+async function turnOn() {
+  if (page.turningOn) return;
+  page.turningOn = true;
+  page.error = null;
+  try {
+    writeJson(FILES.state, { ...(readJson(FILES.state, {}) || {}), enabled: true, changedAt: new Date().toISOString() });
+    hubLog('info', 'Remote access turned on from the pairing page');
+    if (hubOptions.onTurnOn) await hubOptions.onTurnOn();
+    else await startHub(hubOptions);
+  } catch (err) {
+    page.error = err.message;
+    hubLog('error', `Could not turn remote access on: ${err.message}`);
+  } finally {
+    page.turningOn = false;
+  }
+}
+
+/**
+ * Starts the hub in this process. Resolves to null if another process already hosts it.
+ * `onTurnOn`: how the pairing page turns remote access on again (the hosting chat restarts the hub).
+ */
+export async function startHub(options = {}) {
+  if (options && Object.keys(options).length) hubOptions = options;
   if (!takeLock()) return null;
   const cleanups = [];
   // Keep the lock fresh so a crashed hub (or a reused PID) is recognised, and stop if the lock or
@@ -84,7 +224,7 @@ async function boot(log, cleanups) {
 
   // ---------------------------------------------------------------- identity
   const secrets = new FileSecrets(FILES.secrets);
-  const hostName = `${os.hostname()} · Copilot`;
+  const hostName = HOST_NAME;
   const identity = await identityLib.loadHostIdentity(secrets, hostName);
   const vapid = await identityLib.loadVapid(secrets);
   const run = (args) => new Promise((resolve) => execFile('gh', args, { timeout: 8000, windowsHide: true }, (err, out, errOut) => resolve(err ? null : `${out}\n${errOut}`)));
@@ -302,10 +442,9 @@ async function boot(log, cleanups) {
   }
 
   // ---------------------------------------------------------------- session channels
-  const pageKey = newToken();
   const ipcToken = newToken();
   const channels = new Set();
-  let pairServer;
+  await pageServer();
 
   function status() {
     const online = new Map(relay.activeConnections().map((c) => [c.deviceId, c]));
@@ -319,7 +458,7 @@ async function boot(log, cleanups) {
       sessions: host.sessionCount,
       pairing: state.pairing ? { link: state.pairing.link, expiresAt: state.pairing.expiresAt } : null,
       devices: store.list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: online.has(d.id), passkey: !!d.passkey, totp: !!d.totp, push: !!d.push, lastSeenAt: d.lastSeenAt })),
-      pageUrl: `http://127.0.0.1:${pairServer.address().port}/pair?k=${pageKey}`,
+      pageUrl: pageUrl(),
     };
   }
 
@@ -386,85 +525,47 @@ async function boot(log, cleanups) {
   });
 
   // ---------------------------------------------------------------- local pairing page
-  pairServer = http.createServer((req, res) => {
-    handlePairRequest(req, res).catch((err) => {
-      log('warn', `Pairing page: ${err.message}`);
-      if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
-      res.end();
-    });
+  // Served by this process's page server (see pageServer): it answers here while this hub runs.
+  const whileOn = async (route, body) => {
+    switch (route) {
+      case 'GET /pair/state': {
+        const s = status();
+        return { ...s, on: true, pairing: pairingReady() ? { ...s.pairing, svg: state.pairing.svg } : null, approvals: [...approvals.values()].map(({ done, ...a }) => a) };
+      }
+      case 'POST /pair/answer': {
+        const b = await body();
+        approvals.get(b.id)?.done(!!b.allow);
+        return { ok: true };
+      }
+      case 'POST /pair/renew':
+        await newPairingCode().catch(() => {});
+        return { ok: true };
+      case 'POST /pair/remove': {
+        const b = await body();
+        const d = store.get(String(b.id || ''));
+        if (d) {
+          store.remove(d.id);
+          relay.revokeDevice(d.id);
+          log('info', `Removed device "${d.name}"`);
+          rendezvous.retireLegacy().catch(() => {});
+        }
+        return { ok: !!d };
+      }
+      case 'POST /pair/off':
+        writeJson(FILES.state, { ...(readJson(FILES.state, {}) || {}), enabled: false, changedAt: new Date().toISOString() });
+        setTimeout(() => stopRequested?.('turned off on the pairing page'), 100);
+        return { ok: true };
+      case 'POST /pair/on':
+        return { ok: true };
+      default:
+        return undefined;
+    }
+  };
+  page.handler = whileOn;
+  cleanups.push(() => {
+    // The page stays up, showing that remote access is off (or following the hub to another process).
+    if (page.handler === whileOn) page.handler = null;
   });
-  async function handlePairRequest(req, res) {
-    let u;
-    try {
-      u = new URL(req.url || '/', 'http://127.0.0.1');
-    } catch {
-      res.writeHead(400);
-      return res.end();
-    }
-    const port = pairServer.address().port;
-    // `embed=1`: shown as a panel (canvas) in the GitHub Copilot app, which may frame it.
-    const embed = u.searchParams.get('embed') === '1';
-    const send = (code, body, type = 'application/json') => {
-      res.writeHead(code, {
-        'content-type': type,
-        'cache-control': 'no-store',
-        ...(embed ? {} : { 'x-frame-options': 'DENY' }),
-        'referrer-policy': 'no-referrer',
-        'content-security-policy': "default-src 'none'; img-src https://mithawala.github.io data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
-      });
-      res.end(typeof body === 'string' ? body : JSON.stringify(body));
-    };
-    // Only this machine, only with the key the extensions received, and no DNS-rebinding host names.
-    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(req.headers.host)) return send(403, 'Forbidden', 'text/plain');
-    const k = Buffer.from(u.searchParams.get('k') || '');
-    const want = Buffer.from(pageKey);
-    if (k.length !== want.length || !crypto.timingSafeEqual(k, want)) return send(403, 'Forbidden', 'text/plain');
-    const body = async () => {
-      let raw = '';
-      for await (const c of req) {
-        raw += c;
-        if (raw.length > 10000) break;
-      }
-      try {
-        return JSON.parse(raw || '{}');
-      } catch {
-        return {};
-      }
-    };
-    if (req.method === 'GET' && u.pathname === '/pair') return send(200, pairingPage({ key: pageKey, hostName, embed, appUrl: PWA_URL }), 'text/html; charset=utf-8');
-    if (req.method === 'GET' && u.pathname === '/pair/state') {
-      const s = status();
-      return send(200, { ...s, pairing: pairingReady() ? { ...s.pairing, svg: state.pairing.svg } : null, approvals: [...approvals.values()].map(({ done, ...a }) => a) });
-    }
-    if (req.method === 'POST' && u.pathname === '/pair/answer') {
-      const b = await body();
-      approvals.get(b.id)?.done(!!b.allow);
-      return send(200, { ok: true });
-    }
-    if (req.method === 'POST' && u.pathname === '/pair/renew') {
-      await newPairingCode().catch(() => {});
-      return send(200, { ok: true });
-    }
-    if (req.method === 'POST' && u.pathname === '/pair/remove') {
-      const b = await body();
-      const d = store.get(String(b.id || ''));
-      if (d) {
-        store.remove(d.id);
-        relay.revokeDevice(d.id);
-        log('info', `Removed device "${d.name}"`);
-        rendezvous.retireLegacy().catch(() => {});
-      }
-      return send(200, { ok: !!d });
-    }
-    if (req.method === 'POST' && u.pathname === '/pair/off') {
-      writeJson(FILES.state, { ...(readJson(FILES.state, {}) || {}), enabled: false, changedAt: new Date().toISOString() });
-      setTimeout(() => stopRequested?.('turned off on the pairing page'), 100);
-      return send(200, { ok: true });
-    }
-    return send(404, 'Not found', 'text/plain');
-  }
-  await new Promise((r) => pairServer.listen(0, '127.0.0.1', r));
-  cleanups.push(() => pairServer.close());
 
   writeJson(FILES.hub, { pid: process.pid, port: ipcServer.address().port, token: ipcToken, version: VERSION, relayPort: relay.port, startedAt: new Date().toISOString() });
   log('info', `Hub ready: relay 127.0.0.1:${relay.port}, sessions port ${ipcServer.address().port}`);

@@ -19,7 +19,7 @@ The GitHub Copilot app uses the same plugins; restart it after installing.
 Type `/pocket-pilot` in a chat (or ask "pair my phone") and confirm. In the GitHub Copilot app the
 Pocket Pilot panel opens next to the chat; the CLI opens it in your browser and prints the QR code.
 Scan it (on another computer, open the copied link). `/pocket-pilot status` shows the tunnel and
-paired devices; `/pocket-pilot off` or **Turn off** in the panel closes the tunnel. Remove devices in
+paired devices; `/pocket-pilot off` or **Turn off remote access** in the panel closes the tunnel, and **Turn on remote access** there opens it again. Remove devices in
 the panel.
 
 Remote access isn't tied to that chat: close or delete it and another open chat takes over within

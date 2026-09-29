@@ -27,41 +27,97 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
 .warn{color:var(--warn)}.err{color:var(--err)}.app-url{display:inline-block;max-width:100%;overflow-wrap:anywhere;color:var(--accent);user-select:all}
 .embed{padding:8px;place-items:start stretch}.embed .card{width:100%;background:transparent;border:none;box-shadow:none;padding:8px;grid-template-columns:1fr}.embed .qr{max-width:320px}
 .foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.top{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.top .brand{margin:0}
+.state{display:inline-flex;align-items:center;gap:8px;padding:5px 13px;border-radius:99px;font-size:13px;font-weight:600;border:1px solid var(--line);background:#2c313a;color:var(--muted);white-space:nowrap}
+.state .dot{width:9px;height:9px}.state.on{color:var(--ok);border-color:rgba(152,195,121,.45);background:rgba(152,195,121,.1)}.state.on .dot{background:var(--ok);box-shadow:0 0 0 3px rgba(152,195,121,.2)}
+.state.off .dot{background:transparent;border:2px solid var(--muted)}.state.busy{color:var(--warn);border-color:rgba(229,192,123,.45)}.state.busy .dot{background:var(--warn)}
+.offcard{display:grid;gap:10px;padding:18px;border:1px solid var(--line);border-radius:10px;background:#1d2025}.offcard b{font-size:16px;color:var(--strong)}.offcard p{margin:0}
+.offcard button{justify-self:start;padding:9px 16px;font-size:14px}
+button:disabled{opacity:.55;cursor:default;filter:none}.hide{display:none!important}
 </style></head>
 <body class="${embed ? 'embed' : ''}"><main class="card">
+  <header class="top">
+    <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pocket Pilot</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
+    <span id="state" class="state busy"><span class="dot"></span><span id="stateText">Checking…</span></span>
+  </header>
   <section>
-    <div id="qr" class="qr wait">Starting the secure tunnel…</div>
-    <p class="small muted" id="exp"></p>
-    <div class="row"><button id="copy" disabled>Copy link</button><button id="renew" disabled>New code</button></div>
+    <div id="offcard" class="offcard hide">
+      <b>Remote access is off</b>
+      <p class="muted small">Your paired devices can't connect to this PC until you turn it on again. They stay paired.</p>
+      <button id="on" class="primary">Turn on remote access</button>
+      <p class="muted small" id="offNote"></p>
+    </div>
+    <div id="pairsec">
+      <div id="qr" class="qr wait">Starting the secure tunnel…</div>
+      <p class="small muted" id="exp"></p>
+      <div class="row"><button id="copy" disabled>Copy link</button><button id="renew" disabled>New code</button></div>
+    </div>
   </section>
   <section>
-    <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pair a device</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
     <div id="approvals"></div>
-    <ol>
-      <li>On your device, open <b class="app-url">${esc(appHost)}</b><span class="muted"> — on a phone or tablet, add it to your Home Screen first and pair from there.</span></li>
-      <li>Tap <b>Scan the QR code</b> in the app, or point your camera at the code. On another computer, open the copied link.</li>
-      <li>Allow the device here, then confirm with Face ID, your fingerprint or Windows Hello.</li>
-    </ol>
-    <p class="small muted">The code works once and expires after 10 minutes. Everything between your device and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>
-    <h2>Status</h2>
-    <div class="row" id="status"></div>
+    <div id="howto">
+      <h2>Pair a device</h2>
+      <ol>
+        <li>On your device, open <b class="app-url">${esc(appHost)}</b><span class="muted"> — on a phone or tablet, add it to your Home Screen first and pair from there.</span></li>
+        <li>Tap <b>Scan the QR code</b> in the app, or point your camera at the code. On another computer, open the copied link.</li>
+        <li>Allow the device here, then confirm with Face ID, your fingerprint or Windows Hello.</li>
+      </ol>
+      <p class="small muted">The code works once and expires after 10 minutes. Everything between your device and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>
+      <h2>Status</h2>
+      <div class="row" id="status"></div>
+    </div>
     <h2>Paired devices</h2>
     <div id="devices" class="small muted">None yet.</div>
-    <div class="foot"><button id="off">Turn off remote access</button><span class="small muted">Keeps running when you close or delete the chat it was started from. With no chat open for 30 minutes it pauses, and comes back with your next chat.</span></div>
+    <div class="foot" id="foot"><button id="toggle" disabled>Turn off remote access</button><span class="small muted" id="toggleNote"></span></div>
   </section>
 </main>
 <script>
 const K = ${JSON.stringify(key)};
+const EMBED = ${embed ? 'true' : 'false'};
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let link = null;
+let on = null;
+let busy = '';
 async function api(path, body) {
   const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(K), body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' });
   if (!r.ok) throw new Error((await r.text()) || r.status);
   return r.json();
 }
 function pill(cls, text) { return '<span class="pill ' + cls + '"><span class="dot"></span>' + esc(text) + '</span>'; }
+function setState(cls, text) { $('state').className = 'state ' + cls; $('stateText').textContent = text; }
+function renderDevices(s) {
+  $('devices').innerHTML = s.devices.length ? s.devices.map((d) => '<div class="dev"><span><b style="color:var(--strong)">' + esc(d.name) + '</b> <span class="muted">' + esc(d.platform || '') + '</span></span><span>' + (d.online ? pill('ok', 'connected') : pill('', 'offline')) + (d.passkey ? ' ' + pill('ok', 'passkey') : d.totp ? ' ' + pill('ok', 'authenticator') : '') + ' <button data-remove="' + esc(d.id) + '" data-name="' + esc(d.name) + '">Remove</button></span></div>').join('') : 'None yet.';
+}
 function render(s) {
+  if (s.moved) { location.replace(s.moved + (EMBED ? '&embed=1' : '')); return; }
+  on = !!s.on;
+  if (busy === 'off' && !on) busy = '';
+  if (busy === 'on' && on) busy = '';
+  const turningOn = busy === 'on' || !!s.turningOn;
+  $('offcard').classList.toggle('hide', on);
+  $('pairsec').classList.toggle('hide', !on);
+  $('howto').classList.toggle('hide', !on);
+  // Off: the big button at the top turns it on (like VS Code's Start remote access); on: this one turns it off.
+  $('foot').classList.toggle('hide', !on);
+  $('toggle').className = on ? '' : 'primary';
+  $('toggle').disabled = !!busy || turningOn;
+  $('on').disabled = turningOn;
+  if (!on) {
+    setState(turningOn ? 'busy' : 'off', turningOn ? 'Turning on…' : 'Remote access off');
+    $('toggle').textContent = turningOn ? 'Turning on…' : 'Turn on remote access';
+    $('on').textContent = turningOn ? 'Turning on…' : 'Turn on remote access';
+    $('offNote').textContent = s.error ? 'Could not turn it on: ' + s.error : 'You can also turn it on with /pocket-pilot in any chat.';
+    $('approvals').innerHTML = '';
+    renderDevices(s);
+    link = null;
+    return;
+  }
+  const local = s.tunnel.mode === 'none';
+  const online = local || (s.tunnel.url && s.tunnel.reachable);
+  setState(busy === 'off' ? 'busy' : online ? 'on' : 'busy', busy === 'off' ? 'Turning off…' : online ? 'Remote access on' : s.tunnel.error ? 'Tunnel error' : 'Remote access starting…');
+  $('toggle').textContent = busy === 'off' ? 'Turning off…' : 'Turn off remote access';
+  $('toggleNote').textContent = 'Keeps running when you close or delete the chat it was started from. With no chat open for 30 minutes it pauses, and comes back with your next chat.';
   const qr = $('qr');
   if (s.pairing) { qr.className = 'qr'; qr.innerHTML = s.pairing.svg; link = s.pairing.link; }
   else { qr.className = 'qr wait'; qr.textContent = s.tunnel.error ? 'Tunnel error: ' + s.tunnel.error : s.tunnel.url ? 'Waiting for Cloudflare to publish the tunnel…' : 'Starting the secure tunnel…'; link = null; }
@@ -69,12 +125,12 @@ function render(s) {
   const left = s.pairing ? Math.max(0, Math.round((s.pairing.expiresAt - Date.now()) / 60000)) : 0;
   $('exp').textContent = s.pairing ? 'Expires in about ' + left + ' min · single use' : '';
   $('status').innerHTML = [
-    pill(s.tunnel.url && s.tunnel.reachable ? 'ok' : s.tunnel.error ? 'err' : 'busy', s.tunnel.url && s.tunnel.reachable ? 'Tunnel online' : s.tunnel.error ? 'Tunnel error' : s.tunnel.url ? 'Tunnel connecting' : 'Tunnel starting'),
+    pill(online ? 'ok' : s.tunnel.error ? 'err' : 'busy', local ? 'Local network only' : online ? 'Tunnel online' : s.tunnel.error ? 'Tunnel error' : s.tunnel.url ? 'Tunnel connecting' : 'Tunnel starting'),
     pill(s.sessions ? 'ok' : '', s.sessions + ' open session' + (s.sessions === 1 ? '' : 's')),
     pill(s.rendezvous ? 'ok' : '', s.rendezvous ? 'Auto-reconnect on' : 'Auto-reconnect off'),
   ].join(' ');
   $('approvals').innerHTML = s.approvals.map((a) => '<div class="approve"><div>' + (a.reset ? '<b>Let “' + esc(a.name) + '”</b> set up Face ID or an authenticator app again?' : '<b>Allow “' + esc(a.name) + '”</b> to control your Copilot sessions?') + '</div><div class="small muted">' + esc([a.platform, a.ip && 'from ' + a.ip].filter(Boolean).join(' · ')) + (a.reset ? ' — only allow this if you asked for it on the device yourself.' : ' — only allow a device you just paired yourself.') + '</div><div class="row" style="margin-top:8px"><button class="primary" data-a="' + esc(a.id) + '" data-v="1">Allow</button><button data-a="' + esc(a.id) + '" data-v="0">Deny</button></div></div>').join('');
-  $('devices').innerHTML = s.devices.length ? s.devices.map((d) => '<div class="dev"><span><b style="color:var(--strong)">' + esc(d.name) + '</b> <span class="muted">' + esc(d.platform || '') + '</span></span><span>' + (d.online ? pill('ok', 'connected') : pill('', 'offline')) + (d.passkey ? ' ' + pill('ok', 'passkey') : d.totp ? ' ' + pill('ok', 'authenticator') : '') + ' <button data-remove="' + esc(d.id) + '" data-name="' + esc(d.name) + '">Remove</button></span></div>').join('') : 'None yet.';
+  renderDevices(s);
 }
 document.addEventListener('click', async (e) => {
   const r = e.target.closest('button[data-remove]');
@@ -87,19 +143,28 @@ document.addEventListener('click', async (e) => {
 });
 $('copy').onclick = async () => { if (link) { await navigator.clipboard.writeText(link); $('copy').textContent = 'Copied'; setTimeout(() => ($('copy').textContent = 'Copy link'), 1500); } };
 $('renew').onclick = async () => { await api('/pair/renew', {}).catch(() => {}); tick(); };
-$('off').onclick = async () => {
-  if (!confirm('Turn off Pocket Pilot remote access? Your paired devices stay paired; run /pocket-pilot in a chat to turn it on again.')) return;
-  $('off').disabled = true;
+async function turnOn() {
+  busy = 'on';
+  setState('busy', 'Turning on…');
+  $('toggle').disabled = true; $('on').disabled = true;
+  $('toggle').textContent = 'Turning on…'; $('on').textContent = 'Turning on…';
+  await api('/pair/on', {}).catch(() => {});
+  tick();
+}
+async function turnOff() {
+  if (!confirm('Turn off Pocket Pilot remote access? Your paired devices stay paired and can connect again once you turn it back on.')) return;
+  busy = 'off';
+  setState('busy', 'Turning off…');
+  $('toggle').disabled = true; $('toggle').textContent = 'Turning off…';
   await api('/pair/off', {}).catch(() => {});
-  $('qr').className = 'qr wait'; $('qr').textContent = 'Remote access is off. Run /pocket-pilot in a chat to turn it on again.';
-  stopped = true;
-};
+  tick();
+}
+$('on').onclick = turnOn;
+$('toggle').onclick = () => (on ? turnOff() : turnOn());
 let failures = 0;
-let stopped = false;
 async function tick() {
-  if (stopped) return;
   try { render(await api('/pair/state')); failures = 0; }
-  catch { if (++failures > 3) { $('qr').className = 'qr wait'; $('qr').textContent = 'This page lost Pocket Pilot (for example, its chat was closed). Your devices stay connected: run /pocket-pilot to open the page again.'; } }
+  catch { if (++failures > 3) { setState('off', 'Not connected'); $('offcard').classList.add('hide'); $('pairsec').classList.remove('hide'); $('qr').className = 'qr wait'; $('qr').textContent = 'This page lost Pocket Pilot (for example, its chat was closed). Your devices stay connected: run /pocket-pilot to open the page again.'; $('toggle').disabled = true; } }
 }
 tick(); setInterval(tick, 1500);
 </script></body></html>`;

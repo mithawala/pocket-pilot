@@ -137,6 +137,7 @@ async function copilotPanelHarness() {
   return pairingPage({ key: 'demo', hostName: 'Studio PC', embed: true }).replace('https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png', '/pwa/icons/icon-192.png');
 }
 const copilotPanelState = () => ({
+  on: true,
   hostName: 'Studio PC',
   tunnel: { url: 'https://quiet-meadow-lantern.trycloudflare.com', reachable: true, mode: 'quick' },
   sessions: 3,
