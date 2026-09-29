@@ -4,6 +4,7 @@ import { Turn, PendingTurn } from './parts.js';
 import { Composer } from './composer.js';
 import { ConnectionBanner } from './sessions.js';
 import { statusOf, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
+import { waitingOn } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 
 const PAGE = 25;
@@ -86,6 +87,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
     store,
     chat,
     provider,
+    host: hostApp(conn?.record),
     modelName: (id) => models.find((m) => m.id === id)?.name || id,
     // A failed last turn can be sent again as it was, with the model now selected.
     retry: (turn) => () => {
@@ -168,7 +170,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
   }, []);
 
   const status = statusOf(store.statusFor(session));
-  const inputNeeded = sessionState?.inputNeeded || [];
+  const waiting = waitingOn(sessionState, chat, chatState);
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;
   const title = session?.title || chatState?.title || 'Session';
@@ -185,8 +187,8 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
       <button class="icon-btn" onClick=${() => setMenu(true)} aria-label="Session options"><${Icon} name="more" /></button>
       ${embedded && html`<button class="icon-btn" onClick=${onBack} aria-label="Close"><${Icon} name="x" /></button>`}
     </div>
-    ${inputNeeded.length > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-      <${Icon} name="alert-circle" /><span>${inputNeeded.length === 1 ? 'The agent is waiting for you' : `${inputNeeded.length} requests are waiting for you`}</span><span class="go">Review</span>
+    ${waiting > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+      <${Icon} name="alert-circle" /><span>${waiting === 1 ? 'The agent is waiting for you' : `${waiting} requests are waiting for you`}</span><span class="go">Review</span>
     </button>`}
     <${ConnectionBanner} conn=${conn} store=${store} onRepair=${onRepair} />
     <div class="scroll-wrap">

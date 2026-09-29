@@ -1,6 +1,6 @@
 import { html, useState, useEffect } from '../lib/ui.js';
 import { Icon, toast } from './common.js';
-import { pushBlockedReason } from '../lib/push.js';
+import { pushBlockedReason, appleDevice } from '../lib/push.js';
 import { unb64u } from '../core/bytes.js';
 import { fingerprint } from '../core/secure-channel.js';
 import { fingerprintText } from './pair.js';
@@ -21,7 +21,7 @@ export function NotificationSetup({ app, host, compact }) {
   if (reason === 'ios-install') {
     return html`<div class="card" style="margin-bottom:12px">
       <div class="row"><${Icon} name="bell" /><b>Get notified when an agent needs you</b></div>
-      <p class="muted small" style="margin:8px 0 0">On iPhone, notifications work once the app is on your Home Screen: tap <b>Share</b> <span aria-hidden="true">⎋</span> → <b>Add to Home Screen</b>, then open Pocket Pilot from there.</p>
+      <p class="muted small" style="margin:8px 0 0">On ${appleDevice()}, only the app on your Home Screen can notify you, and it's kept apart from the browser: tap <b>Share</b> → <b>Add to Home Screen</b>, open Pocket Pilot from there and pair it once more with <b>Scan the QR code</b>.</p>
     </div>`;
   }
   if (reason === 'unsupported') return compact ? null : html`<p class="muted small">This browser does not support push notifications.</p>`;

@@ -218,8 +218,11 @@ export function ConnectionBanner({ conn, store, onRepair }) {
 }
 
 export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
-  // Session state changes can correct a session's status (see HostStore.statusFor).
-  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || (d.kind === 'session' && (store.sessions.get(d.uri)?.status & 31) === S.Error));
+  // Session and chat state can correct a session's status (see HostStore.statusFor).
+  const correctable = (s) => !!s && ((s.status & 31) === S.Error || has(s.status, S.Input));
+  useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root'
+    || (d.kind === 'session' && correctable(store.sessions.get(d.uri)))
+    || (d.kind === 'chat' && [...store.sessions.values()].some((s) => has(s.status, S.Input) && store.chatFor(s.resource) === d.uri)));
   const [q, setQ] = useState('');
   const [groupBy, setGroupByState] = useState(() => (readPref('pp:groupBy', 'recent') === 'folder' ? 'folder' : 'recent'));
   const [collapsed, setCollapsed] = useState(() => new Set(readPref('pp:collapsedFolders', [])));

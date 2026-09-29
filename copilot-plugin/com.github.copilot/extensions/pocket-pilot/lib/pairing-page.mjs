@@ -38,7 +38,7 @@ code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--s
     <div class="brand"><img src="https://mithawala.github.io/pocket-pilot/app/icons/icon-192.png" alt=""><div><h1>Pair a device</h1><div class="muted small">${esc(hostName)} · GitHub Copilot app &amp; CLI</div></div></div>
     <div id="approvals"></div>
     <ol>
-      <li>On your device, open <b class="app-url">${esc(appHost)}</b><span class="muted"> — add it to your Home Screen first to get notifications.</span></li>
+      <li>On your device, open <b class="app-url">${esc(appHost)}</b><span class="muted"> — on a phone or tablet, add it to your Home Screen first and pair from there.</span></li>
       <li>Tap <b>Scan the QR code</b> in the app, or point your camera at the code. On another computer, open the copied link.</li>
       <li>Allow the device here, then confirm with Face ID, your fingerprint or Windows Hello.</li>
     </ol>

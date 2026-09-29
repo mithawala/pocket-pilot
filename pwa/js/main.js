@@ -1,6 +1,7 @@
 import { html, render } from './lib/ui.js';
 import { App, AppController, applyTheme } from './ui/app.js';
 import { isPairingFragment } from './core/secure-channel.js';
+import { trackViewport } from './lib/viewport.js';
 
 let savedTheme = null;
 try {
@@ -14,27 +15,7 @@ matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => {
   if (document.documentElement.getAttribute('data-theme') === 'system') applyTheme('system');
 });
 
-// Fit the app to the *visible* viewport, so the composer sits right above the on-screen keyboard
-// (iOS shrinks the visual viewport and pans it instead of resizing the page).
-function trackViewport() {
-  const style = document.documentElement.style;
-  const vv = window.visualViewport;
-  let frame = 0;
-  const apply = () => {
-    frame = 0;
-    if (vv && Math.abs(vv.scale - 1) > 0.01) return; // pinch-zoomed: leave the layout alone
-    style.setProperty('--app-h', `${Math.round(vv ? vv.height : window.innerHeight)}px`);
-    style.setProperty('--vv-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
-  };
-  const schedule = () => {
-    if (!frame) frame = requestAnimationFrame(apply);
-  };
-  (vv || window).addEventListener('resize', schedule);
-  vv?.addEventListener('scroll', schedule);
-  window.addEventListener('orientationchange', schedule);
-  apply();
-}
-trackViewport();
+trackViewport(window);
 
 // Take the pairing token out of the address bar (and history) before anything else runs.
 let pendingFragment = null;

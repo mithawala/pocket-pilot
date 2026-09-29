@@ -29,7 +29,7 @@ Command-line publishing is optional: `npx @vscode/vsce publish --packagePath poc
 ## Things to keep in mind
 
 - **Trademarks:** keep "Copilot" and GitHub or Microsoft logos out of the extension name and icon. Mentioning that it works with GitHub Copilot in the description is fine.
-- **Personal project:** if you work for a company whose products the extension relates to, check its policy on publishing personal or open-source projects first.
+- **Personal project:** if you work for a company whose products the extension relates to, check its policy on publishing personal projects first.
 - **Other editors (optional):** to reach VS Code forks such as VSCodium or Cursor, publish the same `.vsix` to [Open VSX](https://open-vsx.org) with `npx ovsx publish`.
 
 ## Updates after publishing

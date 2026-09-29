@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- **New license: PolyForm Shield 1.0.0.** Pocket Pilot stays free for everyone, including at work, and its source code stays public on GitHub to read, audit and improve. What changes: nobody may offer a product that competes with it, such as a copy, a rebrand or a paid version. The product page now says *source-available* instead of *open source*. Versions up to 0.4.3 remain under the MIT License.
+- **The app keeps its full height on iPhone.** After the on-screen keyboard closed, iOS sometimes didn't tell the page, which left the chat and the input box high on the screen with an empty band below until a reload. The app now takes the whole screen whenever nothing is being typed, and measures again when focus moves, the app comes back from the background or Safari restores the page. Editing a queued message no longer zooms the page in.
+- **"Waiting for you" only while the agent really waits for you.**
+  - While a request is open (an approval, a question, or an MCP server that needs a sign-in on your PC), the chat no longer shows *Working…* under it. The sign-in card names the server and says what to do: *Sign in to github-mcp-server on your PC. The agent is paused until you do.*
+  - The latest signal wins: once the agent writes or thinks again after a request, or tools of the same MCP server run again after a sign-in, the request counts as done even if the PC never said so. The banner, the *Needs you* label and the card go away.
+- **iPhone and iPad: add Pocket Pilot to the Home Screen before pairing.** iOS keeps the Home Screen app apart from Safari, so a pairing made in Safari didn't carry over to the app added afterwards. A pairing link (or the app) opened in Safari now starts with *Add Pocket Pilot to your Home Screen first* and three steps; pairing in Safari is still possible. The Home Screen app explains how to pair it if you paired in Safari first, and your PC lists the two apart (*iPhone (Safari)* and *iPhone · Home Screen app*). The Pocket Pilot panels, the product page and the README say to add the app to the Home Screen first.
+
 ## 0.4.3
 
 - **Pairing steps talk about your device, not an iPhone.** The Pocket Pilot panel in VS Code and in the GitHub Copilot app now reads *On your device, open mithawala.github.io/pocket-pilot/app — add it to your Home Screen first to get notifications*, and you confirm *with Face ID, your fingerprint or Windows Hello*. On an iPhone, the app itself still shows the exact *Share → Add to Home Screen* steps.

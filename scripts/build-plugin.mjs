@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Assembles the GitHub Copilot plugin (copilot-plugin/): copies the shared core (relay, tunnel,
 // pairing, passkeys, push), the AHP client/types, the secure channel and the QR encoder into the
-// extension's vendor/ folder with the same relative layout, and stamps the version.
+// extension's vendor/ folder with the same relative layout, stamps the version and adds the LICENSE.
 // The folder is committed so `copilot plugin install mithawala/pocket-pilot:copilot-plugin` works.
 //   node scripts/build-plugin.mjs          # write
 //   node scripts/build-plugin.mjs --check  # exit 1 if anything is out of date
@@ -36,6 +36,7 @@ for (const f of walk(path.join(root, 'pwa', 'vendor', 'ahp'))) {
   if (!rel.includes('/ws/')) add(rel, rel);
 }
 add('media/vendor/qrcode.js', 'media/vendor/qrcode.js');
+want.set(path.join(plugin, 'LICENSE'), fs.readFileSync(path.join(root, 'LICENSE')));
 want.set(path.join(ext, 'version.json'), Buffer.from(`${JSON.stringify({ version: pkg.version }, null, 2)}\n`));
 
 const manifestPath = path.join(plugin, 'plugin.json');

@@ -4,6 +4,7 @@
 import { AhpClient } from '../../vendor/ahp/client/index.js';
 import { rootReducer, sessionReducer, chatReducer, SUPPORTED_PROTOCOL_VERSIONS } from '../../vendor/ahp/types/index.js';
 import { S, has, uuid, effectiveStatus } from '../lib/format.js';
+import { waitingOn } from '../lib/asks.js';
 
 const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
@@ -302,14 +303,22 @@ export class HostStore extends EventTarget {
   }
 
   /**
-   * A session's status, corrected with its state when this app has it (see effectiveStatus): a working
-   * session must not show "Error" because an older sub-agent failed. Current extensions already send
-   * corrected statuses; this covers PCs that still run an older one.
+   * A session's status, corrected with its state when this app has it: a working session must not
+   * show "Error" because an older sub-agent failed (see effectiveStatus; current extensions already
+   * send corrected statuses, this covers older ones), and it only "needs you" while a request is
+   * really open in the chat this app follows (see waitingOn).
    */
   statusFor(summary) {
     const raw = summary?.status;
-    if (typeof raw !== 'number' || (raw & 31) !== S.Error) return raw;
-    return effectiveStatus(raw, this.sessionState.get(summary.resource));
+    if (typeof raw !== 'number') return raw;
+    const st = this.sessionState.get(summary.resource);
+    let status = (raw & 31) === S.Error ? effectiveStatus(raw, st) : raw;
+    if (has(status, S.Input) && st) {
+      const chat = this.chatFor(summary.resource);
+      const cs = chat ? this.chatState.get(chat) : null;
+      if (cs && waitingOn(st, chat, cs) === 0) status = (status & ~31) | (cs.activeTurn ? S.InProgress : S.Idle);
+    }
+    return status;
   }
 
   sortedSessions() {

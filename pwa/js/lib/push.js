@@ -9,8 +9,21 @@ export function isIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+/** "iPad" or "iPhone", for wording (iPadOS reports itself as a Mac with touch). */
+export function appleDevice() {
+  return /ipad/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'iPad' : 'iPhone';
+}
+
 export function isStandalone() {
   return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+/**
+ * Whether this is a browser whose Home Screen app keeps its own storage (iPhone and iPad): a pairing
+ * made in the browser doesn't carry over to the app, so the app should be added before pairing.
+ */
+export function pairInHomeScreenApp() {
+  return isIos() && !isStandalone();
 }
 
 /** iOS only delivers web push to apps added to the Home Screen. */

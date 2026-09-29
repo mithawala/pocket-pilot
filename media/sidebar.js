@@ -82,7 +82,7 @@
           body += `<section class="card qr-card">
             <h2>Pair a device</h2>
             ${appUrl ? `<ol class="pair-steps">
-              <li>On your device, open <a href="#" data-a="openUrl" data-url="${esc(appUrl)}">${esc(appHost)}</a><span class="muted"> — add it to your Home Screen first to get notifications</span></li>
+              <li>On your device, open <a href="#" data-a="openUrl" data-url="${esc(appUrl)}">${esc(appHost)}</a><span class="muted"> — on a phone or tablet, add it to your Home Screen first and pair from there</span></li>
               <li>Tap <b>Scan the QR code</b> in the app, or point your camera at it:</li>
             </ol>` : '<p class="scan">Scan with your phone or tablet camera</p>'}
             <div class="qr">${st.pairing.svg}</div>

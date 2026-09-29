@@ -3,6 +3,7 @@ import { html, Component, useState, useEffect, useRef } from '../lib/ui.js';
 import { renderMarkdown, renderInline, mdPlain, mdOf } from '../lib/markdown.js';
 import { highlightElement, rawLanguage } from '../lib/highlight.js';
 import { duration, haptic, providerLabel } from '../lib/format.js';
+import { openAsks, mcpServer } from '../lib/asks.js';
 import { Icon, Spinner, Switch, toast } from './common.js';
 
 /** Wraps each <pre> in a code block with a language label and Copy button, then highlights it. */
@@ -83,6 +84,8 @@ function ToolRow({ tc }) {
   const [open, setOpen] = useState(false);
   const running = tc.status === 'running' || tc.status === 'streaming';
   const failed = tc.status === 'cancelled' || tc.success === false;
+  // A request that is no longer open but never got an outcome (the agent moved on without one).
+  const unsettled = ['pending-confirmation', 'pending-result-confirmation', 'auth-required'].includes(tc.status);
   const preview = open ? inputPreview(tc) : null;
   const out = open ? resultText(tc) : '';
   const toggle = (e) => {
@@ -91,7 +94,7 @@ function ToolRow({ tc }) {
   };
   return html`<div class=${`tool ${failed ? 'failed' : ''}`}>
     <button class="head" onClick=${toggle} aria-expanded=${open}>
-      <span class="ts">${running ? html`<${Spinner} />` : failed ? html`<span class="errc"><${Icon} name="x" /></span>` : html`<span class="okc"><${Icon} name="check" /></span>`}</span>
+      <span class="ts">${running ? html`<${Spinner} />` : failed ? html`<span class="errc"><${Icon} name="x" /></span>` : unsettled ? html`<span class="dimc"><${Icon} name=${tc.status === 'auth-required' ? 'key' : 'shield'} /></span>` : html`<span class="okc"><${Icon} name="check" /></span>`}</span>
       <span class="tt" dangerouslySetInnerHTML=${{ __html: renderInline(toolLabel(tc)) }}></span>
       <${Icon} name=${open ? 'down' : 'right'} cls="tchev" />
     </button>
@@ -187,6 +190,16 @@ function ResultConfirmCard({ tc, turnId, ctx }) {
   </div>`;
 }
 
+/** An MCP tool paused on a sign-in, which only the PC can do. */
+function AuthCard({ tc, ctx }) {
+  const server = tc._meta?.mcpServerName || (mcpServer(tc) ? String(mcpServer(tc)).split(':').pop() : '') || tc.displayName || tc.toolName;
+  const tool = tc._meta?.mcpToolName;
+  return html`<div class="confirm info">
+    <div class="ch"><${Icon} name="key" /><span>Sign in to ${server} on your PC</span></div>
+    <div class="cm muted small">The agent is paused until you do${tool ? `, so it can use ${tool}` : ''}. Sign in from this chat in ${ctx.host || 'VS Code'}, or stop the agent to go on without it.</div>
+  </div>`;
+}
+
 function QuestionField({ q, value, onChange }) {
   if (q.kind === 'boolean') {
     return html`<div class="row"><span class="grow">${q.message}</span><${Switch} on=${!!value} label=${q.message} onChange=${onChange} /></div>`;
@@ -257,12 +270,12 @@ function InputRequestCard({ request, ctx }) {
   </div>`;
 }
 
-/** Groups consecutive plain tool calls so a long agent run stays readable. */
-function groupParts(parts) {
+/** Groups consecutive plain tool calls so a long agent run stays readable; open requests stand alone. */
+function groupParts(parts, open) {
   const out = [];
   let tools = null;
   for (const p of parts) {
-    const plainTool = p.kind === 'toolCall' && !['pending-confirmation', 'pending-result-confirmation', 'auth-required'].includes(p.toolCall.status);
+    const plainTool = p.kind === 'toolCall' && !open.has(p);
     if (plainTool) {
       if (!tools) out.push((tools = { kind: 'tools', calls: [] }));
       tools.calls.push(p.toolCall);
@@ -290,8 +303,8 @@ function answerText(part) {
   return bits.length ? `Answered · ${bits.join(' · ')}` : `Answered: ${mdPlain(req.message, 90)}`;
 }
 
-function Parts({ parts, turnId, active, ctx, retry }) {
-  const grouped = groupParts(parts);
+function Parts({ parts, turnId, active, ctx, retry, open }) {
+  const grouped = groupParts(parts, open);
   const lastIdx = grouped.length - 1;
   return grouped.map((p, i) => {
     const live = active && i === lastIdx;
@@ -303,11 +316,19 @@ function Parts({ parts, turnId, active, ctx, retry }) {
       case 'reasoning':
         return html`<${Reasoning} key=${p.id || i} text=${p.content} live=${live} />`;
       case 'toolCall':
-        if (p.toolCall.status === 'pending-confirmation') return active ? html`<${ConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />` : null;
-        if (p.toolCall.status === 'pending-result-confirmation') return active ? html`<${ResultConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />` : null;
-        return html`<div class="confirm info" key=${p.toolCall.toolCallId}><div class="ch"><${Icon} name="key" /><span>${p.toolCall.displayName} needs you to sign in on the PC.</span></div><div class="actions"></div></div>`;
+        // Only open requests get here (see groupParts).
+        if (p.toolCall.status === 'pending-confirmation') return html`<${ConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />`;
+        if (p.toolCall.status === 'pending-result-confirmation') return html`<${ResultConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />`;
+        return html`<${AuthCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} ctx=${ctx} />`;
       case 'inputRequest':
-        if (!p.response && active) return html`<${InputRequestCard} key=${p.request.id} request=${p.request} ctx=${ctx} />`;
+        if (open.has(p)) return html`<${InputRequestCard} key=${p.request.id} request=${p.request} ctx=${ctx} />`;
+        if (!p.response && active) {
+          // The agent went on without an answer from this app: it was dealt with on the PC.
+          return html`<div class="tools" key=${p.request.id}><div class="tool"><div class="head">
+            <span class="ts"><span class="dimc"><${Icon} name="chat" /></span></span>
+            <span class="tt">${mdPlain(p.request?.message || p.request?.questions?.[0]?.message, 90) || 'Question'}</span>
+          </div></div></div>`;
+        }
         return html`<div class="tools" key=${p.request.id}><div class=${`tool ${p.response === 'accept' ? '' : 'failed'}`}><div class="head">
           <span class="ts">${p.response === 'accept' ? html`<span class="okc"><${Icon} name="check" /></span>` : html`<span class="errc"><${Icon} name="x" /></span>`}</span>
           <span class="tt">${answerText(p)}</span>
@@ -349,12 +370,15 @@ export class Turn extends Component {
   render({ turn, active, activity, ctx, isLast }) {
     const parts = turn.responseParts || [];
     const last = parts[parts.length - 1];
-    const waiting = active && (!last || (last.kind !== 'markdown' && !(last.kind === 'toolCall' && ['running', 'streaming'].includes(last.toolCall.status)) && last.kind !== 'reasoning'));
+    // Requests still open in this turn; a past turn has none (see openAsks).
+    const open = new Set(active ? openAsks(turn) : []);
+    // "Working…" between steps, but not while the agent waits for you: the request's card says so.
+    const waiting = active && !open.size && (!last || (last.kind !== 'markdown' && !(last.kind === 'toolCall' && ['running', 'streaming'].includes(last.toolCall.status)) && last.kind !== 'reasoning'));
     const model = turn.message?.model?.id;
     return html`<div class="turn">
       <${UserMessage} message=${turn.message} />
       <${RespHead} provider=${ctx.provider} />
-      <${Parts} parts=${parts} turnId=${turn.id} active=${active} ctx=${ctx} retry=${isLast && turn.state === 'error' ? ctx.retry?.(turn) : null} />
+      <${Parts} parts=${parts} turnId=${turn.id} active=${active} ctx=${ctx} open=${open} retry=${isLast && turn.state === 'error' ? ctx.retry?.(turn) : null} />
       ${active && waiting && html`<div class="activity-line"><${Spinner} /><span class="shimmer">${activity || 'Working…'}</span></div>`}
       ${!active && html`<div class="turn-foot">
         ${turn.state === 'cancelled' && html`<span>Stopped</span>`}

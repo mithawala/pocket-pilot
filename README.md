@@ -45,9 +45,9 @@
    - download `cloudflared` (~55 MB, verified),
    - optionally enable auto-reconnect (secret gist, the only feature that uses your GitHub account).
 3. **Scan the QR code** with your phone's camera (for a tablet or another computer: **Copy link** and open it there). Check that the fingerprint matches, tap **Pair securely**, click **Allow** in VS Code and confirm with Face ID / fingerprint / Windows Hello.
+   - **iPhone and iPad:** add the app to your Home Screen *before* pairing: open [the app](https://mithawala.github.io/pocket-pilot/app/) in Safari, tap **Share → Add to Home Screen**, open Pocket Pilot from your Home Screen and tap **Scan the QR code** there. iOS keeps the Home Screen app apart from Safari (a pairing made in Safari doesn't carry over), and only the Home Screen app can show notifications. If you scan with the Camera app, the app in Safari walks you through this.
 4. Tap **Enable notifications**.
-   - **iPhone:** notifications require the app on your Home Screen — in Safari tap **Share → Add to Home Screen**, then open Pocket Pilot from there and enable notifications.
-   - **Android:** tap **Install** (or Chrome menu → *Add to Home screen*) for an app-like experience; notifications work in the browser too.
+   - **Android:** tap **Install** (or Chrome menu → *Add to Home screen*) for an app-like experience; notifications work in the browser too, and the installed app keeps the browser's pairing.
 
 The phone app lives at **https://mithawala.github.io/pocket-pilot/app/** — try it without pairing at [`/app/?demo`](https://mithawala.github.io/pocket-pilot/app/?demo). The product page is **https://mithawala.github.io/pocket-pilot/**.
 
@@ -118,24 +118,24 @@ GitHub Copilot has built-in remote control: `/remote on` (or `copilot --remote`)
 
 | | Copilot remote control (`/remote`) | Pocket Pilot |
 |---|---|---|
-| **Made by** | GitHub; official and supported. | An independent open-source project, in preview. |
+| **Made by** | GitHub; official and supported. | An independent project, in preview, with its source code on GitHub. |
 | **Where you use it** | The GitHub Mobile app and github.com. | An installable web app on iPhone and Android, with a desktop layout in any browser. |
 | **Which sessions** | Copilot CLI sessions, started in the terminal, VS Code or JetBrains. | Every session in VS Code's agent host, including Claude sessions — and, with the plugin, the chats in the GitHub Copilot app and CLI. |
-| **Turning it on** | Per session with `/remote on` or `copilot --remote` (the CLI can default to it with `"remoteSessions": true`). VS Code also needs the `github.copilot.chat.cli.remote.enabled` setting, and its docs list a workspace that maps to a GitHub repository. | Pair your phone once. All sessions show up, including ones you start later. |
-| **Starting new work from your phone** | Steers sessions already running on your machine. New work started from GitHub Mobile runs as a cloud agent on GitHub. | Starts new sessions on your own PC: pick the folder, model, mode, approvals and an optional new worktree. |
-| **Inside a session** | Live progress, steering and queued messages, approvals, questions, plan review, switching modes, stopping. | The same, plus the model with its thinking level and context size (kept in sync with VS Code's picker), dictation, photo and file attachments, and previews of files the agent links to. |
+| **Turning it on** | Per session with `/remote on` or `copilot --remote` (the CLI can default to it with `"remoteSessions": true`). VS Code also needs the `github.copilot.chat.cli.remote.enabled` setting, and its docs list a workspace that maps to a GitHub repository. | Pair your phone once (in the GitHub Copilot app, start it with `/pocket-pilot`). All sessions show up, including ones you start later. |
+| **Starting new work from your phone** | Steers sessions already running on your machine. New work started from GitHub Mobile runs as a cloud agent on GitHub. | In VS Code, starts new sessions on your own PC: pick the folder, model, mode, approvals and an optional new worktree. In the GitHub Copilot app, start them on your PC and they show up right away. |
+| **Inside a session** | Live progress, steering and queued messages, approvals, questions, plan review, switching modes, stopping. | The same, plus the model with its thinking level and context size (kept in sync with the model picker on your PC), dictation, photo and file attachments, and previews of files the agent links to. |
 | **Notifications** | Live activities (iOS) and live updates (Android) in GitHub Mobile. | Web Push sent from your PC when an agent needs you, finishes or fails. |
 | **Where your session goes** | Session events are sent to GitHub and synced to your GitHub account, where only you can see them. | Straight from your phone to your PC, end-to-end encrypted. The tunnel only relays ciphertext and nothing is stored in a cloud. |
-| **Signing in** | Your GitHub account. | Pairing you approve in VS Code, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone. |
+| **Signing in** | Your GitHub account. | Pairing you approve on your PC, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone. |
 | **Work accounts** | For Copilot Business and Enterprise, an admin must set the "Store local sessions in the Cloud" policy to "View and control". | Nothing to switch on at GitHub, but your company's policies still apply. |
 | **Network** | Your machine connects out to GitHub. | A Cloudflare quick tunnel (outbound port 7844), or a tunnel you choose. |
-| **Cost** | Included with Copilot. | Free and open source (MIT). |
+| **Cost** | Included with Copilot. | Free, including at work. The source code is public on GitHub. |
 
 **Choose `/remote` when** your organization provides it and you want the officially supported route, you also run Copilot in JetBrains, you want everything in GitHub Mobile next to cloud agent sessions and pull requests you can review and merge, or your network doesn't allow tunnels.
 
-**Choose Pocket Pilot when** you want every VS Code agent session on your phone without switching each one on, you want to start new sessions on your own PC from your phone, you use Claude sessions in VS Code, you want the phone link end-to-end encrypted with no copy of the session in a cloud, or you want model, thinking level and context size controls or a desktop browser layout.
+**Choose Pocket Pilot when** you want every agent session, in VS Code or the GitHub Copilot app, on your phone without switching each one on, you want to start new sessions on your own PC from your phone (VS Code), you use Claude sessions in VS Code, you want the phone link end-to-end encrypted with no copy of the session in a cloud, or you want model, thinking level and context size controls or a desktop browser layout.
 
-They work side by side: a session with `/remote on` still shows up in Pocket Pilot. Either way, your prompts go to the AI model exactly as they do in VS Code; what differs is how your phone reaches the session. If your organization has turned remote control off, check with them before using Pocket Pilot for work. It isn't a way around company policy.
+They work side by side: a session with `/remote on` still shows up in Pocket Pilot. Either way, your prompts go to the AI model exactly as they do on your PC; what differs is how your phone reaches the session. If your organization has turned remote control off, check with them before using Pocket Pilot for work. It isn't a way around company policy.
 
 Sources: GitHub Docs, [About remote control of Copilot CLI sessions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-remote-control) and [Steering a Copilot CLI session from another device](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/steer-remotely); GitHub Changelog, [remote control generally available](https://github.blog/changelog/2026-05-18-remote-control-for-copilot-cli-sessions-now-generally-available-on-mobile-web-and-vs-code/) and [GitHub Mobile live notifications](https://github.blog/changelog/2026-07-08-github-mobile-live-notifications-for-copilot-cli-sessions/); VS Code docs, [agent harnesses](https://code.visualstudio.com/docs/agents/run/agent-harnesses). Checked in September 2026.
 
@@ -170,4 +170,10 @@ Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agen
 
 ## License
 
-MIT
+Pocket Pilot is **source-available** under the [PolyForm Shield License 1.0.0](LICENSE). In plain words:
+
+- **Use it for free** for any purpose, including at work, on as many PCs and devices as you like.
+- **Read, audit and change it**, and send fixes or ideas as issues and pull requests.
+- **Don't offer a product that competes with it**, such as a copy, a rebrand or a paid version, even one that is free of charge.
+
+The [LICENSE](LICENSE) file has the exact terms; this summary doesn't replace them. Third-party code in the `vendor` folders keeps its own license (listed above). Versions up to and including 0.4.3 were released under the MIT License.

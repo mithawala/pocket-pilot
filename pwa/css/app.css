@@ -135,6 +135,7 @@ a { color: var(--accent); }
 .btn.primary:hover, .btn.primary:active, .btn.ok:hover, .btn.ok:active { background: var(--btn-2); }
 .btn.danger { color: var(--err); }
 .btn.block { width: 100%; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
 .btn.sm { height: 32px; padding: 0 11px; font-size: 13px; }
 .btn:disabled { opacity: 0.5; pointer-events: none; }
 .btn svg { width: 17px; height: 17px; flex: none; }
@@ -313,7 +314,7 @@ a.btn { text-decoration: none; }
 .tool .ts { width: 16px; height: 16px; display: grid; place-items: center; flex: none; }
 .tool .ts svg { width: 15px; height: 15px; }
 .tool .ts .spinner { width: 13px; height: 13px; border-width: 1.5px; }
-.tool .okc { color: var(--ok); } .tool .errc { color: var(--err); }
+.tool .okc { color: var(--ok); } .tool .errc { color: var(--err); } .tool .dimc { color: var(--muted); }
 .tool .tt { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .tool .tt code { font-family: var(--mono); font-size: 0.9em; color: var(--strong); background: var(--surface); border-radius: 4px; padding: 0.05em 0.3em; }
 .tool .tt .file-link { color: var(--accent); }
@@ -417,7 +418,7 @@ a.btn { text-decoration: none; }
 .pending-item .pa button:hover { color: var(--text); background: var(--surface); }
 .pending-item.editing { border-color: var(--focus); }
 .pending-item .pe { flex: 1; min-width: 0; }
-.pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: 240px; padding: 2px 0; font: inherit; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }
+.pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: 240px; padding: 2px 0; font: inherit; font-size: 16px; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }
 .pending-item .pe-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px; }
 .pending-item .pe-bar .muted { flex: 1; min-width: 0; }
 .pending-item .pe-bar .btn.sm { height: 28px; padding: 0 10px; }
@@ -478,6 +479,16 @@ button.set-row:active, a.set-row:active { background: var(--surface); }
 .progress-steps .ps.active { color: var(--strong); border-color: var(--focus); }
 .progress-steps .ps.done { color: var(--ok); }
 .ios-tip { margin: 14px 0; padding: 11px 13px; font-size: 13.5px; color: var(--text-2); background: color-mix(in srgb, var(--accent) 9%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-2)); border-radius: 8px; }
+.home-first { margin: 16px 0 0; padding: 14px 15px 6px; text-align: left; background: color-mix(in srgb, var(--accent) 9%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line-2)); border-radius: 10px; }
+.home-first .hf-head { display: flex; align-items: center; gap: 9px; color: var(--strong); font-size: 15.5px; }
+.home-first .hf-head svg { width: 20px; height: 20px; flex: none; color: var(--accent); }
+.home-first p { margin: 8px 0 4px; font-size: 13.5px; color: var(--text-2); }
+.home-first ol { margin: 8px 0; padding: 0; list-style: none; counter-reset: hf; }
+.home-first li { position: relative; margin: 0 0 9px; padding-left: 30px; font-size: 14px; line-height: 1.45; color: var(--text); counter-increment: hf; }
+.home-first li::before { content: counter(hf); position: absolute; left: 0; top: 0; width: 21px; height: 21px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: var(--btn); border-radius: 50%; }
+.home-first b { color: var(--strong); font-weight: 600; }
+.home-first .hf-ic { display: inline-grid; place-items: center; width: 22px; height: 22px; vertical-align: -5px; color: var(--accent); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 5px; }
+.home-first .hf-ic svg { width: 14px; height: 14px; }
 details.card > summary { cursor: pointer; }
 
 /* ---------- QR scanner */

@@ -84,7 +84,7 @@
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <a class="phone-callout" href="./app/"><svg class="ic"><use href="#i-phone" /></svg><span>On your phone? <b>Open the Pocket Pilot app</b></span><svg class="ic"><use href="#i-arrow" /></svg></a>
-          <div class="eyebrow"><span class="dot"></span>Free &amp; open source · For VS Code and the GitHub Copilot app</div>
+          <div class="eyebrow"><span class="dot"></span>Free · For VS Code and the GitHub Copilot app</div>
           <h1>Your coding agents, <span class="grad">in your pocket.</span></h1>
           <p class="lead">Every GitHub Copilot and Claude agent session — in VS Code or the GitHub Copilot app — on your phone, tablet or another computer, with the same history streaming live. Reply, approve tool calls, switch models and get notified the moment an agent needs you.</p>
           <div class="get" role="group" aria-label="Get Pocket Pilot">
@@ -178,7 +178,7 @@
         <div><svg class="ic"><use href="#i-lock" /></svg><span><b>End-to-end encrypted</b>even the tunnel can't read it</span></div>
         <div><svg class="ic"><use href="#i-face" /></svg><span><b>Face ID &amp; fingerprint</b>passkey on every phone</span></div>
         <div><svg class="ic"><use href="#i-eye-off" /></svg><span><b>No servers, no accounts</b>nothing to sign up for</span></div>
-        <div><svg class="ic"><use href="#i-gift" /></svg><span><b>Free &amp; open source</b>MIT licensed</span></div>
+        <div><svg class="ic"><use href="#i-gift" /></svg><span><b>Free, even at work</b>source code on GitHub</span></div>
       </div>
     </section>
 
@@ -362,9 +362,9 @@
                   </div>
                   <div class="tab-panel" data-panel="ios">
                     <ol>
-                      <li>Open <a href="./app/">the app</a> in <b>Safari</b> and tap <b>Share → Add to Home Screen</b>.</li>
-                      <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.</li>
-                      <li>iOS only shows notifications for Home Screen apps, so always use that icon.</li>
+                      <li>Open <a href="./app/">the app</a> in <b>Safari</b> and tap <b>Share → Add to Home Screen</b> <em>before</em> you pair.</li>
+                      <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b> (not the Camera app: it opens Safari).</li>
+                      <li>iPhone keeps the Home Screen app apart from Safari, and only it can show notifications, so always use that icon. Paired in Safari first? Pair the Home Screen app once more.</li>
                     </ol>
                   </div>
                   <div class="tab-panel" data-panel="android" hidden>
@@ -495,7 +495,7 @@
             <details><summary>Does it work with the GitHub Copilot app?</summary><p>Yes. Install the <a href="#copilot-app">Pocket Pilot plugin</a> and type <code>/pocket-pilot</code> in a chat: the Pocket Pilot panel opens next to it with the QR code. The plugin runs with the app's own chats and uses the same encrypted tunnel, pairing, passkeys and notifications as the VS Code extension. Approvals and questions can be answered on the PC or the phone; whichever answers first wins.</p></details>
             <details><summary>What happens if I close or delete the chat I ran <code>/pocket-pilot</code> in?</summary><p>Nothing you'd notice. Remote access isn't tied to that chat: another open chat takes over within seconds, the Cloudflare tunnel keeps its address, and your devices reconnect by themselves. With no chat open, it waits, and your devices reconnect as soon as you open a chat again, even after restarting the app. To turn it off, run <code>/pocket-pilot off</code> or click <b>Turn off</b> in the Pocket Pilot panel.</p></details>
             <details><summary>Does my PC have to stay on?</summary><p>Yes. VS Code (or the GitHub Copilot app / CLI) must be running and the PC awake. If the VS Code window running Pocket Pilot closes, another window takes over automatically; in the GitHub Copilot app, another open chat does.</p></details>
-            <details><summary>Does it work on iPhone?</summary><p>Yes. Add the app to your Home Screen from Safari to get notifications (iOS 16.4+) and a full-screen experience, then pair with the scanner built into the app.</p></details>
+            <details><summary>Does it work on iPhone?</summary><p>Yes. Add the app to your Home Screen from Safari <em>before</em> you pair, then pair with the scanner built into the app: that gets you notifications (iOS 16.4+) and a full-screen app. iPhone keeps the Home Screen app apart from Safari, so a pairing made in Safari doesn't carry over; if that happened, pair the Home Screen app once more and remove the Safari entry from your paired devices. The app walks you through it.</p></details>
             <details><summary>Can I pair a tablet or another computer?</summary><p>Yes, any device with a current browser. Scan the QR code on a phone or tablet; on a computer, click <b>Copy link</b> in the Pocket Pilot panel and open the link there. The passkey uses Face ID, your fingerprint, Windows Hello or the screen lock, and wide screens get a desktop layout with your sessions next to the chat.</p></details>
             <details><summary>I have several VS Code windows open. Which one do I use?</summary><p>Any of them. One window hosts the tunnel, and every other window shows the same panel: the QR code, the tunnel, your paired devices. Buttons work from any window, and a device's pairing request appears in the window you're using. Your devices see the sessions of all windows either way.</p></details>
             <details><summary>Why is Pocket Pilot listed under Extensions in the Copilot app?</summary><p>The plugin brings a small extension that runs alongside your chats; that's how they reach your phone. <b>Customize → Extensions</b> lists it as <i>pocket-pilot · Plugin: pocket-pilot</i>, and its switch turns Pocket Pilot on or off.</p></details>
@@ -505,11 +505,12 @@
             <details><summary>Does Pocket Pilot need my GitHub account?</summary><p>Not for remote access. VS Code and the GitHub Copilot app stay signed in to GitHub on their own, and Pocket Pilot never touches that sign-in or your token. Only the optional auto-reconnect asks to use your GitHub account once, to keep your PC's encrypted address in a secret gist.</p></details>
             <details><summary>What's the auto-reconnect gist on my GitHub account?</summary><p>One secret gist, <i>Pocket Pilot · encrypted addresses of your PCs</i>, with one small file per PC. Each file holds only that PC's current tunnel address, encrypted with a key that only its paired devices have, so GitHub or anyone who finds it sees nothing useful. Pocket Pilot updates a PC's file when its address changes (after a reboot or <b>New tunnel</b>); your devices read it without signing in and reconnect by themselves. You can turn auto-reconnect off and delete the gist any time.</p></details>
             <details><summary>What if I lose a device?</summary><p>Remove it in the Pocket Pilot panel in VS Code or the GitHub Copilot app and it's disconnected instantly, or run <b>Pocket Pilot: Reset Identity</b> to invalidate every pairing. Anyone holding the device would also need your Face ID or fingerprint.</p></details>
-            <details><summary>Is it really free?</summary><p>Yes. Cloudflare quick tunnels are free and need no account, the app is a static site on GitHub Pages, and notifications use your phone's built-in push service. Pocket Pilot has no servers and no paid tier.</p></details>
+            <details><summary>Is it really free?</summary><p>Yes. Cloudflare quick tunnels are free and need no account, the app is a static site on GitHub Pages, and notifications use your phone's built-in push service. Pocket Pilot has no servers and no paid tier, and you may use it at work too.</p></details>
+            <details><summary>Is Pocket Pilot open source?</summary><p>Its source code is public on GitHub, so you can read and audit every line, suggest changes and self-host the app. It's licensed under the <a href="https://github.com/mithawala/pocket-pilot/blob/main/LICENSE">PolyForm Shield License 1.0.0</a>: you may use it for free for anything, including work, but not offer a competing product such as a copy, a rebrand or a paid version. That makes it source-available rather than open source.</p></details>
             <details><summary>How do I update?</summary><p>From the VS Code Marketplace, VS Code updates Pocket Pilot for you. If you installed the <code>.vsix</code>, the extension checks for new releases and offers a one-click <b>Update</b> (or run <b>Pocket Pilot: Check for Updates</b>). For the Copilot app, run <code>copilot plugin update pocket-pilot@pocket-pilot</code> with VS Code and the app closed (see the uninstall question); <code>/pocket-pilot</code> tells you when there's a new version. The phone app updates itself.</p></details>
             <details><summary>How do I uninstall the Copilot app plugin?</summary><p>Run <code>/pocket-pilot off</code>, quit VS Code and the GitHub Copilot app, then run <code>copilot plugin uninstall pocket-pilot@pocket-pilot</code> in a terminal. On Windows, VS Code keeps a watch on every installed Copilot plugin's folder while it runs, so uninstalling or updating any plugin then fails with <i>Access is denied (os error 5)</i>. That isn't specific to Pocket Pilot.</p></details>
             <details><summary>My network blocks the tunnel. Now what?</summary><p>Quick tunnels need outbound port 7844. In VS Code, set <code>pocketPilot.tunnel.mode</code> to <code>custom</code> and use a tunnel your network allows, such as a named Cloudflare tunnel, Dev Tunnels or Tailscale Funnel.</p></details>
-            <details><summary>Is this an official Microsoft or GitHub product?</summary><p>No. Pocket Pilot is an independent open-source project built on the Agent Host Protocol that VS Code exposes locally.</p></details>
+            <details><summary>Is this an official Microsoft or GitHub product?</summary><p>No. Pocket Pilot is an independent project by Asif Mithawala, built on the Agent Host Protocol that VS Code exposes locally.</p></details>
           </div>
         </div>
       </div>
@@ -524,7 +525,7 @@
         </div>
         <div class="cmp" data-reveal role="table" aria-label="Copilot remote control compared with Pocket Pilot">
           <div class="cmp-row cmp-head" role="row"><div role="columnheader"><span class="sr">Topic</span></div><div role="columnheader">Copilot remote control</div><div role="columnheader">Pocket Pilot</div></div>
-          <div class="cmp-row" role="row"><div role="rowheader">Made by</div><div role="cell" data-label="/remote">GitHub. Official and supported.</div><div role="cell" data-label="Pocket Pilot">An independent open-source project, in preview.</div></div>
+          <div class="cmp-row" role="row"><div role="rowheader">Made by</div><div role="cell" data-label="/remote">GitHub. Official and supported.</div><div role="cell" data-label="Pocket Pilot">An independent project, in preview, with its source code on GitHub.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Where you use it</div><div role="cell" data-label="/remote">The GitHub Mobile app and github.com.</div><div role="cell" data-label="Pocket Pilot">An installable web app on iPhone and Android, with a desktop layout in any browser.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Which sessions</div><div role="cell" data-label="/remote">Copilot CLI sessions, started in the terminal, VS Code or JetBrains.</div><div role="cell" data-label="Pocket Pilot">Every session in VS Code's agent host, including Claude sessions, and, with the plugin, the chats in the GitHub Copilot app and CLI.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Turning it on</div><div role="cell" data-label="/remote">Per session with <code>/remote on</code> or <code>copilot --remote</code> (the CLI can default to it). VS Code also needs the <code>github.copilot.chat.cli.remote.enabled</code> setting, and its docs list a workspace that maps to a GitHub repository.</div><div role="cell" data-label="Pocket Pilot">Pair your phone once (in the GitHub Copilot app, start it with <code>/pocket-pilot</code>). All sessions show up, including ones you start later.</div></div>
@@ -535,7 +536,7 @@
           <div class="cmp-row" role="row"><div role="rowheader">Signing in</div><div role="cell" data-label="/remote">Your GitHub account.</div><div role="cell" data-label="Pocket Pilot">Pairing you approve on your PC, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Work accounts</div><div role="cell" data-label="/remote">For Copilot Business and Enterprise, an admin must set the "Store local sessions in the Cloud" policy to "View and control".</div><div role="cell" data-label="Pocket Pilot">Nothing to switch on at GitHub, but your company's policies still apply.</div></div>
           <div class="cmp-row" role="row"><div role="rowheader">Network</div><div role="cell" data-label="/remote">Your machine connects out to GitHub.</div><div role="cell" data-label="Pocket Pilot">A Cloudflare quick tunnel (outbound port 7844), or a tunnel you choose.</div></div>
-          <div class="cmp-row" role="row"><div role="rowheader">Cost</div><div role="cell" data-label="/remote">Included with Copilot.</div><div role="cell" data-label="Pocket Pilot">Free and open source (MIT).</div></div>
+          <div class="cmp-row" role="row"><div role="rowheader">Cost</div><div role="cell" data-label="/remote">Included with Copilot.</div><div role="cell" data-label="Pocket Pilot">Free, including at work. The source code is public on GitHub.</div></div>
         </div>
         <div class="cmp-when" data-reveal>
           <div class="when">
@@ -586,7 +587,7 @@
         <a href="https://github.com/mithawala/pocket-pilot">Source</a>
       </nav>
       <p class="made-by">Developed by <a href="https://mithawala.com">Asif Mithawala</a></p>
-      <p>MIT licensed. An independent project, not affiliated with Microsoft, GitHub, Anthropic or Cloudflare. All trademarks belong to their owners.</p>
+      <p>Source available under the <a href="https://github.com/mithawala/pocket-pilot/blob/main/LICENSE">PolyForm Shield License 1.0.0</a>. An independent project, not affiliated with Microsoft, GitHub, Anthropic or Cloudflare. All trademarks belong to their owners.</p>
     </div>
   </footer>
 </body>
