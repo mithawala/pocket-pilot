@@ -213,6 +213,8 @@ export function ConnectionBanner({ conn, store, onRepair }) {
   if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your PC…</div>`;
   if (st === 'passkey') return html`<div class="banner"><${Icon} name="lock" size="18" />Confirm it's you (Face ID / fingerprint)…</div>`;
   if (st === 'code') return html`<div class="banner"><${Icon} name="lock" size="18" />Enter the code from your authenticator app…</div>`;
+  if (st === 'approval') return html`<div class="banner"><${Spinner} />Click Allow on your PC to set up this device again…</div>`;
+  if (st === 'setup') return html`<div class="banner"><${Icon} name="key" size="18" />Setting up this device again…</div>`;
   if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This device is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
   if (st === 'locked') return html`<div class="banner err"><${Icon} name="lock" size="18" /><span>${conn.detail || 'Verification failed.'}</span><button onClick=${() => { conn.stopped = false; conn.poke(); }}>Retry</button></div>`;
   return html`<div class="banner warn"><${Spinner} /><span>PC offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
@@ -255,7 +257,7 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
       <img class="brand" src="./icons/icon.svg" alt="" />
       <button class="titles" onClick=${onSwitchHost} aria-label="Switch PC">
         <h1 class="host"><span>${host.hostName}</span><${Icon} name="down" /></h1>
-        <div class="sub"><span class=${`dot ${online ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`}></span>${online ? `${list.length} session${list.length === 1 ? '' : 's'}` : { passkey: 'confirm it’s you', code: 'waiting for your code', authenticating: 'connecting', unpaired: 'not paired', locked: 'locked' }[conn.state] || conn.state}</div>
+        <div class="sub"><span class=${`dot ${online ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`}></span>${online ? `${list.length} session${list.length === 1 ? '' : 's'}` : { passkey: 'confirm it’s you', code: 'waiting for your code', approval: 'waiting for your PC', setup: 'setting up', authenticating: 'connecting', unpaired: 'not paired', locked: 'locked' }[conn.state] || conn.state}</div>
       </button>
       <button class="icon-btn" onClick=${onSettings} aria-label="Settings"><${Icon} name="gear" /></button>
     </div>

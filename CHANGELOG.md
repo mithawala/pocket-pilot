@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- **A passkey that stopped working no longer locks a device out.** If the passkey was saved in an app you have since turned off or removed (Microsoft Authenticator, 1Password…), the phone can't find it anymore and used to stay stuck until you paired it again. Now *Confirm it's you* explains what happened and offers **Set up this device again**: click **Allow** on your PC, then save a new passkey or use an authenticator app. The device stays paired. The code prompt offers the same when the authenticator app is gone. Setting up again always needs a yes on the PC, even when pairing doesn't.
+- **Face ID after a tap when the browser needs one.** iPhones before iOS 17.4 only show the passkey sheet right after a tap, so the automatic Face ID prompt could fail without a word. The app now falls back to a **Use Face ID or fingerprint** button, and to **Save a passkey** while pairing.
+- **Chrome and Edge on iPhone.** Edge on iPhone was taken for Safari; the app now names the browser correctly in its advice and in your list of paired devices. Home Screen apps added from Chrome or Edge work like ones added from Safari, and the product page and README say so.
+
 ## 0.6.0
 
 - **Authenticator apps as an alternative to passkeys.** A device can now confirm it's you with 6-digit codes from Google Authenticator, Microsoft Authenticator, the Passwords app, 1Password or any other authenticator app, instead of Face ID or a fingerprint. Pick it when pairing (*No Face ID or passkey? Use an authenticator app*), or when saving the passkey fails. The phone makes the setup key and sends it end-to-end encrypted; add it to your app by link, QR code or by hand, and enter a code to confirm. Your PC then asks for a code every 12 hours by default. A code works only once, and wrong codes lock the device for 15 minutes, doubling up to a day. The setting *Pocket Pilot › Security: Authenticator App* turns it off (passkeys only). The GitHub Copilot app plugin supports it too.

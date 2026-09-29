@@ -6,7 +6,7 @@ import { pairWithHost } from '../net/host-connection.js';
 import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { deviceDescription } from '../lib/format.js';
 import { isIos, isStandalone, appleDevice, pairInHomeScreenApp } from '../lib/push.js';
-import { AuthenticatorSetup, PasskeyTrouble, loadSetup, clearSetup } from './authenticator.js';
+import { AuthenticatorSetup, FactorChooser, loadSetup, clearSetup } from './authenticator.js';
 
 // The product page sits one level above the app on GitHub Pages (…/pocket-pilot/app/ → …/pocket-pilot/).
 const PRODUCT_URL = /\/app\/$/.test(location.pathname) ? new URL('../', location.href).href : 'https://mithawala.github.io/pocket-pilot/';
@@ -52,11 +52,11 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     </div>
     ${inBrowser && html`<${HomeScreenFirst} />`}
     <button class=${`btn block ${inBrowser ? '' : 'primary'}`} style="margin-top:14px" onClick=${onScan}><${Icon} name="phone" /> ${inBrowser ? 'Scan the QR code here instead' : 'Scan the QR code'}</button>
-    ${inApp && html`<div class="ios-tip">Paired in Safari before? This Home Screen app doesn't share Safari's pairing, so pair it once more: tap <b>Scan the QR code</b> and scan a code from your PC. You can remove the Safari entry from <b>Paired devices</b> on your PC.</div>`}
+    ${inApp && html`<div class="ios-tip">Paired in the browser before (Safari, Chrome or Edge)? This Home Screen app doesn't share the browser's pairing, so pair it once more: tap <b>Scan the QR code</b> and scan a code from your PC. You can remove the browser's entry from <b>Paired devices</b> on your PC.</div>`}
     <ol class="steps">
       <li><div><b>Install Pocket Pilot on your PC</b><div class="muted small">The VS Code extension or the GitHub Copilot app plugin — see <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
       <li><div><b>Turn on remote access</b><div class="muted small">VS Code: “Start remote access” in the Pocket Pilot panel. Copilot app or CLI: type <b>/pocket-pilot</b> in a chat.</div></div></li>
-      <li><div><b>Scan the QR code</b><div class="muted small">${inBrowser ? 'In the app on your Home Screen (see above).' : inApp ? 'With the button above. The Camera app would open the code in Safari, which pairs separately.' : 'With the button above or your camera — on a computer, paste the pairing link below.'}</div></div></li>
+      <li><div><b>Scan the QR code</b><div class="muted small">${inBrowser ? 'In the app on your Home Screen (see above).' : inApp ? 'With the button above. The Camera app would open the code in your browser, which pairs separately.' : 'With the button above or your camera — on a computer, paste the pairing link below.'}</div></div></li>
     </ol>
     <div class="trust">
       <div><${Icon} name="lock" size="18" /> End-to-end encrypted — even the tunnel can’t read it</div>
@@ -122,30 +122,21 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
   });
   const factor = async (req) => {
     const allowTotp = req.alternatives.includes('totp');
-    let mode = live.current.method === 'totp' && allowTotp ? 'totp' : 'passkey';
-    if (mode === 'passkey' && !(await passkeysAvailable())) {
-      if (!allowTotp) throw new Error(live.current.method === 'totp' ? 'Your PC only accepts passkeys, and this device has no Face ID, fingerprint or screen lock.' : 'No Face ID / fingerprint / screen lock is set up on this device');
-      mode = 'totp';
-    }
-    for (;;) {
-      if (mode === 'totp') {
-        let s = live.current.setup;
-        if (!s?.verified) {
-          const r = await request({ kind: 'totp' });
-          if (r === 'passkey') {
-            mode = 'passkey';
-            continue;
-          }
-          s = r;
-        }
-        return { totp: { secret: s.secret, code: await codeAt(s.secret, stepAt()) } };
-      }
+    const canPasskey = await passkeysAvailable();
+    const wantsTotp = live.current.method === 'totp';
+    const ready = live.current.setup;
+    if (wantsTotp && allowTotp && ready?.verified) return { totp: { secret: ready.secret, code: await codeAt(ready.secret, stepAt()) } };
+    if (!canPasskey && !allowTotp) throw new Error(wantsTotp ? 'Your PC only accepts passkeys, and this device has no Face ID, fingerprint or screen lock.' : 'No Face ID / fingerprint / screen lock is set up on this device');
+    let error = null;
+    if (canPasskey && !(wantsTotp && allowTotp)) {
+      // Straight away where the browser allows it; older iPhones need the tap on the card below.
       try {
         return { credential: await webauthn.register(req) };
       } catch (err) {
-        if (await request({ kind: 'trouble', error: err, allowTotp }) === 'totp') mode = 'totp';
+        error = err;
       }
     }
+    return request({ kind: 'factor', req, error, allowTotp, canPasskey, startWithTotp: (wantsTotp || !canPasskey) && allowTotp, intro: wantsTotp && !allowTotp ? 'Your PC only accepts passkeys, so save one here.' : '' });
   };
   const start = async () => {
     setError(null);
@@ -209,13 +200,8 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
         <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your PC — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && !ask && html`<div class="muted small">${factorNote}</div>`}</div>
       </div>`)}
     </div>`}
-    ${ask?.kind === 'trouble' && html`<${PasskeyTrouble} error=${ask.error} allowTotp=${ask.allowTotp}
-      onRetry=${() => ask.resolve('retry')} onTotp=${() => { setMethod('totp'); ask.resolve('totp'); }} onCancel=${() => ask.reject(new Error('Pairing cancelled'))} />`}
-    ${ask?.kind === 'totp' && totpSetup({
-      note: 'Your PC is waiting. Add Pocket Pilot to your authenticator app, then enter its code here.',
-      onReady: (s) => { setSetup(s); ask.resolve(s); },
-      onPasskey: canPasskey ? () => { setMethod('passkey'); ask.resolve('passkey'); } : null,
-      onCancel: () => ask.reject(new Error('Pairing cancelled')),
-    })}
+    ${ask?.kind === 'factor' && html`<${FactorChooser} error=${ask.error} register=${() => webauthn.register(ask.req)} allowTotp=${ask.allowTotp} canPasskey=${ask.canPasskey} startWithTotp=${ask.startWithTotp}
+      storageKey=${setupKey} hostName=${info.name || 'PC'} deviceName=${name.trim() || dev.name} intro=${ask.intro}
+      onDone=${(r) => ask.resolve(r)} onCancel=${() => ask.reject(new Error('Pairing cancelled'))} />`}
   </div>`;
 }

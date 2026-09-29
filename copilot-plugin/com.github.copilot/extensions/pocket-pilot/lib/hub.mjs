@@ -152,23 +152,27 @@ async function boot(log, cleanups) {
     return { path: file, uri: pathToFileURL(file).href };
   }
 
-  /** A new device wants in: ask on the pairing page and in the session that showed the QR code. */
+  /** A new device wants in (or a paired one wants to set up its passkey again): ask on the pairing page and in the session that showed the QR code. */
   function approveDevice(info) {
     const id = crypto.randomUUID();
-    log('info', `Pairing request from "${info.name}" (${info.platform || '?'}${info.ip ? `, ${info.ip}` : ''})`);
+    const what = info.reset ? 'Setup' : 'Pairing';
+    log('info', `${what} request from "${info.name}" (${info.platform || '?'}${info.ip ? `, ${info.ip}` : ''})`);
     return new Promise((resolve) => {
       const done = (allow) => {
         if (!approvals.has(id)) return;
         approvals.delete(id);
         clearTimeout(timer);
-        log('info', `Pairing "${info.name}": ${allow ? 'allowed' : 'declined'}`);
+        log('info', `${what} "${info.name}": ${allow ? 'allowed' : 'declined'}`);
         resolve(!!allow);
       };
       const timer = setTimeout(() => done(false), 3 * 60 * 1000);
-      approvals.set(id, { id, name: String(info.name || 'Device').slice(0, 80), platform: info.platform, ip: info.ip, done });
+      approvals.set(id, { id, name: String(info.name || 'Device').slice(0, 80), platform: info.platform, ip: info.ip, reset: !!info.reset, done });
       const asker = state.lastPairRequester;
       if (asker && !asker.ch.closed && asker.canConfirm) {
-        asker.rpc.request('confirm', {
+        asker.rpc.request('confirm', info.reset ? {
+          title: `Let "${info.name}" set up Face ID or an authenticator app again?`,
+          message: `${[info.platform, info.ip && `from ${info.ip}`].filter(Boolean).join(' · ')}\n\nThis paired device can't use its passkey or authenticator app anymore. Only allow this if you asked for it on the device yourself just now.`,
+        } : {
           title: `Allow "${info.name}" to control your Copilot sessions?`,
           message: `${[info.platform, info.ip && `from ${info.ip}`].filter(Boolean).join(' · ')}\n\nThe device will be able to read your open sessions, chat with the agent and approve its tool calls. Only allow this if you just scanned the QR code (or opened the pairing link) yourself.`,
         }, 3 * 60 * 1000).then((v) => typeof v === 'boolean' && done(v)).catch(() => {});

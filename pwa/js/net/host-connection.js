@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.6.1';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 
@@ -173,12 +173,19 @@ class SecureAhpTransport {
  * Events: 'state' {state, detail}, 'ready' {transport, welcome}, 'control' {message}, 'record' {record}
  */
 export class HostConnection extends EventTarget {
-  constructor(record, { WebSocketImpl, webauthn, askCode, fetchImpl, isVisible = () => true } = {}) {
+  /**
+   * Second factor on reconnect, answered by the app's UI: `confirmPasskey(request)` resolves to a passkey
+   * assertion, `askCode(request)` to an authenticator code, and either to `{ reset: true }` when the person
+   * can't use them anymore and sets up a new one with `enrollFactor(request)` (after a yes on the PC).
+   */
+  constructor(record, { WebSocketImpl, webauthn, confirmPasskey, askCode, enrollFactor, fetchImpl, isVisible = () => true } = {}) {
     super();
     this.record = record;
     this.WebSocketImpl = WebSocketImpl;
     this.webauthn = webauthn;
+    this.confirmPasskey = confirmPasskey || ((req) => this.webauthn.assert(req));
     this.askCode = askCode || (() => Promise.reject(new Error('No way to enter a code here')));
+    this.enrollFactor = enrollFactor || (async (req) => ({ credential: await this.webauthn.register(req) }));
     this.fetchImpl = fetchImpl;
     this.isVisible = isVisible;
     this.state = 'idle';
@@ -221,7 +228,7 @@ export class HostConnection extends EventTarget {
   /** Reconnect immediately (e.g. when the app returns to the foreground). */
   poke() {
     if (this.stopped) return;
-    if (['online', 'connecting', 'authenticating', 'passkey', 'code'].includes(this.state)) return;
+    if (['online', 'connecting', 'authenticating', 'passkey', 'code', 'approval', 'setup'].includes(this.state)) return;
     this.attempt = 0;
     this._schedule(0);
   }
@@ -263,24 +270,42 @@ export class HostConnection extends EventTarget {
         const m = await ch.recvControl(12 * 60 * 1000);
         if (m.t === 'passkey.challenge') {
           this._setState('passkey');
+          let reply;
           try {
-            const assertion = await this.webauthn.assert({ challenge: m.challenge, credentialId: m.credentialId, rpId: m.rpId });
-            await ch.sendControl({ t: 'passkey.assertion', assertion });
+            const r = await this.confirmPasskey({ challenge: m.challenge, credentialId: m.credentialId, rpId: m.rpId, hostName: this.record.hostName });
+            reply = r?.reset ? { t: 'factor.reset' } : { t: 'passkey.assertion', assertion: r };
           } catch (err) {
-            await ch.sendControl({ t: 'passkey.cancelled', reason: String(err?.message || err).slice(0, 200) });
+            reply = { t: 'passkey.cancelled', reason: String(err?.message || err).slice(0, 200) };
           }
+          await ch.sendControl(reply);
           this._setState('authenticating');
         } else if (m.t === 'totp.challenge') {
           this._setState('code');
-          let typed = null;
+          let answer = null;
           try {
-            typed = normalizeCode(await this.askCode({ hostName: this.record.hostName, deviceName: this.record.deviceName, wrong: !!m.wrong }));
+            answer = await this.askCode({ hostName: this.record.hostName, deviceName: this.record.deviceName, wrong: !!m.wrong });
           } catch {
             /* cancelled */
           }
+          const typed = answer && !answer.reset ? normalizeCode(answer) : null;
           if (typed) this._code = { code: typed, at: Date.now() };
           if (sock.closed && typed) throw new Error('Reconnecting to check the code');
-          await ch.sendControl(typed ? { t: 'totp.code', code: typed } : { t: 'totp.cancel' });
+          await ch.sendControl(answer?.reset ? { t: 'factor.reset' } : typed ? { t: 'totp.code', code: typed } : { t: 'totp.cancel' });
+          this._setState('authenticating');
+        } else if (m.t === 'pending') {
+          // Setting up the second factor again: the PC asks for a yes first.
+          this._setState('approval');
+        } else if (m.t === 'passkey.register') {
+          this._setState('setup');
+          let reply;
+          try {
+            const r = await this.enrollFactor({ challenge: m.challenge, userId: m.userId, userName: `${this.record.hostName || 'PC'} · Pocket Pilot`, displayName: this.record.deviceName, hostName: this.record.hostName, deviceName: this.record.deviceName, hostId: this.record.hostId, alternatives: Array.isArray(m.alternatives) ? m.alternatives : [] });
+            reply = r.totp ? { t: 'totp.enroll', secret: r.totp.secret, code: r.totp.code } : { t: 'passkey.registered', credential: r.credential };
+          } catch (err) {
+            reply = { t: 'passkey.unavailable', reason: String(err?.message || err).slice(0, 200) };
+          }
+          if (sock.closed) throw new Error('The connection to your PC was lost while this device was being set up. Try again.');
+          await ch.sendControl(reply);
           this._setState('authenticating');
         } else if (m.t === 'welcome') {
           welcome = m;

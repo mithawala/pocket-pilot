@@ -48,3 +48,23 @@ test('push prompt: closing the card hides it for good on this device, Home Scree
   storage.clear();
   assert.ok(paired().pushPrompt(), 'only this device\'s choice');
 });
+
+test('devices: Edge, Chrome and Firefox on an iPhone are named by their browser, not as Safari', async () => {
+  const { deviceDescription } = await import('../pwa/js/lib/format.js');
+  const { pairInHomeScreenApp } = await import('../pwa/js/lib/push.js');
+  const cases = [
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/140.0.3485.54 Mobile/15E148 Safari/605.1.15', 'iPhone · Edge'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.101 Mobile/15E148 Safari/604.1', 'iPhone · Chrome'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/143.0 Mobile/15E148 Safari/605.1.15', 'iPhone · Firefox'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1', 'iPhone · Safari'],
+    ['Mozilla/5.0 (Linux; Android 14; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 EdgA/140.0.3485.54', 'Android · Edge'],
+    ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.3485.54', 'Windows · Edge'],
+  ];
+  for (const [ua, platform] of cases) {
+    navigator.userAgent = ua;
+    assert.equal(deviceDescription().platform, platform);
+  }
+  // Every iPhone browser keeps its Home Screen app apart, so each gets the "Home Screen first" advice.
+  navigator.userAgent = cases[0][0];
+  assert.equal(pairInHomeScreenApp(), true);
+});

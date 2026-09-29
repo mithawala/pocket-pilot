@@ -587,8 +587,9 @@ class DeviceConnection extends EventEmitter {
     if (!device.passkey) return this._verifyTotp(device, auth);
     const challenge = b64u(crypto.randomBytes(32));
     await this.sendControl({ t: 'passkey.challenge', challenge, credentialId: device.passkey.credentialId, rpId: device.passkey.rpId });
-    const reply = await this._recvControl(180000);
+    const reply = await this._recvControl(FACTOR_TIMEOUT_MS);
     this._assertStillPaired(device.id);
+    if (reply.t === 'factor.reset') return this._resetFactor(device);
     if (reply.t !== 'passkey.assertion') {
       await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Face ID / fingerprint verification was cancelled.' });
       throw new RelayError('passkey-failed', 'Passkey cancelled', { quiet: true });
@@ -627,6 +628,7 @@ class DeviceConnection extends EventEmitter {
         await this.sendControl({ t: 'totp.challenge', wrong });
         const reply = await this._recvControl(FACTOR_TIMEOUT_MS);
         this._assertStillPaired(device.id);
+        if (reply.t === 'factor.reset') return this._resetFactor(device);
         if (reply.t !== 'totp.code') {
           await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Verification was cancelled.' });
           throw new RelayError('passkey-failed', 'Authenticator code cancelled', { quiet: true });
@@ -659,6 +661,29 @@ class DeviceConnection extends EventEmitter {
     }
     await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Too many wrong codes. Check that the date and time are set automatically on this device, then try again.' });
     throw new RelayError('passkey-failed', 'Too many wrong authenticator codes', { quiet: true });
+  }
+
+  /**
+   * A paired device that can't use its passkey or authenticator app anymore (the app that kept the passkey
+   * was turned off, say) sets up a new one. This always needs a yes on the PC, even when pairing doesn't:
+   * the device key alone must never be enough to get past the second factor.
+   */
+  async _resetFactor(device) {
+    const { o } = this.relay;
+    await this.sendControl({ t: 'pending', reason: 'approval' });
+    const approved = await withTimeout(Promise.resolve(o.approveDevice({ name: device.name, platform: device.platform, ip: this.meta.ip, origin: this.meta.origin, userAgent: this.meta.userAgent, reset: true })), 180000, false);
+    this._assertStillPaired(device.id);
+    if (!approved) {
+      this.relay._recordFailure(this.meta.ip);
+      await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Setting up this device again was declined (or timed out) on your PC.' });
+      throw new RelayError('passkey-failed', 'Second-factor reset declined', { quiet: true });
+    }
+    const { passkey = null, totp = null } = await this._enrollFactor({ id: device.id, name: device.name, policy: o.policy() });
+    this._assertStillPaired(device.id);
+    const updated = o.store.update(device.id, () => ({ passkey, totp: totp || undefined }));
+    if (!updated) throw new RelayError('revoked', 'Device was removed', { quiet: true, closeCode: 4401 });
+    this.log('info', `"${device.name}" set up ${totp ? 'an authenticator app' : passkey ? 'a new passkey' : 'no second factor'} again`);
+    return updated;
   }
 
   // ---------------------------------------------------------- secure messaging

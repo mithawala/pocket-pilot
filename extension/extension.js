@@ -659,12 +659,18 @@ class PocketPilotService {
 
   async _askApproval(info) {
     const where = [info.platform, info.ip && `from ${info.ip}`].filter(Boolean).join(' · ');
-    const choice = await vscode.window.showWarningMessage(
-      `Allow "${info.name}" to control your agent sessions?`,
-      { modal: true, detail: `${where}\n\nThe device will be able to read your sessions, chat with the agents and approve their tool calls. Only allow this if you just scanned the QR code (or opened the pairing link) yourself.` },
-      'Allow',
-    );
-    this.logLine('info', `Pairing request from "${info.name}" (${where}): ${choice === 'Allow' ? 'allowed' : 'declined'}`);
+    const choice = info.reset
+      ? await vscode.window.showWarningMessage(
+        `Let "${info.name}" set up Face ID or an authenticator app again?`,
+        { modal: true, detail: `${where}\n\nThis paired device can't use its passkey or authenticator app anymore, for example because the app that kept the passkey was turned off. Only allow this if you asked for it on the device yourself just now; otherwise remove the device in the Pocket Pilot panel.` },
+        'Allow',
+      )
+      : await vscode.window.showWarningMessage(
+        `Allow "${info.name}" to control your agent sessions?`,
+        { modal: true, detail: `${where}\n\nThe device will be able to read your sessions, chat with the agents and approve their tool calls. Only allow this if you just scanned the QR code (or opened the pairing link) yourself.` },
+        'Allow',
+      );
+    this.logLine('info', `${info.reset ? 'Setup' : 'Pairing'} request from "${info.name}" (${where}): ${choice === 'Allow' ? 'allowed' : 'declined'}`);
     return choice === 'Allow';
   }
 

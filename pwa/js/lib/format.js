@@ -76,7 +76,7 @@ export function hostApp(host) {
 export function deviceDescription() {
   const ua = navigator.userAgent;
   const os = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /mac os/i.test(ua) ? 'Mac' : /windows/i.test(ua) ? 'Windows' : /linux/i.test(ua) ? 'Linux' : 'Device';
-  const browser = /edg\//i.test(ua) ? 'Edge' : /crios|chrome/i.test(ua) ? 'Chrome' : /fxios|firefox/i.test(ua) ? 'Firefox' : /safari/i.test(ua) ? 'Safari' : 'Browser';
+  const browser = /edg(ios|a)?\//i.test(ua) ? 'Edge' : /crios|chrome/i.test(ua) ? 'Chrome' : /fxios|firefox/i.test(ua) ? 'Firefox' : /safari/i.test(ua) ? 'Safari' : 'Browser';
   let model = '';
   const m = /Android [\d.]+; ([^;)]+)/.exec(ua);
   if (m && !/^K$/.test(m[1])) model = m[1].trim();

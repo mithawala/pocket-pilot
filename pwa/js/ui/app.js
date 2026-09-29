@@ -2,7 +2,7 @@ import { html, useState, useEffect, useMemo, useChange } from '../lib/ui.js';
 import { db, persistStorage } from '../lib/db.js';
 import { HostConnection } from '../net/host-connection.js';
 import { HostStore } from '../model/host-store.js';
-import { webauthn } from '../lib/webauthn.js';
+import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { subscribe as pushSubscribe, currentSubscription } from '../lib/push.js';
 import { Toasts, Sheet, Icon, toast } from './common.js';
 import { SessionsScreen, DesktopHome } from './sessions.js';
@@ -10,7 +10,7 @@ import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
 import { SettingsScreen, NotificationSetup, pushPromptWanted } from './settings.js';
 import { QrScanner } from './scanner.js';
-import { CodeSheet } from './authenticator.js';
+import { CodeSheet, PasskeySheet, FactorSheet, clearSetup } from './authenticator.js';
 import { isPairingFragment } from '../core/secure-channel.js';
 
 function parseRoute() {
@@ -71,22 +71,57 @@ export class AppController extends EventTarget {
     this.dispatchEvent(new CustomEvent('change', { detail: {} }));
   }
 
-  /** The PC asks for a code from the authenticator app: shown as a sheet over whatever is open. */
-  _askCode({ hostName, deviceName, wrong }) {
-    this.codeRequest?.reject(new Error('Replaced'));
+  /**
+   * Shows one of the second-factor sheets over whatever is open ('code', 'passkey' or 'factor') and
+   * resolves with the answer.
+   */
+  _ask(kind, props) {
+    this.sheet?.reject(new Error('Replaced'));
     return new Promise((resolve, reject) => {
+      const request = { kind, ...props };
       const done = (fn) => (v) => {
-        if (this.codeRequest !== request) return;
-        this.codeRequest = null;
+        if (this.sheet !== request) return;
+        this.sheet = null;
         this._emit();
         fn(v);
       };
-      const request = { hostName, deviceName, wrong };
       request.resolve = done(resolve);
       request.reject = done(reject);
-      this.codeRequest = request;
+      this.sheet = request;
       this._emit();
     });
+  }
+
+  /** The PC asks for a code from the authenticator app. */
+  _askCode({ hostName, deviceName, wrong }) {
+    return this._ask('code', { hostName, deviceName, wrong });
+  }
+
+  /**
+   * The PC asks for the passkey again. Straight to Face ID where the browser allows it without a tap
+   * (iOS 17.4 and later, other browsers); otherwise, or when it fails, a sheet with a button.
+   */
+  async _confirmPasskey(req) {
+    let error = null;
+    if (document.visibilityState === 'visible' && document.hasFocus?.() !== false) {
+      try {
+        return await webauthn.assert(req);
+      } catch (err) {
+        error = err;
+      }
+    }
+    return this._ask('passkey', { hostName: req.hostName, error, assert: () => webauthn.assert(req) });
+  }
+
+  /** After a yes on the PC, this device sets up a new passkey or an authenticator app. */
+  async _enrollFactor(req) {
+    const canPasskey = await passkeysAvailable();
+    const allowTotp = req.alternatives.includes('totp');
+    if (!canPasskey && !allowTotp) throw new Error('This device has no Face ID, fingerprint or screen lock, and your PC only accepts passkeys.');
+    const storageKey = `again-${req.hostId}`;
+    const r = await this._ask('factor', { hostName: req.hostName, deviceName: req.deviceName, storageKey, allowTotp, canPasskey, register: () => webauthn.register(req) });
+    clearSetup(storageKey);
+    return r;
   }
 
   /** Whether this device closed the "Get notified" card (Settings still offers notifications). */
@@ -157,7 +192,7 @@ export class AppController extends EventTarget {
 
   _connectCurrent() {
     if (this.demo) return;
-    this.codeRequest?.reject(new Error('Switched PC'));
+    this.sheet?.reject(new Error('Switched PC'));
     if (this.active) {
       this.active.conn.stop();
       this.active.store.dispose();
@@ -165,7 +200,13 @@ export class AppController extends EventTarget {
     }
     const host = this.current;
     if (!host) return;
-    const conn = new HostConnection(host, { webauthn, askCode: (req) => this._askCode(req), isVisible: () => document.visibilityState === 'visible' });
+    const conn = new HostConnection(host, {
+      webauthn,
+      askCode: (req) => this._askCode(req),
+      confirmPasskey: (req) => this._confirmPasskey(req),
+      enrollFactor: (req) => this._enrollFactor(req),
+      isVisible: () => document.visibilityState === 'visible',
+    });
     conn.addEventListener('record', (e) => db.putHost(e.detail.record).catch(() => {}));
     conn.addEventListener('ready', () => this._syncPush(host).catch(() => {}));
     const store = new HostStore(conn);
@@ -380,7 +421,9 @@ export function App({ app }) {
     ${screen}
     <${Toasts} />
     <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />
-    <${CodeSheet} request=${app.codeRequest} onSubmit=${(code) => app.codeRequest?.resolve(code)} onCancel=${() => app.codeRequest?.reject(new Error('cancelled'))} />
+    <${CodeSheet} request=${app.sheet?.kind === 'code' ? app.sheet : null} onSubmit=${(code) => app.sheet?.resolve(code)} onReset=${() => app.sheet?.resolve({ reset: true })} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
+    <${PasskeySheet} request=${app.sheet?.kind === 'passkey' ? app.sheet : null} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
+    <${FactorSheet} request=${app.sheet?.kind === 'factor' ? app.sheet : null} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
     ${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}
   </div>`;
 }

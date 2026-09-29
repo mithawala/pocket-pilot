@@ -370,6 +370,77 @@ test('authenticator codes lock the device after too many wrong ones, and can be 
   }
 });
 
+test('a device that can no longer use its passkey sets up another factor after a yes on the PC', async () => {
+  const env = await setupRelay({ policy: { passkey: 'required', passkeyGraceHours: 0, requireApproval: false } });
+  const wa = softWebAuthn('http://localhost:5173');
+  const conns = [];
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Louise iPhone', platform: 'iPhone · Home Screen app', webauthn: wa });
+    assert.equal(env.approvals.length, 0, 'pairing needed no approval on this PC');
+    const dev = env.store.list()[0];
+    assert.ok(dev.passkey?.credentialId);
+
+    // The app that kept the passkey was turned off, so Face ID finds nothing: set up again, with codes this time.
+    const secret = newSecret();
+    const states = [];
+    const conn = new HostConnection(record, {
+      webauthn: wa,
+      confirmPasskey: async () => ({ reset: true }),
+      enrollFactor: async (req) => {
+        assert.deepEqual(req.alternatives, ['totp']);
+        assert.equal(req.deviceName, 'Louise iPhone');
+        return { totp: { secret, code: await codeAt(secret, stepAt()) } };
+      },
+    });
+    conns.push(conn);
+    conn.addEventListener('state', (e) => states.push(e.detail.state));
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { welcome } = await ready;
+    assert.equal(env.approvals.length, 1, 'setting up again always needs a yes on the PC, even when pairing does not');
+    assert.equal(env.approvals[0].reset, true);
+    assert.ok(states.includes('approval') && states.includes('setup'), states.join(','));
+    assert.equal(welcome.factor, 'totp');
+    let now = env.store.list()[0];
+    assert.equal(now.id, dev.id, 'the same device, not a new pairing');
+    assert.equal(now.passkey, null);
+    assert.equal(now.totp.secret, secret);
+    conn.stop();
+
+    // And back to a passkey from the code prompt ("Lost your authenticator app?").
+    const back = new HostConnection(record, { webauthn: wa, askCode: async () => ({ reset: true }) });
+    conns.push(back);
+    const ready2 = waitEvent(back, 'ready');
+    back.start();
+    const { welcome: w2 } = await ready2;
+    now = env.store.list()[0];
+    assert.equal(w2.factor, 'passkey');
+    assert.ok(now.passkey?.credentialId);
+    assert.equal(now.totp, undefined);
+    assert.equal(env.approvals.length, 2);
+  } finally {
+    for (const c of conns) c.stop();
+    await env.cleanup();
+  }
+});
+
+test('setting up a device again is refused without a yes on the PC', async () => {
+  const env = await setupRelay({ policy: { passkey: 'required', passkeyGraceHours: 0 }, approve: async (info) => !info.reset });
+  const wa = softWebAuthn('http://localhost:5173');
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Stolen phone', platform: 'x', webauthn: wa });
+    conn = new HostConnection(record, { webauthn: wa, confirmPasskey: async () => ({ reset: true }), enrollFactor: async () => { throw new Error('should not get this far'); } });
+    const locked = waitEvent(conn, 'state', (d) => d.state === 'locked');
+    conn.start();
+    assert.match((await locked).detail, /declined/);
+    assert.ok(env.store.list()[0].passkey?.credentialId, 'the old passkey stays');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
 test('malformed request targets get a 400 instead of crashing the relay', async () => {
   const env = await setupRelay();
   const net = await import('node:net');
