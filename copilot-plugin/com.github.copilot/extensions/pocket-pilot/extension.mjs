@@ -53,6 +53,16 @@ function insideVsCode() {
 }
 
 const clip = (s, n = CLIP) => (typeof s === 'string' && s.length > n ? `${s.slice(0, n)}\n… (truncated)` : s);
+const INLINE_PICTURE = 4 * 1024 * 1024;
+
+/** A message's attachments as the phone shows them: files by path, small pasted pictures inline. */
+function slimAttachments(list) {
+  if (!Array.isArray(list) || !list.length) return undefined;
+  return list.filter((a) => a && typeof a === 'object').map((a) => ({
+    type: a.type, path: a.path, displayName: a.displayName, title: a.title, mimeType: a.mimeType,
+    ...(a.type === 'blob' && /^image\//.test(a.mimeType || '') && typeof a.data === 'string' && a.data.length <= INLINE_PICTURE ? { data: a.data } : {}),
+  }));
+}
 
 /** Keeps what the phone renders; drops model internals (encrypted reasoning, telemetry, prompts). */
 function slim(e) {
@@ -60,7 +70,7 @@ function slim(e) {
   let data = d;
   switch (e.type) {
     case 'user.message':
-      data = { content: d.content, messageId: d.messageId, source: d.source, delivery: d.delivery, isAutopilotContinuation: d.isAutopilotContinuation };
+      data = { content: d.content, messageId: d.messageId, source: d.source, delivery: d.delivery, isAutopilotContinuation: d.isAutopilotContinuation, attachments: slimAttachments(d.attachments) };
       break;
     case 'assistant.message':
       data = {

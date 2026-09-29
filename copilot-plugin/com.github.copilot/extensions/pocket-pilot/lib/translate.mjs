@@ -52,6 +52,45 @@ export function fileUri(p) {
   }
 }
 
+const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', heic: 'image/heic', heif: 'image/heif', avif: 'image/avif' };
+/** Inline pictures up to this size (base64) travel with the chat; bigger ones show as a chip. */
+const MAX_INLINE_PICTURE = 4 * 1024 * 1024;
+
+export function imageTypeOf(file) {
+  return IMAGE_TYPES[String(file || '').split('.').pop().toLowerCase()] || '';
+}
+
+/** How a local path is compared (Windows paths ignore case). */
+export function fileKey(p) {
+  const abs = path.resolve(String(p));
+  return process.platform === 'win32' ? abs.toLowerCase() : abs;
+}
+
+/**
+ * The runtime's message attachments as Agent Host Protocol attachments: files (pasted pictures among
+ * them) by URI, pictures sent inline as they are, and the rest (folders, selections) as labels.
+ * `onFile(path)` hears about every attached file, which the phone may then read.
+ */
+export function messageAttachments(list, onFile) {
+  const out = [];
+  for (const a of Array.isArray(list) ? list : []) {
+    if (!a || typeof a !== 'object') continue;
+    const label = String(a.displayName || a.title || (a.path ? path.basename(a.path) : '') || 'Attachment');
+    if (a.type === 'file' && a.path) {
+      const uri = fileUri(a.path);
+      if (!uri) continue;
+      onFile?.(a.path);
+      const type = /^image\//.test(a.mimeType || '') ? a.mimeType : imageTypeOf(a.path);
+      out.push({ type: 'resource', uri, label, ...(type ? { displayKind: 'image', _meta: { contentType: type } } : {}) });
+    } else if (a.type === 'blob' && /^image\//.test(a.mimeType || '') && typeof a.data === 'string' && a.data.length <= MAX_INLINE_PICTURE) {
+      out.push({ type: 'embeddedResource', label: a.displayName || 'Pasted image', data: a.data, contentType: a.mimeType, displayKind: 'image' });
+    } else if (a.type === 'blob' || a.type === 'directory' || a.type === 'selection' || a.type === 'file') {
+      out.push({ type: 'simple', label, ...(a.type === 'blob' && /^image\//.test(a.mimeType || '') ? { displayKind: 'image' } : {}) });
+    }
+  }
+  return out;
+}
+
 function fileLink(p) {
   const name = String(p).split(/[\\/]/).filter(Boolean).pop() || String(p);
   const uri = fileUri(p);
@@ -157,6 +196,8 @@ export class SessionTranslator {
     this.partialAt = new Map();
     this.live = false;
     this.seq = 0;
+    /** Files attached to this chat's messages (the phone may read them). */
+    this.files = new Set();
   }
 
   get activeTurnId() {
@@ -280,9 +321,9 @@ export class SessionTranslator {
     return { id, startedAt: startedAtMs, parts: new Map(), tools: new Map(), hidden: new Set(), usage: { inputTokens: 0, outputTokens: 0 }, aborted: false };
   }
 
-  _startTurn(id, ts, text) {
+  _startTurn(id, ts, text, attachments) {
     this.turn = this._newTurn(id, ts);
-    const message = { text: String(text ?? ''), origin: { kind: 'user' }, ...(this.model ? { model: this.model } : {}) };
+    const message = { text: String(text ?? ''), origin: { kind: 'user' }, ...(this.model ? { model: this.model } : {}), ...(attachments?.length ? { attachments } : {}) };
     this._emit({ type: 'chat/turnStarted', turnId: id, startedAt: new Date(ts).toISOString(), message });
   }
 
@@ -310,7 +351,7 @@ export class SessionTranslator {
     }
     if (this.turn && system) return;
     if (this.turn) this._endTurn(ts, this.turn.aborted ? 'cancelled' : 'complete');
-    this._startTurn(`u-${d.messageId || e.id || ++this.seq}`, ts, content);
+    this._startTurn(`u-${d.messageId || e.id || ++this.seq}`, ts, content, messageAttachments(d.attachments, (p) => this.files.add(fileKey(p))));
     this.turn.bound = true;
   }
 

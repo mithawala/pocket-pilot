@@ -6,15 +6,25 @@ import { ConnectionBanner } from './sessions.js';
 import { statusOf, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
 import { waitingOn } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
+import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
+import { openPictures } from './viewer.js';
 
 const PAGE = 25;
 
 function FileViewer({ store, uri, onClose }) {
   const [state, setState] = useState({ loading: true });
   const codeRef = useRef(null);
+  const name = uri ? filePath(uri).split(/[\\/]/).pop() : '';
+  // A picture the agent links to opens as a picture (an SVG file stays code).
+  const picture = uri && /^image\/(?!svg)/.test(mimeFromName(uri)) ? { type: 'resource', uri, label: name } : null;
+  const read = (u) => store.readImage(u);
   useEffect(() => {
     if (!uri) return;
     setState({ loading: true });
+    if (picture) {
+      loadPicture(picture, read).then((r) => setState({ url: r.url }), (err) => setState({ error: pictureError(err) }));
+      return;
+    }
     store.readFile(uri).then((r) => {
       let text = r.data;
       if (r.encoding === 'base64') {
@@ -32,9 +42,11 @@ function FileViewer({ store, uri, onClose }) {
   useEffect(() => {
     if (state.text && lang && state.text.length < 120000 && codeRef.current) highlightElement(codeRef.current).catch(() => {});
   }, [state.text, lang]);
-  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} doneLabel="Close" title=${uri ? filePath(uri).split(/[\\/]/).pop() : ''}>
+  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} doneLabel="Close" title=${name}>
     <div class="kv" style="margin-bottom:8px">${uri ? filePath(uri) : ''}</div>
-    ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>` : html`<div class="md"><pre><code key=${uri} ref=${codeRef} class=${lang ? `language-${lang}` : ''}>${state.text}</code></pre></div>`}
+    ${state.loading ? html`<${Spinner} />` : state.error ? html`<div class="errpart">${state.error}</div>`
+      : state.url ? html`<button type="button" class="file-img" onClick=${() => openPictures([{ att: picture, read }], 0)} aria-label=${`View ${name} full screen`}><img src=${state.url} alt=${name} /></button>`
+      : html`<div class="md"><pre><code key=${uri} ref=${codeRef} class=${lang ? `language-${lang}` : ''}>${state.text}</code></pre></div>`}
   </${Sheet}>`;
 }
 
@@ -88,6 +100,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
     chat,
     provider,
     host: hostApp(conn?.record),
+    readImage: (u) => store.readImage(u),
     modelName: (id) => models.find((m) => m.id === id)?.name || id,
     // A failed last turn can be sent again as it was, with the model now selected.
     retry: (turn) => () => {
@@ -199,7 +212,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
           ${hidden > 0 && html`<button class="btn sm load-older" onClick=${() => setShown(shown + PAGE)}>Show ${Math.min(PAGE, hidden)} earlier turns</button>`}
           ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} isLast=${!active && t.id === lastTurnId} ctx=${ctx} />`)}
           ${active && html`<${Turn} key=${active.id} turn=${active} active=${true} activity=${chatState.activity || session?.activity} ctx=${ctx} />`}
-          ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} />`)}
+          ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} read=${ctx.readImage} />`)}
           ${empty && html`<div class="chat-empty">
             <div class="big"><${Icon} name="sparkle" /></div>
             <h2>${providerLabel(provider)} is ready</h2>

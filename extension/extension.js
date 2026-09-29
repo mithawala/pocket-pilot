@@ -10,6 +10,7 @@ const identityLib = require('./core/identity');
 const agentHost = require('./core/agentHost');
 const { cmpVersion } = agentHost;
 const { SessionMonitor } = require('./core/monitor');
+const { isSessionAttachment } = require('./core/attachments');
 const { PersistentTunnel } = require('./core/tunnel');
 const { GistRendezvous } = require('./core/rendezvous');
 const { SharedState } = require('./shared');
@@ -787,6 +788,8 @@ class PocketPilotService {
     } catch {
       return false;
     }
+    // Pictures and files pasted into a chat, so the phone can show them.
+    if (isSessionAttachment(p, this.userData, this.monitor.sessions.keys())) return true;
     return this.monitor.workingDirectories().some((d) => {
       try {
         return isInside(p, vscode.Uri.parse(d).fsPath);

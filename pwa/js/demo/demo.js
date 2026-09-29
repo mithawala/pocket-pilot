@@ -45,6 +45,25 @@ function tool(id, toolName, displayName, kind, invocation, past, input, output) 
 
 const userMsg = (text, model = 'claude-opus-5.5', config = { thinkingLevel: 'max', contextSize: 1000000 }) => ({ text, origin: { kind: 'user' }, model: { id: model, config } });
 
+// A pasted screenshot, the way VS Code keeps it: a file on the PC that the app reads when it's shown.
+const DEMO_PICTURE = 'file:///c%3A/Users/you/AppData/Roaming/Code/agentSessionData/demo-dark/attachments/demo/Pasted%20Image.png';
+const pictureOf = (uri, label) => ({ type: 'resource', uri, label, displayKind: 'image', _meta: { 'vscode.agentHost.snapshotAttachment': { isSnapshot: true, contentType: 'image/png' } } });
+
+// The settings page before dark mode, drawn as an SVG.
+function settingsScreenshot() {
+  const row = (y, label, value) => `<rect x="24" y="${y}" width="342" height="52" rx="10" fill="#fff" stroke="#e3e6ea"/><text x="42" y="${y + 32}" font-size="16" fill="#1f2328">${label}</text><text x="348" y="${y + 32}" font-size="15" fill="#6e7781" text-anchor="end">${value}</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="390" height="640" viewBox="0 0 390 640" font-family="Segoe UI, -apple-system, sans-serif">
+<rect width="390" height="640" fill="#f6f8fa"/><rect width="390" height="64" fill="#fff"/><rect y="63" width="390" height="1" fill="#e3e6ea"/>
+<text x="24" y="41" font-size="21" font-weight="700" fill="#1f2328">Settings</text><circle cx="356" cy="32" r="15" fill="#dbe9ff"/><text x="356" y="38" font-size="14" font-weight="700" fill="#2f6feb" text-anchor="middle">AK</text>
+<text x="28" y="104" font-size="12" font-weight="700" fill="#6e7781" letter-spacing="1">ACCOUNT</text>
+${row(116, 'Profile', 'Ada K.')}${row(176, 'Notifications', 'On')}${row(236, 'Language', 'English')}
+<text x="28" y="330" font-size="12" font-weight="700" fill="#6e7781" letter-spacing="1">APPEARANCE</text>
+${row(342, 'Theme', 'Light only')}${row(402, 'Text size', 'Default')}
+<rect x="24" y="482" width="342" height="92" rx="10" fill="#fff8c5" stroke="#eac54f"/><text x="42" y="514" font-size="15" font-weight="600" fill="#7d4e00">No dark mode yet</text>
+<text x="42" y="540" font-size="14" fill="#7d4e00">Add a toggle here that remembers</text><text x="42" y="560" font-size="14" fill="#7d4e00">the choice.</text>
+</svg>`;
+}
+
 function folder(name) {
   return `file:///c%3A/Users/you/code/${name}`;
 }
@@ -134,7 +153,7 @@ function sessionsData() {
   add('dark', 'Add dark mode to the settings page', 'copilotcli', 'acme-web', S.InProgress | S.IsRead, 0, 'Editing ThemeToggle.tsx', {
     activeTurn: {
       id: 'demo-dark-t1', startedAt: ago(2), usage: undefined,
-      message: userMsg('Add a dark mode toggle to the settings page and remember the choice.'),
+      message: { ...userMsg('Add a dark mode toggle to the settings page and remember the choice. This is how it looks now:'), attachments: [pictureOf(DEMO_PICTURE, 'Pasted Image')] },
       responseParts: [
         tool('d1', 'view', 'Read', 'read', 'Read [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)', 'Read [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)', { path: 'src/settings/Page.tsx' }),
         tool('d2', 'create', 'Create File', 'create', 'Create [ThemeToggle.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/ThemeToggle.tsx)', 'Created [ThemeToggle.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/ThemeToggle.tsx)', { path: 'src/settings/ThemeToggle.tsx' }),
@@ -350,6 +369,11 @@ class DemoStore extends HostStore {
 
   async readFile(uri) {
     return { data: `// ${decodeURIComponent(uri.split('/').pop())}\n// (demo) The real app shows the file from your PC here.\nexport function example() {\n  return 42;\n}\n`, encoding: 'utf-8' };
+  }
+
+  async readImage(uri) {
+    if (uri !== DEMO_PICTURE) throw new Error('This picture is only on the PC (demo)');
+    return { data: btoa(settingsScreenshot()), encoding: 'base64', contentType: 'image/svg+xml' };
   }
 
   async createSession({ provider, folder: dir, config, text, model }) {

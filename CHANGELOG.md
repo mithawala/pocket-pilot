@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- **Pictures in chats.** Screenshots pasted into a chat on your PC, in VS Code or the GitHub Copilot app, now show in the conversation on your phone, and so do the photos you send from it. Tap one to see it full screen: pinch or double-tap to zoom, swipe to the next one, and swipe down, tap **×** or press Escape to close. Queued and steering messages show their pictures instead of just "2 attachments", and so does a photo waiting to be sent. A picture the agent links to opens as a picture too. The phone needs Pocket Pilot 0.7 on your PC to read a chat's pictures; with an older version it says so.
+- **The app fills the screen on iPhone again.** Once the keyboard had been open, iOS could keep a Home Screen app short of the screen, with a dark band at the bottom, until the app was closed. The app now notices and makes iOS measure the screen again, without losing your place in the list.
+
 ## 0.6.7
 
 - **Credits for all third-party code.** The new `THIRD-PARTY-NOTICES.md` lists every bundled library with its license, credits the icon sets the app and the product page use (Feather, Lucide and the GitHub mark from Octicons), and includes their license texts. It ships with the extension, the GitHub Copilot app plugin and the product page. The QR code library now comes with its MIT license file too. Pocket Pilot's own license is unchanged.

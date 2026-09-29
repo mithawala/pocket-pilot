@@ -4,7 +4,9 @@ import { renderMarkdown, renderInline, mdPlain, mdOf } from '../lib/markdown.js'
 import { highlightElement, rawLanguage } from '../lib/highlight.js';
 import { duration, haptic, providerLabel } from '../lib/format.js';
 import { openAsks, mcpServer } from '../lib/asks.js';
+import { splitAttachments } from '../lib/attachments.js';
 import { Icon, Spinner, Switch, toast } from './common.js';
+import { Thumbs } from './viewer.js';
 
 /** Wraps each <pre> in a code block with a language label and Copy button, then highlights it. */
 function enhanceCode(root) {
@@ -349,12 +351,13 @@ function Parts({ parts, turnId, active, ctx, retry, open }) {
   });
 }
 
-function UserMessage({ message, pending }) {
-  const atts = (message.attachments || []).filter((a) => a.type !== 'simple' || !/browser pages|workspace/i.test(a.label || ''));
+function UserMessage({ message, pending, read }) {
+  const { images, others } = splitAttachments(message);
   return html`<div class="msg-user">
     <div>
-      <div class=${`bubble ${pending ? 'pending' : ''}`}>${message.text}</div>
-      ${atts.length > 0 && html`<div class="att">${atts.map((a, i) => html`<span class="chip" key=${i}><${Icon} name=${a.type === 'embeddedResource' ? 'image' : 'clip'} /><span>${a.label}</span></span>`)}</div>`}
+      ${(message.text || !images.length) && html`<div class=${`bubble ${pending ? 'pending' : ''}`}>${message.text}</div>`}
+      ${images.length > 0 && html`<${Thumbs} images=${images} read=${read} />`}
+      ${others.length > 0 && html`<div class="att">${others.map((a, i) => html`<span class="chip" key=${i}><${Icon} name=${a.displayKind === 'image' ? 'image' : 'clip'} /><span>${a.label}</span></span>`)}</div>`}
     </div>
   </div>`;
 }
@@ -376,7 +379,7 @@ export class Turn extends Component {
     const waiting = active && !open.size && (!last || (last.kind !== 'markdown' && !(last.kind === 'toolCall' && ['running', 'streaming'].includes(last.toolCall.status)) && last.kind !== 'reasoning'));
     const model = turn.message?.model?.id;
     return html`<div class="turn">
-      <${UserMessage} message=${turn.message} />
+      <${UserMessage} message=${turn.message} read=${ctx.readImage} />
       <${RespHead} provider=${ctx.provider} />
       <${Parts} parts=${parts} turnId=${turn.id} active=${active} ctx=${ctx} open=${open} retry=${isLast && turn.state === 'error' ? ctx.retry?.(turn) : null} />
       ${active && waiting && html`<div class="activity-line"><${Spinner} /><span class="shimmer">${activity || 'Working…'}</span></div>`}
@@ -390,6 +393,6 @@ export class Turn extends Component {
   }
 }
 
-export function PendingTurn({ message }) {
-  return html`<div class="turn"><${UserMessage} message=${message} pending=${true} /><div class="activity-line"><${Spinner} /><span class="shimmer">Sending…</span></div></div>`;
+export function PendingTurn({ message, read }) {
+  return html`<div class="turn"><${UserMessage} message=${message} pending=${true} read=${read} /><div class="activity-line"><${Spinner} /><span class="shimmer">Sending…</span></div></div>`;
 }

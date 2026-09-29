@@ -63,7 +63,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg-2); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.5; }
 body { -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
 button, input, textarea, select { font: inherit; color: inherit; }
 /* 16px keeps iOS from zooming into focused fields. */
@@ -240,6 +240,42 @@ a.btn { text-decoration: none; }
 .msg-user .bubble { padding: 9px 13px; color: var(--strong); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 12px 12px 3px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-user .bubble.pending { opacity: 0.6; }
 .msg-user .att { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+
+/* ---------- pictures in chats: thumbnails, and the full-screen viewer (ui/viewer.js) */
+.thumbs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 100%; margin-top: 6px; }
+.thumb { position: relative; display: grid; place-items: center; align-content: center; gap: 4px; width: 104px; height: 104px; padding: 0; overflow: hidden; color: var(--muted); background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; cursor: zoom-in; }
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-touch-callout: none; }
+.thumb.ready { display: block; }
+.thumb:not(.ready) { padding: 8px; }
+.thumb.loading > svg { opacity: 0.55; }
+.thumb.failed { border-style: dashed; cursor: pointer; }
+.thumb .thumb-label { max-width: 100%; overflow: hidden; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+/* One picture: shown whole, like a photo in a messaging app. */
+.thumbs.one .thumb.ready { width: auto; height: auto; background: transparent; }
+.thumbs.one .thumb.ready img { width: auto; height: auto; max-width: min(220px, 58vw); max-height: 260px; object-fit: contain; }
+.thumbs.sm { justify-content: flex-start; margin: 5px 0 2px; }
+.thumbs.sm .thumb { width: 52px; height: 52px; border-radius: 6px; }
+.thumbs.sm .thumb .thumb-label { display: none; }
+.thumbs.xs { display: contents; }
+.thumbs.xs .thumb { width: 22px; height: 22px; margin-left: -4px; padding: 0; border: none; border-radius: 4px; }
+.thumbs.xs .thumb .thumb-label { display: none; }
+.thumbs.xs .thumb > svg { width: 14px; height: 14px; }
+.file-img { display: block; width: 100%; padding: 0; background: var(--bg-3); border-radius: 6px; cursor: zoom-in; }
+.file-img img { display: block; max-width: 100%; max-height: 60vh; margin: 0 auto; }
+.viewer { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; color: #fff; background: #000; animation: fade 0.15s ease; }
+.viewer-bar { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-top) + 6px) 10px 6px 16px; background: #000; }
+.viewer-title { flex: 1; min-width: 0; overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-count { margin-left: 6px; font-weight: 400; color: rgba(255, 255, 255, 0.7); }
+.viewer-btn { display: grid; place-items: center; flex: none; width: 42px; height: 42px; color: #fff; background: rgba(255, 255, 255, 0.14); border-radius: 50%; }
+.viewer-btn:hover, .viewer-btn:focus-visible { background: rgba(255, 255, 255, 0.26); }
+.viewer-stage { position: relative; flex: 1; min-height: 0; margin-bottom: var(--safe-bottom); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.viewer-stage img { position: absolute; inset: 0; max-width: 100%; max-height: 100%; margin: auto; transform-origin: center center; will-change: transform; -webkit-touch-callout: none; }
+.viewer-stage > .spinner { position: absolute; left: 50%; top: 50%; margin: -14px 0 0 -14px; }
+.viewer-error { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 24px; text-align: center; color: rgba(255, 255, 255, 0.85); }
+.viewer-error p { max-width: 320px; margin: 0; }
+.viewer-prev, .viewer-next { position: absolute; top: 50%; z-index: 2; margin-top: -21px; }
+.viewer-prev { left: 10px; }
+.viewer-next { right: 10px; }
 .resp-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--strong); }
 .resp-head .av { width: 22px; height: 22px; flex: none; border-radius: 6px; }
 .resp-head .av.claude { box-shadow: 0 0 0 1.5px #cc7a58; }
@@ -413,13 +449,16 @@ a.btn { text-decoration: none; }
 .pending-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; max-width: 860px; margin: 0 auto 6px; }
 .pending-item { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 5px 4px 5px 10px; font-size: 13px; color: var(--text-2); background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; }
 .pending-item > svg { width: 14px; height: 14px; margin-top: 4px; color: var(--muted); flex: none; }
-.pending-item .pt { flex: 1; min-width: 0; padding: 2px 0; text-align: left; color: inherit; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: text; }
+.pending-item .pb { flex: 1; min-width: 0; }
+.pending-item .pt { width: 100%; min-width: 0; padding: 2px 0; text-align: left; color: inherit; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: text; }
 .pending-item .pt.open { display: block; -webkit-line-clamp: unset; line-clamp: none; max-height: 40vh; overflow-y: auto; }
 .pending-item .pt b { font-weight: 600; color: var(--muted); margin-right: 2px; }
 .pending-item .pt:hover { color: var(--text); }
 .pending-item .pa { display: flex; flex: none; gap: 1px; }
 .pending-item .pa button { display: grid; place-items: center; width: 28px; height: 26px; color: var(--muted); border-radius: 5px; }
 .pending-item .pa button:hover { color: var(--text); background: var(--surface); }
+.pending-item .att { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 2px; }
+.chip.pic { padding-left: 7px; }
 .pending-item.editing { border-color: var(--focus); }
 .pending-item .pe { flex: 1; min-width: 0; }
 .pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: 240px; padding: 2px 0; font: inherit; font-size: 16px; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }

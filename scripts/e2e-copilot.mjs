@@ -2,8 +2,8 @@
 // End-to-end check of the GitHub Copilot plugin against the REAL Copilot runtime:
 //   runtime (with copilot-plugin loaded) -> extension process -> hub -> encrypted relay -> phone store.
 // The phone pairs, sees the session, sends a message, approves a shell command and gets the answer;
-// then a message typed "on the PC" shows up on the phone. Uses a throwaway POCKET_PILOT_HOME, a local
-// tunnel (no cloudflared) and a small model.
+// then messages typed "on the PC" show up on the phone, a picture attached to one included. Uses a
+// throwaway POCKET_PILOT_HOME, a local tunnel (no cloudflared) and a small model.
 //   node scripts/e2e-copilot.mjs [--sdk <copilot-sdk dir>] [--cli <copilot executable>] [--model gpt-5-mini]
 import fs from 'node:fs';
 import os from 'node:os';
@@ -175,6 +175,23 @@ const pc = await until(() => {
   return !cs.activeTurn && last?.message.text.includes('pineapple') ? last : null;
 }, 'the PC message on the phone', 120000);
 step(`PC turn mirrored: "${pc.message.text}" -> ${pc.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ').slice(0, 60)}`);
+
+// 2b. A picture attached on the PC (outside the session folder) shows on the phone, which may read it.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const shotDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-pictures-'));
+const shot = path.join(shotDir, 'screenshot.png');
+fs.writeFileSync(shot, PNG);
+await session.send({ prompt: 'Reply with just the word picture.', attachments: [{ type: 'file', path: shot, displayName: 'screenshot.png' }] });
+const withPicture = await until(() => {
+  const cs = store.chatState.get(chat);
+  const last = cs.turns[cs.turns.length - 1];
+  return !cs.activeTurn && last?.message.attachments?.some((a) => a.displayKind === 'image') ? last : null;
+}, 'the attached picture on the phone', 120000);
+const picture = withPicture.message.attachments.find((a) => a.displayKind === 'image');
+const read = await store.readImage(picture.uri);
+if (read.encoding !== 'base64' || !Buffer.from(read.data, 'base64').equals(PNG)) fail(`the phone read the wrong bytes for ${picture.uri}`);
+step(`PC picture on the phone: ${picture.label} (${read.contentType}, ${PNG.length} bytes read through the relay)`);
+fs.rmSync(shotDir, { recursive: true, force: true });
 
 // 3. The agent asks a question; the phone answers it.
 store.sendMessage(uri, { text: 'Use the ask_user tool to ask me whether I prefer tabs or spaces, with the two choices "Tabs" and "Spaces". After I answer, reply with one sentence that repeats my choice.' });

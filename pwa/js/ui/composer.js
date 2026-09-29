@@ -3,6 +3,8 @@ import { Icon, Sheet, toast } from './common.js';
 import { ModelSheet, ModelOptionsSheet, modelSummary, modelChip, optionsChip, hasOptions } from './model-picker.js';
 import { b64 } from '../core/bytes.js';
 import { haptic, providerLabel } from '../lib/format.js';
+import { isImageAttachment, splitAttachments } from '../lib/attachments.js';
+import { Thumbs } from './viewer.js';
 
 const MAX_UPLOAD = 20 * 1024 * 1024;
 const fine = () => window.matchMedia('(pointer: fine)').matches;
@@ -49,7 +51,8 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   const text = item.message?.text || '';
-  const files = item.message?.attachments?.length || 0;
+  const { images, others } = splitAttachments(item.message);
+  const read = (u) => store.readImage(u);
   const label = kind === 'steering' ? 'Steering' : 'Queued';
   const hint = kind === 'steering' ? 'Sent to the running agent after its next tool call' : 'Sent when the agent finishes its current turn';
   const run = (fn) => {
@@ -102,9 +105,13 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
   }
   return html`<div class="pending-item" title=${hint}>
     <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
-    <button class=${`pt ${open ? 'open' : ''}`} onClick=${startEdit} aria-label=${`${label}: ${text}. Tap to edit`}>
-      <b>${label}</b> ${text}${files ? html` <span class="muted">· ${files} attachment${files === 1 ? '' : 's'}</span>` : ''}
-    </button>
+    <div class="pb">
+      <button class=${`pt ${open ? 'open' : ''}`} onClick=${startEdit} aria-label=${`${label}: ${text}. Tap to edit`}>
+        <b>${label}</b> ${text}
+      </button>
+      ${images.length > 0 && html`<${Thumbs} images=${images} read=${read} size="sm" />`}
+      ${others.length > 0 && html`<div class="att">${others.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="clip" /><span>${a.label}</span></span>`)}</div>`}
+    </div>
     <div class="pa">
       ${text.length > 160 && html`<button onClick=${() => setOpen(!open)} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}
       <button onClick=${startEdit} aria-label="Edit" title="Edit"><${Icon} name="edit" size="16" /></button>
@@ -171,6 +178,7 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const draftKey = `draft:${sessionUri}`;
   const [text, setText] = useState(() => sessionStorage.getItem(draftKey) || '');
   const [attachments, setAttachments] = useState([]);
+  const readImage = (u) => store.readImage(u);
   const [uploading, setUploading] = useState(0);
   const [sheet, setSheet] = useState(null);
   const [menu, setMenu] = useState(false);
@@ -323,7 +331,10 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
     </div>`}
     <div class=${`composer ${dictation.listening ? 'listening' : ''}`}>
       ${(attachments.length > 0 || uploading > 0) && html`<div class="att-row">
-        ${attachments.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="image" /><span>${a.name}</span><button onClick=${() => setAttachments(attachments.filter((_, j) => j !== i))} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`)}
+        ${attachments.map((a, i) => {
+          const pic = a.items.find(isImageAttachment);
+          return html`<span class=${`chip ${pic ? 'pic' : ''}`} key=${i}>${pic ? html`<${Thumbs} images=${[pic]} read=${readImage} size="xs" />` : html`<${Icon} name="clip" />`}<span>${a.name}</span><button onClick=${() => setAttachments(attachments.filter((_, j) => j !== i))} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`;
+        })}
         ${uploading > 0 && html`<span class="chip"><span class="spinner"></span>Uploading…</span>`}
       </div>`}
       <textarea ref=${ta} rows="1" placeholder=${placeholder} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} onPaste=${onPaste}></textarea>

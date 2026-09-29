@@ -14,7 +14,7 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { FILES, ensureHome, readJson, writeJson, newToken, serve, Rpc, takeLock, touchLock, releaseLock, connect, hubAlive } from './ipc.mjs';
-import { CopilotAgentHost, isInside } from './agent-host.mjs';
+import { CopilotAgentHost } from './agent-host.mjs';
 import { pairingPage } from './pairing-page.mjs';
 import { renderQrSvg } from './qr.mjs';
 
@@ -272,8 +272,7 @@ async function boot(log, cleanups) {
 
   const isReadAllowed = (uri) => {
     try {
-      const p = fileURLToPath(String(uri));
-      return host.workingDirectories().some((d) => isInside(path.resolve(p), path.resolve(d)));
+      return host.canRead(fileURLToPath(String(uri)));
     } catch {
       return false;
     }

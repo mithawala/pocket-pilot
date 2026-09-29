@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SessionTranslator } from './translate.mjs';
+import { SessionTranslator, fileKey, imageTypeOf } from './translate.mjs';
 
 export const ROOT = 'ahp-root://';
 export const PROVIDER = 'copilotcli';
@@ -14,6 +14,7 @@ const S = { Idle: 1, Error: 2, InProgress: 8, InputNeeded: 16, IsRead: 32, IsArc
 const ACTIVITY = 31;
 const REPLAY_LIMIT = 4000;
 const MAX_READ = 2 * 1024 * 1024;
+const MAX_PICTURE = 20 * 1024 * 1024;
 
 const b64url = (s) => Buffer.from(s).toString('base64url');
 
@@ -185,6 +186,14 @@ export class CopilotAgentHost extends EventEmitter {
 
   workingDirectories() {
     return [...this.sessions.values()].map((e) => e.cwd).filter(Boolean);
+  }
+
+  /** Whether a paired device may read this local file: inside a session folder, or attached to a message. */
+  canRead(file) {
+    const abs = path.resolve(String(file));
+    const key = fileKey(abs);
+    if ([...this.sessions.values()].some((e) => e.translator?.files?.has(key))) return true;
+    return this.workingDirectories().some((d) => isInside(abs, path.resolve(d)));
   }
 
   setModels(list) {
@@ -531,7 +540,7 @@ export class CopilotAgentHost extends EventEmitter {
       case 'dispatchAction':
         return this._clientAction(conn, p.channel, p.action, p.clientSeq);
       case 'resourceRead':
-        return this._read(p.uri);
+        return this._read(p.uri, p.encoding);
       case 'createSession':
         throw new RpcError(RPC.MethodNotFound, 'Start new sessions in the GitHub Copilot app or CLI on your PC; they appear here right away.');
       default:
@@ -539,18 +548,21 @@ export class CopilotAgentHost extends EventEmitter {
     }
   }
 
-  _read(uri) {
+  _read(uri, encoding) {
     let file;
     try {
       file = fileURLToPath(String(uri));
     } catch {
       throw new RpcError(RPC.InvalidParams, 'Only local files can be opened');
     }
-    if (!this.workingDirectories().some((d) => isInside(path.resolve(file), path.resolve(d)))) throw new RpcError(RPC.InvalidParams, 'Reading files outside your session folders is not allowed');
+    file = path.resolve(file);
+    if (!this.canRead(file)) throw new RpcError(RPC.InvalidParams, 'Reading files outside your session folders is not allowed');
     const st = fs.statSync(file);
     if (!st.isFile()) throw new RpcError(RPC.InvalidParams, 'Not a file');
-    if (st.size > MAX_READ) throw new RpcError(RPC.InvalidParams, 'The file is too large to preview');
+    const picture = imageTypeOf(file);
+    if (st.size > (picture ? MAX_PICTURE : MAX_READ)) throw new RpcError(RPC.InvalidParams, 'The file is too large to preview');
     const buf = fs.readFileSync(file);
+    if (picture || encoding === 'base64') return { data: buf.toString('base64'), encoding: 'base64', ...(picture ? { contentType: picture } : {}) };
     const binary = buf.subarray(0, 8000).includes(0);
     return binary ? { data: buf.toString('base64'), encoding: 'base64' } : { data: buf.toString('utf8'), encoding: 'utf-8', contentType: 'text/plain' };
   }

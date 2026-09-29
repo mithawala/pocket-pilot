@@ -5,6 +5,7 @@ import { HostStore } from '../model/host-store.js';
 import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { subscribe as pushSubscribe, currentSubscription } from '../lib/push.js';
 import { Toasts, Sheet, Icon, toast } from './common.js';
+import { PictureViewer } from './viewer.js';
 import { SessionsScreen, DesktopHome } from './sessions.js';
 import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
@@ -420,6 +421,7 @@ export function App({ app }) {
     ${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my PC →</b></a>`}
     ${screen}
     <${Toasts} />
+    <${PictureViewer} />
     <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />
     <${CodeSheet} request=${app.sheet?.kind === 'code' ? app.sheet : null} onSubmit=${(code) => app.sheet?.resolve(code)} onReset=${() => app.sheet?.resolve({ reset: true })} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
     <${PasskeySheet} request=${app.sheet?.kind === 'passkey' ? app.sheet : null} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />

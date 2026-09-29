@@ -522,6 +522,12 @@ export class HostStore extends EventTarget {
     return this.client.request('resourceRead', { channel: ROOT, uri });
   }
 
+  /** A picture from the PC, always as base64 (a text read would mangle the bytes). */
+  async readImage(uri) {
+    if (!this.client) throw new Error('Not connected to your PC');
+    return this.client.request('resourceRead', { channel: ROOT, uri, encoding: 'base64' });
+  }
+
   /** Creates a session, waits until it is ready and sends the first message. */
   async createSession({ provider, folder, config, text, model, attachments }) {
     if (!this.client) throw new Error('Not connected to your PC');
