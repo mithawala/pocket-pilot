@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.6
+
+- **The GitHub Copilot app plugin is ready for the Awesome Copilot marketplace** (the one the Copilot app and CLI include by default). Its manifest now marks it as a canvas plugin and points to a preview image (`assets/preview.png`: the Pocket Pilot panel next to the phone app), which the marketplace shows in its canvas gallery. The license is written the way SPDX expects for licenses outside its list (`LicenseRef-PolyForm-Shield-1.0.0`); nothing about the license itself changed.
+- **The plugin's README explains the security model and how Pocket Pilot differs from Copilot's built-in `/remote`.**
+
 ## 0.6.5
 
 - **Every sheet in the app says how to leave it.** Sheets now have a header with **Done** (or **Cancel** where closing backs out, like *New session*), and it stays in view while the list scrolls. You can also swipe a sheet down to close it, from the handle or the title at any time, or from the list once it's scrolled to the top; a short pull springs back. Tapping outside still works, and Escape now closes only the top sheet when one opens over another (the model list over *New session*). Sheets with a single choice, like the model list, mode and approvals, still close as soon as you pick.

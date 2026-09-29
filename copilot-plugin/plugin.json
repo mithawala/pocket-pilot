@@ -1,15 +1,17 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "pocket-pilot",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Control your GitHub Copilot app and CLI sessions from your phone: same history, live replies, chat, approvals and questions — end-to-end encrypted through a free Cloudflare quick tunnel, with passkeys and push notifications.",
   "author": {
-    "name": "Asif Mithawala"
+    "name": "Asif Mithawala",
+    "url": "https://mithawala.com"
   },
   "homepage": "https://mithawala.github.io/pocket-pilot/",
   "repository": "https://github.com/mithawala/pocket-pilot",
-  "license": "PolyForm-Shield-1.0.0",
+  "license": "LicenseRef-PolyForm-Shield-1.0.0",
   "keywords": [
+    "canvas",
     "remote",
     "mobile",
     "phone",
@@ -18,5 +20,10 @@
     "notifications",
     "approvals",
     "tunnel"
-  ]
+  ],
+  "extensions": {
+    "com.github.copilot": {
+      "logo": "assets/preview.png"
+    }
+  }
 }

@@ -1,6 +1,7 @@
 // Regenerates the landing-page images in site/img/ — phone screenshots from the demo app (app/?demo),
 // the real VS Code sidebar webview (media/sidebar.*) with One Dark colours, the social preview
-// card and the README images in docs/images/ — using headless Edge/Chrome (scripts/lib/headless.mjs).
+// card, the README images in docs/images/ and the Copilot plugin's copilot-plugin/assets/preview.png —
+// using headless Edge/Chrome (scripts/lib/headless.mjs).
 // Usage: node scripts/screenshots.mjs        (set PP_BROWSER to use a specific Chromium binary)
 import http from 'node:http';
 import fs from 'node:fs';
@@ -79,20 +80,57 @@ function ogHarness() {
   <div class="phone"><img src="/site/img/sessions.webp" alt=""></div></body></html>`;
 }
 
-function readmeHarness() {
-  const phone = (img, lift = 0) => `<div class="phone" style="transform:translateY(${lift}px)"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="/site/img/${img}" alt=""></div></div>`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-  * { box-sizing: border-box; }
-  body { margin: 0; width: 1280px; height: 700px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 56px;
-    background: radial-gradient(700px 420px at 50% 0%, rgba(82,139,255,.28), transparent 70%), radial-gradient(600px 400px at 10% 100%, rgba(198,120,221,.22), transparent 70%), #16181d; font-family: "Segoe UI", sans-serif; }
+// A phone around one of the site/img/ screenshots, with status bar, Dynamic Island and home indicator.
+const phoneFrame = (img, lift = 0) => `<div class="phone" style="transform:translateY(${lift}px)"><div class="screen"><div class="status"><span>9:41</span><i class="island"></i><span class="bars"></span></div><img src="/site/img/${img}" alt=""></div></div>`;
+const PHONE_CSS = `
   .phone { width: 280px; padding: 10px; border-radius: 46px; background: linear-gradient(155deg, #3b404e, #1a1d25 45%, #0f1116); box-shadow: 0 40px 80px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.08); }
   .screen { position: relative; overflow: hidden; border-radius: 37px; background: #282c34; container-type: inline-size; }
   .screen img { display: block; width: 100%; height: auto; }
   .status { position: absolute; top: 0; left: 0; right: 0; height: 12cqw; display: flex; align-items: center; justify-content: space-between; padding: 0 7.4cqw 0 8.8cqw; font-size: 3.9cqw; font-weight: 600; color: #fff; }
   .island { position: absolute; left: 50%; top: 2.8cqw; width: 29cqw; height: 8.4cqw; margin-left: -14.5cqw; border-radius: 99px; background: #000; }
   .bars { position: relative; width: 7cqw; height: 3.4cqw; border: .45cqw solid rgba(255,255,255,.9); border-radius: 1.1cqw; }
-  .screen::after { content: ''; position: absolute; left: 50%; bottom: 2cqw; width: 34cqw; height: 1.3cqw; margin-left: -17cqw; border-radius: 99px; background: rgba(255,255,255,.78); }
-  </style></head><body>${phone('sessions.webp', 20)}${phone('approval.webp', -20)}${phone('chat.webp', 20)}</body></html>`;
+  .screen::after { content: ''; position: absolute; left: 50%; bottom: 2cqw; width: 34cqw; height: 1.3cqw; margin-left: -17cqw; border-radius: 99px; background: rgba(255,255,255,.78); }`;
+
+function readmeHarness() {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; height: 700px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 56px;
+    background: radial-gradient(700px 420px at 50% 0%, rgba(82,139,255,.28), transparent 70%), radial-gradient(600px 400px at 10% 100%, rgba(198,120,221,.22), transparent 70%), #16181d; font-family: "Segoe UI", sans-serif; }
+  ${PHONE_CSS}
+  </style></head><body>${phoneFrame('sessions.webp', 20)}${phoneFrame('approval.webp', -20)}${phoneFrame('chat.webp', 20)}</body></html>`;
+}
+
+/**
+ * The Copilot app plugin's listing image (copilot-plugin/assets/preview.png, the plugin.json "logo"):
+ * the Pocket Pilot panel (canvas) as it opens in the app, next to the phone. Galleries crop it to a
+ * wide card, so everything that matters stays in the middle band.
+ */
+function pluginPreviewHarness() {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1600px; height: 900px; overflow: hidden; font-family: "Segoe UI", -apple-system, sans-serif; color: #fff;
+    background: radial-gradient(1100px 620px at 82% 10%, rgba(79,120,255,.32), transparent 60%), radial-gradient(900px 620px at 6% 100%, rgba(109,93,252,.32), transparent 60%), #0a0c11;
+    display: flex; align-items: center; justify-content: center; gap: 50px; }
+  .copy { width: 600px; }
+  .logo { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 18px 50px rgba(79,120,255,.45); }
+  h1 { font-size: 80px; line-height: 1; margin: 30px 0 16px; letter-spacing: -2px; font-weight: 800; }
+  p { font-size: 31px; line-height: 1.3; margin: 0 0 34px; color: #c6ccda; }
+  .chips { display: flex; gap: 12px; flex-wrap: wrap; }
+  .chips span { font-size: 21px; padding: 9px 18px; border-radius: 99px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+  .win { width: 440px; height: 612px; flex: none; display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: #282c34; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.1); }
+  .bar { height: 46px; flex: none; display: flex; align-items: center; padding: 0 12px; background: #1b1d23; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; background: rgba(255,255,255,.08); font-size: 15px; color: #e6e9ef; }
+  .tab img { width: 18px; height: 18px; border-radius: 5px; }
+  .tab i { font-style: normal; color: #8b92a0; margin-left: 4px; }
+  iframe { flex: 1; width: 100%; border: 0; display: block; }
+  ${PHONE_CSS}
+  .phone { width: 300px; flex: none; }
+  </style></head><body>
+  <div class="copy"><img class="logo" src="/pwa/icons/icon.svg" alt="">
+  <h1>Pocket Pilot</h1><p>Your GitHub Copilot sessions,<br>on your phone.</p>
+  <div class="chips"><span>🔒 End-to-end encrypted</span><span>🪪 Passkeys</span><span>💸 Free</span></div></div>
+  <div class="win"><div class="bar"><span class="tab"><img src="/pwa/icons/icon-192.png" alt="">Pocket Pilot<i>×</i></span></div><iframe src="/__copilot-panel.html" scrolling="no"></iframe></div>
+  ${phoneFrame('approval.webp')}</body></html>`;
 }
 
 /** Where the Pocket Pilot icon sits in VS Code: the Activity Bar, with the icon pointed out (README). */
@@ -150,7 +188,7 @@ const copilotPanelState = () => ({
 function startServer() {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
-    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness, '/__activitybar.html': activityBarHarness }[url.pathname];
+    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness, '/__plugin-preview.html': pluginPreviewHarness, '/__activitybar.html': activityBarHarness }[url.pathname];
     if (harness) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
       res.end(await harness());
@@ -254,6 +292,14 @@ async function main() {
     await sleep(300);
     await og.shot('og.png', { format: 'png' });
     await og.close();
+
+    console.log('Rendering the Copilot plugin preview…');
+    const preview = await open(cdp, { width: 1600, height: 900, dpr: 1, mobile: false });
+    await preview.goto(`${base}/__plugin-preview.html`);
+    await preview.waitFor('(() => { const d = document.querySelector("iframe").contentDocument; const loaded = (doc) => [...doc.images].every((i) => i.complete && i.naturalWidth > 0); return d && d.querySelector("#qr svg") && loaded(d) && loaded(document); })()');
+    await sleep(500);
+    await preview.shot('preview.png', { format: 'png', dir: path.join(repo, 'copilot-plugin', 'assets') });
+    await preview.close();
 
     console.log('Rendering README images…');
     const docs = path.join(repo, 'docs', 'images');
