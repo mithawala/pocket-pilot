@@ -1,9 +1,9 @@
 Copyright (c) 2026 Asif Mithawala (https://mithawala.com)
 
 Pocket Pilot is licensed under the PolyForm Shield License 1.0.0, below.
-Third-party code in the `vendor` folders is licensed under its own terms; see
-the LICENSE file in each of those folders. Versions up to and including 0.4.3
-were released under the MIT License.
+Third-party code included with it (the libraries in the `vendor` folders and
+the interface icons) keeps its own license: see THIRD-PARTY-NOTICES.md.
+Versions up to and including 0.4.3 were released under the MIT License.
 
 Required Notice: Copyright (c) 2026 Asif Mithawala (https://mithawala.com)
 

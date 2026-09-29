@@ -16,6 +16,8 @@ const CDN = 'https://cdn.jsdelivr.net/npm';
 
 const AHP = '@microsoft/agent-host-protocol@0.9.0';
 const HLJS = '@highlightjs/cdn-assets@11.12.0';
+// The qrcode-generator npm package ships no LICENSE file: take it from the matching release tag.
+const QRCODE_LICENSE = 'https://raw.githubusercontent.com/kazuhikoarase/qrcode-generator/js2.0.4/LICENSE';
 // Languages for code blocks in chat (loaded on demand); aliases such as ts/sh/ps1/yml come with them.
 const HLJS_LANGS = ['bash', 'c', 'cpp', 'csharp', 'css', 'diff', 'dockerfile', 'go', 'ini', 'java', 'javascript', 'json', 'kotlin', 'markdown', 'php', 'plaintext', 'powershell', 'python', 'ruby', 'rust', 'shell', 'sql', 'swift', 'typescript', 'xml', 'yaml'];
 
@@ -34,7 +36,9 @@ const files = [
   { pkg: 'dompurify@3.4.16', from: 'dist/purify.es.mjs', to: 'pwa/vendor/dompurify/purify.es.js' },
   { pkg: 'dompurify@3.4.16', from: 'LICENSE', to: 'pwa/vendor/dompurify/LICENSE' },
   { pkg: 'qrcode-generator@2.0.4', from: 'dist/qrcode.js', to: 'media/vendor/qrcode.js' },
+  { pkg: 'qrcode-generator@2.0.4', from: 'LICENSE', to: 'media/vendor/LICENSE', url: QRCODE_LICENSE },
   { pkg: 'qrcode-generator@2.0.4', from: 'dist/qrcode.mjs', to: 'pwa/vendor/qrcode/qrcode.mjs' },
+  { pkg: 'qrcode-generator@2.0.4', from: 'LICENSE', to: 'pwa/vendor/qrcode/LICENSE', url: QRCODE_LICENSE },
   { pkg: 'jsqr@1.4.0', from: 'dist/jsQR.js', to: 'pwa/vendor/jsqr/jsQR.js' },
   { pkg: 'jsqr@1.4.0', from: 'LICENSE', to: 'pwa/vendor/jsqr/LICENSE' },
   { pkg: HLJS, from: 'es/core.min.js', to: 'pwa/vendor/hljs/core.min.js' },

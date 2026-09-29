@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.7
+
+- **Credits for all third-party code.** The new `THIRD-PARTY-NOTICES.md` lists every bundled library with its license, credits the icon sets the app and the product page use (Feather, Lucide and the GitHub mark from Octicons), and includes their license texts. It ships with the extension, the GitHub Copilot app plugin and the product page. The QR code library now comes with its MIT license file too. Pocket Pilot's own license is unchanged.
+
 ## 0.6.6
 
 - **The GitHub Copilot app plugin is ready for the Awesome Copilot marketplace** (the one the Copilot app and CLI include by default). Its manifest now marks it as a canvas plugin and points to a preview image (`assets/preview.png`: the Pocket Pilot panel next to the phone app), which the marketplace shows in its canvas gallery. The license is written the way SPDX expects for licenses outside its list (`LicenseRef-PolyForm-Shield-1.0.0`); nothing about the license itself changed.

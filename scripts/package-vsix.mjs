@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 const INCLUDE_DIRS = ['extension', 'media', 'pwa'];
-const INCLUDE_FILES = [['package.json', 'package.json'], ['README.md', 'README.md'], ['CHANGELOG.md', 'CHANGELOG.md'], ['LICENSE', 'LICENSE.txt']];
+const INCLUDE_FILES = [['package.json', 'package.json'], ['README.md', 'README.md'], ['CHANGELOG.md', 'CHANGELOG.md'], ['LICENSE', 'LICENSE.txt'], ['THIRD-PARTY-NOTICES.md', 'THIRD-PARTY-NOTICES.md']];
 const EXCLUDE = [/\.map$/, /\.test\./, /(^|\/)\.DS_Store$/, /(^|\/)Thumbs\.db$/];
 
 function walk(dir, rel = '') {

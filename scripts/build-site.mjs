@@ -47,6 +47,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 copyTree(path.join(repo, 'site'), out);
 copyTree(path.join(repo, 'pwa'), path.join(out, 'app'), (rel) => !APP_SKIP.has(rel));
+fs.copyFileSync(path.join(repo, 'THIRD-PARTY-NOTICES.md'), path.join(out, 'THIRD-PARTY-NOTICES.md'));
 for (const page of ['index.html', '404.html']) {
   const p = path.join(out, page);
   fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('%VERSION%', version));

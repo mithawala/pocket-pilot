@@ -1,5 +1,7 @@
 import { html, useEffect, useState, useRef } from '../lib/ui.js';
 
+// Icons from, or based on, Feather (MIT, Cole Bemis) and Lucide (ISC, Lucide Contributors).
+// License texts: THIRD-PARTY-NOTICES.md, which ships with the site, the extension and the plugin.
 const P = {
   back: 'M15 18l-6-6 6-6',
   plus: 'M12 5v14M5 12h14',

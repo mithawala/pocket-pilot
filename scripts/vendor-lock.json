@@ -39,9 +39,17 @@
     "source": "qrcode-generator@2.0.4/dist/qrcode.js",
     "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
   },
+  "media/vendor/LICENSE": {
+    "source": "qrcode-generator@2.0.4/LICENSE",
+    "sha256": "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c"
+  },
   "pwa/vendor/qrcode/qrcode.mjs": {
     "source": "qrcode-generator@2.0.4/dist/qrcode.mjs",
     "sha256": "ea91d7118a5395289170da848b7c6758b996163bfbccf312591ab65a4911b7c0"
+  },
+  "pwa/vendor/qrcode/LICENSE": {
+    "source": "qrcode-generator@2.0.4/LICENSE",
+    "sha256": "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c"
   },
   "pwa/vendor/jsqr/jsQR.js": {
     "source": "jsqr@1.4.0/dist/jsQR.js",

@@ -173,7 +173,7 @@ Publishing to the VS Code Marketplace: see [docs/MARKETPLACE.md](docs/MARKETPLAC
 
 Project layout: `extension/` (VS Code extension, `core/` is VS Code-independent), `copilot-plugin/` (GitHub Copilot app & CLI plugin: `com.github.copilot/extensions/pocket-pilot/` is the per-session extension and the hub, `vendor/` is generated from `extension/core` and `pwa/`), `pwa/` (phone app; `pwa/js/core/` is shared with the extension, `pwa/js/demo/` drives the demo mode), `site/` (product page), `media/` (sidebar), `scripts/`, `test/`.
 
-Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), [highlight.js](https://highlightjs.org) (BSD-3-Clause). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
+Third-party code: [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) (MIT), [Preact](https://preactjs.com) (MIT), [htm](https://github.com/developit/htm) (Apache-2.0), [marked](https://marked.js.org) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify) (Apache-2.0/MPL-2.0), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), [highlight.js](https://highlightjs.org) (BSD-3-Clause), and icons from [Feather](https://feathericons.com) (MIT), [Lucide](https://lucide.dev) (ISC) and [Octicons](https://github.com/primer/octicons) (MIT). Details and license texts: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Inspired by the idea behind *Copilot Remote Control*; this is an independent implementation.
 
 ## License
 
@@ -183,4 +183,4 @@ Pocket Pilot is **source-available** under the [PolyForm Shield License 1.0.0](L
 - **Read, audit and change it**, and send fixes or ideas as issues and pull requests.
 - **Don't offer a product that competes with it**, such as a copy, a rebrand or a paid version, even one that is free of charge.
 
-The [LICENSE](LICENSE) file has the exact terms; this summary doesn't replace them. Third-party code in the `vendor` folders keeps its own license (listed above). Versions up to and including 0.4.3 were released under the MIT License.
+The [LICENSE](LICENSE) file has the exact terms; this summary doesn't replace them. Third-party code and icons keep their own licenses, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Versions up to and including 0.4.3 were released under the MIT License.
