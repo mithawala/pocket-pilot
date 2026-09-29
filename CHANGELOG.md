@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- **Authenticator apps as an alternative to passkeys.** A device can now confirm it's you with 6-digit codes from Google Authenticator, Microsoft Authenticator, the Passwords app, 1Password or any other authenticator app, instead of Face ID or a fingerprint. Pick it when pairing (*No Face ID or passkey? Use an authenticator app*), or when saving the passkey fails. The phone makes the setup key and sends it end-to-end encrypted; add it to your app by link, QR code or by hand, and enter a code to confirm. Your PC then asks for a code every 12 hours by default. A code works only once, and wrong codes lock the device for 15 minutes, doubling up to a day. The setting *Pocket Pilot › Security: Authenticator App* turns it off (passkeys only). The GitHub Copilot app plugin supports it too.
+- **When a passkey can't be saved, pairing keeps going.** Microsoft Authenticator only keeps passkeys for Microsoft work and school accounts, and Google Authenticator keeps none, so picking one of them made pairing fail and used up the QR code. Now the app explains what happened and where passkeys can go (the Passwords app, Google Password Manager, 1Password, Bitwarden), and offers **Try again** in the same pairing or **Use an authenticator app instead**. If a pairing does fail, the app says whether a new QR code is needed and opens the scanner.
+- **Easier to find in VS Code.** The extension page starts with an **Open Pocket Pilot in VS Code** button (through a small page on the product site, because extension pages only allow web links) and shows where the robot icon sits in the Activity Bar. The Pocket Pilot panel also opens by itself the first time the extension runs.
+
 ## 0.5.1
 
 - **The "Get notified" card can be closed.** The card at the top of the sessions list (in a phone browser it explains the Home Screen app, elsewhere it offers *Enable notifications*) now has a close button, for everyone happy to use Pocket Pilot in the browser. Once closed it stays hidden on that device, and Settings still has notifications.

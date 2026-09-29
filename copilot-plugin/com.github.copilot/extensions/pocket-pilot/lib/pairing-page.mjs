@@ -74,7 +74,7 @@ function render(s) {
     pill(s.rendezvous ? 'ok' : '', s.rendezvous ? 'Auto-reconnect on' : 'Auto-reconnect off'),
   ].join(' ');
   $('approvals').innerHTML = s.approvals.map((a) => '<div class="approve"><div><b>Allow “' + esc(a.name) + '”</b> to control your Copilot sessions?</div><div class="small muted">' + esc([a.platform, a.ip && 'from ' + a.ip].filter(Boolean).join(' · ')) + ' — only allow a device you just paired yourself.</div><div class="row" style="margin-top:8px"><button class="primary" data-a="' + esc(a.id) + '" data-v="1">Allow</button><button data-a="' + esc(a.id) + '" data-v="0">Deny</button></div></div>').join('');
-  $('devices').innerHTML = s.devices.length ? s.devices.map((d) => '<div class="dev"><span><b style="color:var(--strong)">' + esc(d.name) + '</b> <span class="muted">' + esc(d.platform || '') + '</span></span><span>' + (d.online ? pill('ok', 'connected') : pill('', 'offline')) + (d.passkey ? ' ' + pill('ok', 'passkey') : '') + ' <button data-remove="' + esc(d.id) + '" data-name="' + esc(d.name) + '">Remove</button></span></div>').join('') : 'None yet.';
+  $('devices').innerHTML = s.devices.length ? s.devices.map((d) => '<div class="dev"><span><b style="color:var(--strong)">' + esc(d.name) + '</b> <span class="muted">' + esc(d.platform || '') + '</span></span><span>' + (d.online ? pill('ok', 'connected') : pill('', 'offline')) + (d.passkey ? ' ' + pill('ok', 'passkey') : d.totp ? ' ' + pill('ok', 'authenticator') : '') + ' <button data-remove="' + esc(d.id) + '" data-name="' + esc(d.name) + '">Remove</button></span></div>').join('') : 'None yet.';
 }
 document.addEventListener('click', async (e) => {
   const r = e.target.closest('button[data-remove]');

@@ -114,7 +114,7 @@
         ${row('🌐', 'Tunnel', tunnelVal)}
         ${row('🤖', 'Agent host', hostVal)}
         ${row('🔁', 'Auto-reconnect', rdvVal)}
-        ${row('🛡️', 'Security', `${sec.passkey === 'off' ? 'Keys + E2E' : sec.passkey === 'required' ? 'Passkey required' : 'Passkey optional'}${sec.requireApproval ? ' · approval' : ''}`)}
+        ${row('🛡️', 'Security', `${sec.passkey === 'off' ? 'Keys + E2E' : `${sec.allowTotp === false ? 'Passkey' : 'Passkey or code'} ${sec.passkey === 'required' ? 'required' : 'optional'}`}${sec.requireApproval ? ' · approval' : ''}`)}
       </section>`;
 
       body += `<section class="card"><h2>Paired devices <span class="count">${devices.length}</span></h2>`;
@@ -124,7 +124,7 @@
         body += `<div class="device">
           <div class="dicon">${/mac|windows|linux|cros/i.test(d.platform || '') ? '💻' : '📱'}</div>
           <div class="dmain"><div class="dname">${esc(d.name)}</div><div class="dmeta">${esc(d.platform || 'Device')} ${status}</div>
-          <div class="dtags">${d.passkey ? '<span title="Passkey (biometric) protected">🔐 passkey</span>' : '<span class="muted" title="No passkey">🔓 no passkey</span>'}${d.push ? '<span title="Push notifications enabled">🔔 push</span>' : ''}</div></div>
+          <div class="dtags">${d.passkey ? '<span title="Passkey (biometric) protected">🔐 passkey</span>' : d.totp ? '<span title="Protected by codes from an authenticator app">🔢 authenticator</span>' : '<span class="muted" title="No passkey or authenticator app">🔓 no passkey</span>'}${d.push ? '<span title="Push notifications enabled">🔔 push</span>' : ''}</div></div>
           <button class="icon" title="Remove this device" data-a="removeDevice" data-id="${esc(d.id)}">✕</button>
         </div>`;
       }

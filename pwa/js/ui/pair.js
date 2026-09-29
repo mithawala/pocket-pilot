@@ -1,10 +1,12 @@
-import { html, useState, useEffect } from '../lib/ui.js';
+import { html, useState, useEffect, useRef } from '../lib/ui.js';
 import { Icon, Spinner } from './common.js';
 import { decodePairingFragment } from '../core/secure-channel.js';
+import { codeAt, stepAt } from '../core/totp.js';
 import { pairWithHost } from '../net/host-connection.js';
 import { webauthn, passkeysAvailable } from '../lib/webauthn.js';
 import { deviceDescription } from '../lib/format.js';
 import { isIos, isStandalone, appleDevice, pairInHomeScreenApp } from '../lib/push.js';
+import { AuthenticatorSetup, PasskeyTrouble, loadSetup, clearSetup } from './authenticator.js';
 
 // The product page sits one level above the app on GitHub Pages (…/pocket-pilot/app/ → …/pocket-pilot/).
 const PRODUCT_URL = /\/app\/$/.test(location.pathname) ? new URL('../', location.href).href : 'https://mithawala.github.io/pocket-pilot/';
@@ -77,50 +79,88 @@ export function Welcome({ onLink, onScan, installPrompt }) {
 const STEPS = [
   ['connecting', 'Connecting securely'],
   ['approval', 'Approve on your PC'],
-  ['passkey', 'Create your passkey'],
+  ['passkey', 'Protect this device'],
   ['finishing', 'Finishing'],
 ];
 
-export function PairScreen({ fragment, onPaired, onCancel }) {
+export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
   const info = decodePairingFragment(fragment);
   const dev = deviceDescription();
   const browser = dev.platform.split(' · ')[1] || 'Safari';
   // Name the Safari and Home Screen copies apart, so the PC's list of devices tells them apart too.
   const [name, setName] = useState(pairInHomeScreenApp() ? `${dev.name} (${browser})` : dev.name);
   const platform = isIos() && isStandalone() ? `${dev.platform.split(' · ')[0]} · Home Screen app` : dev.platform;
+  const setupKey = info ? fingerprintText(info.hostFingerprint) : '';
   const [phase, setPhase] = useState(null);
   const [error, setError] = useState(null);
+  const [spent, setSpent] = useState(false);
   const [here, setHere] = useState(false);
+  // The second factor: a passkey, or codes from an authenticator app (set up before or during pairing).
+  const [setup, setSetup] = useState(() => (info ? loadSetup(setupKey) : null));
+  const [method, setMethod] = useState(() => (setup?.verified ? 'totp' : 'passkey'));
+  const [canPasskey, setCanPasskey] = useState(true);
+  const [ask, setAsk] = useState(null);
+  const live = useRef({});
+  live.current = { method, setup, canPasskey, phase };
   const gate = !!info && !phase && !here && pairInHomeScreenApp();
   useEffect(() => {
     // "Add to Home Screen" saves the current address: make it the app's start, not this pairing.
     if (gate) history.replaceState(null, '', `${location.pathname}${location.search}`);
   }, [gate]);
+  useEffect(() => {
+    passkeysAvailable().then((ok) => {
+      setCanPasskey(ok);
+      if (!ok) setMethod('totp');
+    });
+  }, []);
   if (!info) {
     return html`<div class="page safe"><div class="card stack"><b>Invalid pairing link</b><p class="muted">Show a new QR code in VS Code and scan it again.</p><button class="btn" onClick=${onCancel}>Back</button></div></div>`;
   }
+  // Waits for the person's choice while the pairing stays open.
+  const request = (q) => new Promise((resolve, reject) => {
+    setAsk({ ...q, resolve: (v) => { setAsk(null); resolve(v); }, reject: (e) => { setAsk(null); reject(e); } });
+  });
+  const factor = async (req) => {
+    const allowTotp = req.alternatives.includes('totp');
+    let mode = live.current.method === 'totp' && allowTotp ? 'totp' : 'passkey';
+    if (mode === 'passkey' && !(await passkeysAvailable())) {
+      if (!allowTotp) throw new Error(live.current.method === 'totp' ? 'Your PC only accepts passkeys, and this device has no Face ID, fingerprint or screen lock.' : 'No Face ID / fingerprint / screen lock is set up on this device');
+      mode = 'totp';
+    }
+    for (;;) {
+      if (mode === 'totp') {
+        let s = live.current.setup;
+        if (!s?.verified) {
+          const r = await request({ kind: 'totp' });
+          if (r === 'passkey') {
+            mode = 'passkey';
+            continue;
+          }
+          s = r;
+        }
+        return { totp: { secret: s.secret, code: await codeAt(s.secret, stepAt()) } };
+      }
+      try {
+        return { credential: await webauthn.register(req) };
+      } catch (err) {
+        if (await request({ kind: 'trouble', error: err, allowTotp }) === 'totp') mode = 'totp';
+      }
+    }
+  };
   const start = async () => {
     setError(null);
+    setSpent(false);
     setPhase('connecting');
-    // Can take seconds on some desktops; only needed once the PC asks for the passkey.
-    const hasPasskeys = passkeysAvailable();
     try {
-      const record = await pairWithHost({
-        fragment,
-        deviceName: name.trim() || dev.name,
-        platform,
-        webauthn: {
-          register: async (opts) => {
-            if (!(await hasPasskeys)) throw new Error('No Face ID / fingerprint / screen lock is set up on this device');
-            return webauthn.register(opts);
-          },
-        },
-        onStatus: setPhase,
-      });
+      const record = await pairWithHost({ fragment, deviceName: name.trim() || dev.name, platform, factor, onStatus: setPhase });
+      clearSetup(setupKey);
       setPhase('done');
       onPaired(record);
     } catch (err) {
+      // Once the PC has answered, this QR code is used up: pairing again needs a new one.
+      setSpent(live.current.phase !== 'connecting' || !!err.untrusted || /expired|already used/i.test(err.message || ''));
       setPhase(null);
+      setAsk(null);
       setError(err.message || String(err));
     }
   };
@@ -138,6 +178,8 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
       <button class="btn block ghost" style="margin-top:6px" onClick=${onCancel}>Cancel</button>
     </div>`;
   }
+  const totpSetup = (props) => html`<${AuthenticatorSetup} storageKey=${setupKey} hostName=${info.name || 'PC'} deviceName=${name.trim() || dev.name} ...${props} />`;
+  const factorNote = method === 'totp' ? 'Using codes from your authenticator app.' : 'Confirm with Face ID, Touch ID or your fingerprint.';
   return html`<div class="page safe">
     <div class="hero" style="padding-top:12px">
       <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
@@ -147,15 +189,33 @@ export function PairScreen({ fragment, onPaired, onCancel }) {
     </div>
     ${!phase && html`<div class="card stack">
       <div class="field"><label>Name this device</label><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} maxlength="60" /></div>
-      ${error && html`<div class="errpart">${error}</div>`}
-      <button class="btn primary block" onClick=${start}><${Icon} name="lock" /> Pair securely</button>
+      ${error && html`<div class="errpart">${error}${spent ? ' To pair, click New code on your PC and scan the new QR code.' : ''}</div>`}
+      ${method === 'totp' && setup?.verified && html`<div class="authn-ready"><${Icon} name="check" /> Your authenticator app is set up. Pair to finish.</div>`}
+      ${spent
+        ? html`${onRescan && html`<button class="btn primary block" onClick=${onRescan}><${Icon} name="phone" /> Scan a new QR code</button>`}`
+        : html`<button class="btn primary block" disabled=${method === 'totp' && !setup?.verified} onClick=${start}><${Icon} name="lock" /> Pair securely</button>`}
       <button class="btn block" onClick=${onCancel}>Cancel</button>
+      ${method === 'passkey'
+        ? html`<button class="btn block ghost" onClick=${() => setMethod('totp')}>No Face ID or passkey? Use an authenticator app</button>`
+        : canPasskey && !setup?.verified && html`<button class="btn block ghost" onClick=${() => setMethod('passkey')}>Use Face ID or a passkey instead</button>`}
     </div>`}
+    ${!phase && method === 'totp' && !setup?.verified && totpSetup({
+      note: canPasskey ? 'Instead of Face ID, your PC will ask for a code from your authenticator app now and then.' : "This device can't save passkeys, so your PC will ask for a code from your authenticator app now and then.",
+      onReady: (s) => setSetup(s),
+    })}
     ${phase && html`<div class="progress-steps">
       ${STEPS.map(([k, label], i) => html`<div class=${`ps ${i === idx ? 'active' : i < idx || phase === 'done' ? 'done' : ''}`}>
         ${i === idx && phase !== 'done' ? html`<${Spinner} />` : i < idx || phase === 'done' ? html`<${Icon} name="check" size="18" />` : html`<span class="dot"></span>`}
-        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your PC — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && html`<div class="muted small">Confirm with Face ID, Touch ID or your fingerprint.</div>`}</div>
+        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your PC — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && !ask && html`<div class="muted small">${factorNote}</div>`}</div>
       </div>`)}
     </div>`}
+    ${ask?.kind === 'trouble' && html`<${PasskeyTrouble} error=${ask.error} allowTotp=${ask.allowTotp}
+      onRetry=${() => ask.resolve('retry')} onTotp=${() => { setMethod('totp'); ask.resolve('totp'); }} onCancel=${() => ask.reject(new Error('Pairing cancelled'))} />`}
+    ${ask?.kind === 'totp' && totpSetup({
+      note: 'Your PC is waiting. Add Pocket Pilot to your authenticator app, then enter its code here.',
+      onReady: (s) => { setSetup(s); ask.resolve(s); },
+      onPasskey: canPasskey ? () => { setMethod('passkey'); ask.resolve('passkey'); } : null,
+      onCancel: () => ask.reject(new Error('Pairing cancelled')),
+    })}
   </div>`;
 }

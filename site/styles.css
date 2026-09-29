@@ -290,6 +290,12 @@ h4 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -0.005em; }
 .sec { padding: 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
 .sec .ic { width: 44px; height: 44px; margin-bottom: 16px; padding: 10px; border-radius: 12px; color: #7ee2a8; background: rgba(60, 207, 122, 0.1); border: 1px solid rgba(60, 207, 122, 0.28); }
 .center-link { margin: 34px 0 0; text-align: center; }
+.open-vscode .section-head { margin-bottom: 0; }
+.open-logo { display: block; margin: 0 auto 22px; border-radius: 16px; box-shadow: 0 16px 40px rgba(79, 120, 255, 0.45); }
+.open-vscode .cta-row { margin-top: 28px; }
+.open-hint { margin: 30px auto 16px !important; max-width: 560px; font-size: 15.5px !important; }
+.open-bar { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.open-vscode .center-link { margin-top: 26px; }
 .center-link a { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .center-link .ic { width: 18px; height: 18px; }
 

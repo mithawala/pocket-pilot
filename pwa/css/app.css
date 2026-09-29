@@ -493,6 +493,25 @@ button.set-row:active, a.set-row:active { background: var(--surface); }
 .home-first b { color: var(--strong); font-weight: 600; }
 .home-first .hf-ic { display: inline-grid; place-items: center; width: 22px; height: 22px; vertical-align: -5px; color: var(--accent); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 5px; }
 .home-first .hf-ic svg { width: 14px; height: 14px; }
+.authn, .trouble { margin-top: 14px; text-align: left; }
+.authn-head { display: flex; align-items: center; gap: 9px; color: var(--strong); font-size: 15.5px; }
+.authn-head svg { width: 19px; height: 19px; flex: none; color: var(--accent); }
+.authn-head.warn svg { color: var(--warn); }
+.authn p, .trouble p { margin: 0; }
+.authn-steps { margin: 2px 0 0; padding-left: 20px; display: grid; gap: 14px; font-size: 14px; }
+.authn-steps li::marker { font-weight: 700; color: var(--accent); }
+.authn-steps li > * + * { margin-top: 8px; }
+.authn-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.authn-actions .btn { text-decoration: none; }
+.authn-qr { display: flex; align-items: center; gap: 12px; }
+.otp-qr { width: 148px; height: 148px; flex: none; padding: 6px; background: #fff; border-radius: 8px; }
+.otp-qr svg { display: block; width: 100%; height: 100%; }
+.authn-key { font-family: var(--mono); font-size: 12.5px; color: var(--strong); word-break: normal; overflow-wrap: anywhere; user-select: all; }
+.authn-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.authn-ready { display: flex; align-items: center; gap: 8px; padding: 9px 11px; font-size: 13.5px; color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line-2)); border-radius: 6px; }
+.authn-ready svg { width: 16px; height: 16px; flex: none; }
+.code-row { display: flex; gap: 8px; }
+.code-input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 20px !important; letter-spacing: 0.3em; text-align: center; }
 details.card > summary { cursor: pointer; }
 
 /* ---------- QR scanner */

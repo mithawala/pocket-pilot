@@ -95,6 +95,54 @@ function readmeHarness() {
   </style></head><body>${phone('sessions.webp', 20)}${phone('approval.webp', -20)}${phone('chat.webp', 20)}</body></html>`;
 }
 
+/** The "Open Pocket Pilot in VS Code" button at the top of the README (transparent PNG). */
+function buttonHarness() {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; background: transparent; }
+  body { padding: 10px; }
+  .b { display: inline-flex; align-items: center; gap: 14px; height: 60px; padding: 0 26px 0 12px; border-radius: 16px; font: 700 21px "Segoe UI", -apple-system, sans-serif; color: #fff;
+    background: linear-gradient(135deg, #6d5dfc 0%, #4f78ff 55%, #22c1ee 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28); }
+  .b img { width: 42px; height: 42px; border-radius: 10px; }
+  .b svg { width: 20px; height: 20px; }
+  </style></head><body><div class="b" id="b"><img src="/pwa/icons/icon.svg" alt="">Open Pocket Pilot in VS Code<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div></body></html>`;
+}
+
+/** Where the Pocket Pilot icon sits in VS Code: the Activity Bar, with the icon pointed out. */
+function activityBarHarness() {
+  const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const icons = [
+    svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'),
+    svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
+    svg('<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 9"/>'),
+    svg('<path d="M8 5v14l11-7z"/>'),
+    svg('<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1" transform="rotate(12 17.5 6.5)"/>'),
+  ];
+  const pp = fs.readFileSync(path.join(repo, 'media', 'activity.svg'), 'utf8');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; background: transparent; font-family: "Segoe UI", -apple-system, sans-serif; }
+  body { padding: 10px; }
+  #a { display: flex; align-items: stretch; width: 400px; border-radius: 12px; overflow: hidden; background: #282c34; box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset; }
+  .bar { width: 52px; padding: 8px 0 18px; background: #21252b; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .ic { position: relative; width: 52px; height: 48px; display: grid; place-items: center; color: #7f848e; }
+  .ic svg { width: 26px; height: 26px; }
+  .ic.pp { color: #fff; }
+  .ic.pp::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px; background: #fff; }
+  .ic.pp::after { content: ''; position: absolute; inset: 3px 5px; border: 2px solid #61afef; border-radius: 10px; box-shadow: 0 0 0 5px rgba(97,175,239,.22); }
+  .side { flex: 1; position: relative; }
+  .tip { position: absolute; left: 22px; top: 263px; display: flex; align-items: center; gap: 10px; color: #d7dae0; font-size: 17px; font-weight: 600; }
+  .tip svg { width: 38px; height: 24px; color: #61afef; }
+  .tip small { display: block; font-size: 13px; font-weight: 400; color: #9da5b4; }
+  .lines { position: absolute; left: 22px; right: 22px; top: 22px; display: grid; gap: 12px; }
+  .lines i { display: block; height: 9px; border-radius: 5px; background: #3a3f4b; }
+  </style></head><body><div id="a">
+    <div class="bar">${icons.map((i) => `<div class="ic">${i}</div>`).join('')}<div class="ic pp">${pp}</div></div>
+    <div class="side">
+      <div class="lines"><i style="width:62%"></i><i style="width:84%"></i><i style="width:48%"></i><i style="width:74%"></i><i style="width:56%"></i></div>
+      <div class="tip"><svg viewBox="0 0 38 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M36 12H4M12 4l-8 8 8 8"/></svg><span>Pocket Pilot<small>in the Activity Bar, far left</small></span></div>
+    </div>
+  </div></body></html>`;
+}
+
 /** The Copilot app plugin's pairing page as a panel (canvas), with sample state. */
 async function copilotPanelHarness() {
   const { pairingPage } = await import('../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/pairing-page.mjs');
@@ -113,7 +161,7 @@ const copilotPanelState = () => ({
 function startServer() {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
-    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness }[url.pathname];
+    const harness = { '/__sidebar.html': sidebarHarness, '/__og.html': ogHarness, '/__readme.html': readmeHarness, '/__copilot-panel.html': copilotPanelHarness, '/__button.html': buttonHarness, '/__activitybar.html': activityBarHarness }[url.pathname];
     if (harness) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
       res.end(await harness());
@@ -234,6 +282,20 @@ async function main() {
     const box = await how.eval('(() => { const r = document.querySelector("#how .diagram").getBoundingClientRect(); return { x: Math.max(0, r.left - 28), y: r.top + scrollY - 28, width: r.width + 56, height: r.height + 56 }; })()');
     await how.shot('how-it-works.png', { format: 'png', dir: docs, clip: box });
     await how.close();
+
+    console.log('Rendering the Open in VS Code button and the Activity Bar hint…');
+    const element = async (page, id) => page.eval(`(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()`);
+    const btn = await open(cdp, { width: 640, height: 200, dpr: 2, mobile: false, transparent: true });
+    await btn.goto(`${base}/__button.html`);
+    await btn.waitFor('[...document.images].every((i) => i.complete && i.naturalWidth > 0)');
+    await sleep(200);
+    await btn.shot('open-in-vscode.png', { format: 'png', dir: docs, clip: await element(btn, 'b') });
+    await btn.close();
+    const bar = await open(cdp, { width: 480, height: 420, dpr: 2, mobile: false, transparent: true });
+    await bar.goto(`${base}/__activitybar.html`);
+    await sleep(300);
+    await bar.shot('activity-bar.png', { format: 'png', clip: await element(bar, 'a') });
+    await bar.close();
   } finally {
     await close();
     server.close();

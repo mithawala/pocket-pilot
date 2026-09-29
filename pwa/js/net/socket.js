@@ -72,6 +72,10 @@ export function openSocket(url, { WebSocketImpl = globalThis.WebSocket, timeoutM
       get bufferedAmount() {
         return ws.bufferedAmount;
       },
+      /** True once the connection is closing or closed (sending then drops data silently). */
+      get closed() {
+        return ws.readyState >= 2 || !!q.error;
+      },
     };
     const timer = setTimeout(() => {
       if (!opened) {

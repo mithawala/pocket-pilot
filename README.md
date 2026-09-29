@@ -2,6 +2,10 @@
 
 **Your Copilot agents, in your pocket.** Chat with your GitHub Copilot and Claude agent sessions — in VS Code, the GitHub Copilot app or the Copilot CLI — approve their tool calls and get notified when they need you, from your phone, anywhere. Free, end-to-end encrypted, passkey-protected, no servers.
 
+<p align="center"><a href="https://mithawala.github.io/pocket-pilot/open/"><img src="docs/images/open-in-vscode.png" width="340" alt="Open Pocket Pilot in VS Code"></a></p>
+
+<p align="center">Installed it? The button opens the Pocket Pilot panel. You can also click the <b>robot icon</b> in the <b>Activity Bar</b>, the column of icons on the far left of VS Code.</p>
+
 **[Product page](https://mithawala.github.io/pocket-pilot/) · [Live demo](https://mithawala.github.io/pocket-pilot/app/?demo) · [Download the extension](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix) · [Plugin for the GitHub Copilot app](#github-copilot-app-and-cli)**
 
 <p align="center"><img src="docs/images/screens.jpg" width="860" alt="Pocket Pilot on a phone: the sessions list, a tool approval and a finished chat"></p>
@@ -12,7 +16,7 @@
 - **In sync with your PC.** The model, thinking level and context size you pick on the phone show up in VS Code's picker and the other way round, and the model list always comes live from your PC.
 - **Also for the GitHub Copilot app and CLI.** A Copilot plugin gives the same phone app to the sessions you run in the GitHub Copilot desktop app or the Copilot CLI — [see below](#github-copilot-app-and-cli).
 - **Push notifications** when an agent needs approval, asks a question, finishes or fails — sent directly from your PC with standard Web Push (no Firebase, no account).
-- **Secure by design:** QR pairing with approval on your PC, per-device keys that can't be exported, Face ID / fingerprint (passkeys), end-to-end encryption through the tunnel, instant revocation.
+- **Secure by design:** QR pairing with approval on your PC, per-device keys that can't be exported, Face ID / fingerprint (passkeys) or codes from an authenticator app, end-to-end encryption through the tunnel, instant revocation.
 - **Free:** Cloudflare quick tunnel (no account) + a static PWA on GitHub Pages. Your GitHub token never leaves your PC.
 
 ## How it works
@@ -33,7 +37,7 @@
 | Device identity | Each device (phone, tablet or computer) generates an ECDH P-256 key pair; the private key is **non-extractable** (WebCrypto) and stored in IndexedDB. The PC stores only public keys. |
 | Handshake | `ECDH(device, PC)` + ephemeral `ECDH` (forward secrecy) + pairing token → HKDF-SHA-256 → per-direction AES-256-GCM keys. Mutual authentication: a party without the right private key cannot produce a single valid frame. The device pins the PC's key (fingerprint shown during pairing). |
 | Transport | Every frame is AES-256-GCM encrypted with a strict sequence number (no replay, reordering or drops). Cloudflare only sees ciphertext. |
-| Biometrics | Devices register a **passkey** (Face ID / Touch ID / fingerprint / Windows Hello / screen lock) at pairing. The extension verifies WebAuthn assertions itself (ES256/RS256, user-verification required, origin/rpId/challenge/counter checks) and asks again after the grace period (default 12 h). |
+| Second factor | Devices register a **passkey** (Face ID / Touch ID / fingerprint / Windows Hello / screen lock) at pairing, or, if they can't, a **code from an authenticator app** (TOTP, RFC 6238). The extension verifies WebAuthn assertions itself (ES256/RS256, user-verification required, origin/rpId/challenge/counter checks) and asks again after the grace period (default 12 h). Authenticator codes: the phone makes the setup key and sends it end-to-end encrypted; a code works once, and wrong codes lock the device for 15 minutes, doubling up to a day. |
 | Least privilege | The relay allow-lists AHP methods (no file writes, no terminals, no `authenticate` from a device); file reads are limited to your session folders. The agent host connection token never leaves the PC, and Pocket Pilot never touches your GitHub sign-in: VS Code keeps its agent host signed in. |
 | Control | See and remove paired devices in the VS Code sidebar (they're disconnected instantly). *Reset identity* invalidates every pairing. Failed attempts are rate-limited per IP. |
 | Push | Web Push payloads are encrypted for the device (RFC 8291) and signed with VAPID (RFC 8292); only real push services are accepted as endpoints. |
@@ -41,7 +45,10 @@
 ## Get started
 
 1. **Install the extension**: download [`pocket-pilot.vsix`](https://github.com/mithawala/pocket-pilot/releases/latest/download/pocket-pilot.vsix) from the [latest release](https://github.com/mithawala/pocket-pilot/releases/latest), then *Extensions → … → Install from VSIX* (or `code --install-extension pocket-pilot.vsix`).
-2. Open the **Pocket Pilot** view in the activity bar and click **Start remote access**. The first time, VS Code asks to:
+2. Open the **Pocket Pilot** panel (it opens by itself the first time; later, click the robot icon in the Activity Bar on the far left, or **Open Pocket Pilot in VS Code** at the top of this page) and click **Start remote access**. The first time, VS Code asks to:
+
+   <img src="site/img/activity-bar.png" width="300" alt="The Pocket Pilot robot icon in VS Code's Activity Bar">
+
    - download `cloudflared` (~55 MB, verified),
    - optionally enable auto-reconnect (secret gist, the only feature that uses your GitHub account).
 3. **Scan the QR code** with your phone's camera (for a tablet or another computer: **Copy link** and open it there). Check that the fingerprint matches, tap **Pair securely**, click **Allow** in VS Code and confirm with Face ID / fingerprint / Windows Hello.
@@ -89,8 +96,9 @@ Your phone now shows every chat you use in the app or the CLI — with the full 
 | `pocketPilot.tunnel.mode` | `quick` | `quick` (Cloudflare, free), `custom` (your own HTTPS URL: named Cloudflare tunnel, dev tunnel, Tailscale Funnel…), `none`. |
 | `pocketPilot.tunnel.customUrl` | | Public URL for `custom` mode (set `pocketPilot.port` too). |
 | `pocketPilot.security.requireApproval` | `true` | Confirm new devices in VS Code. |
-| `pocketPilot.security.passkey` | `required` | `required`, `optional` or `off`. |
-| `pocketPilot.security.passkeyGraceHours` | `12` | Re-verify Face ID / fingerprint after this long (0 = every connection). |
+| `pocketPilot.security.passkey` | `required` | `required`, `optional` or `off`: whether devices confirm it's you with a passkey or an authenticator app code. |
+| `pocketPilot.security.authenticatorApp` | `true` | Allow 6-digit authenticator app codes instead of a passkey. |
+| `pocketPilot.security.passkeyGraceHours` | `12` | Ask for Face ID / fingerprint or a code again after this long (0 = every connection). |
 | `pocketPilot.security.pairingCodeMinutes` | `10` | QR code lifetime (single use). |
 | `pocketPilot.rendezvous.enabled` | `true` | Encrypted secret gist for automatic reconnection. |
 | `pocketPilot.notifications.*` | `true` | `inputNeeded`, `finished`, `errors`, `skipWhileActive`. |
@@ -105,7 +113,8 @@ Your phone now shows every chat you use in the app or the CLI — with the full 
 - **Does my PC have to stay on?** Yes — VS Code (or the GitHub Copilot app / CLI) must be running and the PC awake.
 - **Tunnel doesn't start on a corporate network?** Quick tunnels need outbound TCP/UDP 7844. Use `tunnel.mode: custom` with a tunnel your network allows.
 - **Multiple VS Code windows?** One window hosts the relay and tunnel; every other window shows the same panel (QR code, tunnel, paired devices) and its buttons act on it. A device's pairing request appears in the window you're using. If the hosting window closes, another takes over automatically (devices reconnect); stopping in any window stops it everywhere.
-- **Can I pair a tablet or another computer?** Yes — any device with a current browser. On a phone or tablet, scan the QR code; on a computer, click **Copy link** in the panel and open the link there. The passkey uses Face ID, a fingerprint, Windows Hello or the screen lock, and wide screens get a desktop layout with the sessions next to the chat.
+- **Can I pair a tablet or another computer?** Yes — any device with a current browser. On a phone or tablet, scan the QR code; on a computer, click **Copy link** in the panel and open the link there. The passkey uses Face ID, a fingerprint, Windows Hello or the screen lock (or use codes from an authenticator app), and wide screens get a desktop layout with the sessions next to the chat.
+- **Which apps can keep the passkey?** The Passwords app (iCloud Keychain), Google Password Manager, 1Password, Bitwarden and other password managers. Microsoft Authenticator only keeps passkeys for Microsoft work and school accounts, and Google Authenticator keeps no passkeys at all. If saving fails, tap **Try again** and pick another place, or choose **Use an authenticator app instead**: then Pocket Pilot asks for a 6-digit code from Google Authenticator, Microsoft Authenticator or any other authenticator app, every 12 hours by default.
 - **Does Pocket Pilot need my GitHub account?** Not for remote access. VS Code keeps its agent host signed in to GitHub and Pocket Pilot never touches that sign-in. Only the optional auto-reconnect asks to use your GitHub account once, to keep the encrypted tunnel address in a secret gist.
 - **What's the auto-reconnect gist?** One secret gist on your GitHub account, *Pocket Pilot · encrypted addresses of your PCs*, with one small file per PC (VS Code and the Copilot app plugin each count as one). Each file holds only that PC's current tunnel address, encrypted (AES-256-GCM) with a key that only its paired devices have, so GitHub and anyone who finds the gist see nothing useful. Pocket Pilot updates a PC's file when its address changes; devices read it anonymously and reconnect. Turn auto-reconnect off in the settings, and delete the gist any time.
 - **Does it update itself?** From the Marketplace, VS Code updates it automatically. A VSIX install (VS Code pins those and never updates them) checks GitHub for new releases and offers a one-click **Update** — or run *Pocket Pilot: Check for Updates*. The Copilot app plugin updates with `copilot plugin update pocket-pilot@pocket-pilot` (on Windows, quit VS Code and the app first — see [Good to know](#github-copilot-app-and-cli)); `/pocket-pilot` tells you when there's a new version. The phone app updates itself.
@@ -126,7 +135,7 @@ GitHub Copilot has built-in remote control: `/remote on` (or `copilot --remote`)
 | **Inside a session** | Live progress, steering and queued messages, approvals, questions, plan review, switching modes, stopping. | The same, plus the model with its thinking level and context size (kept in sync with the model picker on your PC), dictation, photo and file attachments, and previews of files the agent links to. |
 | **Notifications** | Live activities (iOS) and live updates (Android) in GitHub Mobile. | Web Push sent from your PC when an agent needs you, finishes or fails. |
 | **Where your session goes** | Session events are sent to GitHub and synced to your GitHub account, where only you can see them. | Straight from your phone to your PC, end-to-end encrypted. The tunnel only relays ciphertext and nothing is stored in a cloud. |
-| **Signing in** | Your GitHub account. | Pairing you approve on your PC, plus a passkey (Face ID or fingerprint). No GitHub sign-in on the phone. |
+| **Signing in** | Your GitHub account. | Pairing you approve on your PC, plus a passkey (Face ID or fingerprint) or an authenticator app code. No GitHub sign-in on the phone. |
 | **Work accounts** | For Copilot Business and Enterprise, an admin must set the "Store local sessions in the Cloud" policy to "View and control". | Nothing to switch on at GitHub, but your company's policies still apply. |
 | **Network** | Your machine connects out to GitHub. | A Cloudflare quick tunnel (outbound port 7844), or a tunnel you choose. |
 | **Cost** | Included with Copilot. | Free, including at work. The source code is public on GitHub. |

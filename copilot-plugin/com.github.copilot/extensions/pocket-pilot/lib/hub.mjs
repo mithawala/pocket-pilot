@@ -40,7 +40,7 @@ export function hubLog(level, msg) {
   if (process.env.POCKET_PILOT_HUB_STDOUT) process.stderr.write(line);
 }
 
-const settings = () => ({ passkey: 'required', requireApproval: true, tunnel: 'quick', customUrl: '', notify: { input: true, done: true, error: true }, ...readJson(FILES.state, {})?.settings });
+const settings = () => ({ passkey: 'required', authenticatorApp: true, requireApproval: true, tunnel: 'quick', customUrl: '', notify: { input: true, done: true, error: true }, ...readJson(FILES.state, {})?.settings });
 
 /** Starts the hub in this process. Resolves to null if another process already hosts it. */
 export async function startHub() {
@@ -187,7 +187,7 @@ async function boot(log, cleanups) {
     allowedOrigins: () => [...new Set([new URL(PWA_URL).origin, `http://127.0.0.1:${relay.port}`, `http://localhost:${relay.port}`, ...String(process.env.POCKET_PILOT_ORIGINS || '').split(',').filter(Boolean)])],
     policy: () => {
       const s = settings();
-      return { requireApproval: s.requireApproval !== false, passkey: s.passkey, passkeyGraceHours: 12 };
+      return { requireApproval: s.requireApproval !== false, passkey: s.passkey, passkeyGraceHours: 12, allowTotp: s.authenticatorApp !== false };
     },
     welcomeExtras: (device) => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvousFor(device), pwaUrl: PWA_URL, hostKind: 'copilot' }),
     isReadAllowed,
@@ -196,7 +196,7 @@ async function boot(log, cleanups) {
     tunnelRedirect: () => PWA_URL,
     log,
   });
-  relay.on('paired', (d) => log('info', `Paired "${d.name}"${d.passkey ? ' with a passkey' : ''}`));
+  relay.on('paired', (d) => log('info', `Paired "${d.name}"${d.passkey ? ' with a passkey' : d.totp ? ' with an authenticator app' : ''}`));
   relay.on('pairing-token-used', () => setTimeout(() => newPairingCode().catch(() => {}), 1500));
   relay.on('push-test', (id) => {
     const d = store.get(id);
@@ -314,7 +314,7 @@ async function boot(log, cleanups) {
       rendezvous: rendezvousOn() && !!rendezvous.info(),
       sessions: host.sessionCount,
       pairing: state.pairing ? { link: state.pairing.link, expiresAt: state.pairing.expiresAt } : null,
-      devices: store.list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: online.has(d.id), passkey: !!d.passkey, push: !!d.push, lastSeenAt: d.lastSeenAt })),
+      devices: store.list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: online.has(d.id), passkey: !!d.passkey, totp: !!d.totp, push: !!d.push, lastSeenAt: d.lastSeenAt })),
       pageUrl: `http://127.0.0.1:${pairServer.address().port}/pair?k=${pageKey}`,
     };
   }

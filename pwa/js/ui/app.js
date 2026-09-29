@@ -10,6 +10,7 @@ import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
 import { SettingsScreen, NotificationSetup, pushPromptWanted } from './settings.js';
 import { QrScanner } from './scanner.js';
+import { CodeSheet } from './authenticator.js';
 import { isPairingFragment } from '../core/secure-channel.js';
 
 function parseRoute() {
@@ -68,6 +69,24 @@ export class AppController extends EventTarget {
   _emit() {
     this._v = (this._v || 0) + 1;
     this.dispatchEvent(new CustomEvent('change', { detail: {} }));
+  }
+
+  /** The PC asks for a code from the authenticator app: shown as a sheet over whatever is open. */
+  _askCode({ hostName, deviceName, wrong }) {
+    this.codeRequest?.reject(new Error('Replaced'));
+    return new Promise((resolve, reject) => {
+      const done = (fn) => (v) => {
+        if (this.codeRequest !== request) return;
+        this.codeRequest = null;
+        this._emit();
+        fn(v);
+      };
+      const request = { hostName, deviceName, wrong };
+      request.resolve = done(resolve);
+      request.reject = done(reject);
+      this.codeRequest = request;
+      this._emit();
+    });
   }
 
   /** Whether this device closed the "Get notified" card (Settings still offers notifications). */
@@ -138,6 +157,7 @@ export class AppController extends EventTarget {
 
   _connectCurrent() {
     if (this.demo) return;
+    this.codeRequest?.reject(new Error('Switched PC'));
     if (this.active) {
       this.active.conn.stop();
       this.active.store.dispose();
@@ -145,7 +165,7 @@ export class AppController extends EventTarget {
     }
     const host = this.current;
     if (!host) return;
-    const conn = new HostConnection(host, { webauthn, isVisible: () => document.visibilityState === 'visible' });
+    const conn = new HostConnection(host, { webauthn, askCode: (req) => this._askCode(req), isVisible: () => document.visibilityState === 'visible' });
     conn.addEventListener('record', (e) => db.putHost(e.detail.record).catch(() => {}));
     conn.addEventListener('ready', () => this._syncPush(host).catch(() => {}));
     const store = new HostStore(conn);
@@ -316,12 +336,13 @@ export function App({ app }) {
   let screen;
   const scrollable = (inner) => html`<div class="screen"><div class="scroll-wrap"><div class="scroll">${inner}</div></div></div>`;
   if (route.name === 'pair' && app.pendingFragment) {
-    screen = scrollable(html`<${PairScreen} fragment=${app.pendingFragment}
+    screen = scrollable(html`<${PairScreen} key=${app.pendingFragment} fragment=${app.pendingFragment}
       onPaired=${async (record) => {
         app.pendingFragment = null;
         await app.addHost(record);
         toast(`Paired with ${record.hostName} 🎉`);
       }}
+      onRescan=${() => setScanning(true)}
       onCancel=${() => { app.pendingFragment = null; location.hash = '#/'; }} />`);
   } else if (!app.current) {
     screen = scrollable(html`<${Welcome} installPrompt=${installHint} onScan=${() => setScanning(true)} onLink=${startPairing} />`);
@@ -359,6 +380,7 @@ export function App({ app }) {
     ${screen}
     <${Toasts} />
     <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />
+    <${CodeSheet} request=${app.codeRequest} onSubmit=${(code) => app.codeRequest?.resolve(code)} onCancel=${() => app.codeRequest?.reject(new Error('cancelled'))} />
     ${scanning && html`<${QrScanner} onResult=${startPairing} onClose=${() => setScanning(false)} />`}
   </div>`;
 }

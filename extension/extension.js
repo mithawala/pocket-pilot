@@ -21,6 +21,7 @@ const STATE_ENABLED = 'pocketPilot.enabled';
 const STATE_CLOUDFLARED_OK = 'pocketPilot.cloudflaredConsent';
 const STATE_RDV_ASKED = 'pocketPilot.rendezvousAsked';
 const STATE_UPDATE_NOTIFIED = 'pocketPilot.updateNotified';
+const STATE_INTRODUCED = 'pocketPilot.introduced';
 const PUSH_SUBJECT = 'mailto:pocket-pilot@users.noreply.github.com';
 const EXTENSION_ID = 'mithawala.pocket-pilot';
 const REPO = 'mithawala/pocket-pilot';
@@ -46,6 +47,7 @@ function settings() {
     port: Number(c.get('port', 0)) || 0,
     requireApproval: c.get('security.requireApproval', true),
     passkey: c.get('security.passkey', 'required'),
+    allowTotp: c.get('security.authenticatorApp', true) !== false,
     passkeyGraceHours: Number(c.get('security.passkeyGraceHours', 12)),
     pairingCodeMinutes: Math.min(60, Math.max(1, Number(c.get('security.pairingCodeMinutes', 10)) || 10)),
     rendezvous: c.get('rendezvous.enabled', true),
@@ -136,7 +138,7 @@ class PocketPilotService {
     ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('pocketPilot')) this._onConfigChanged(e);
     }));
-    // vscode://mithawala.pocket-pilot/start | /pair | /stop
+    // vscode://mithawala.pocket-pilot/open | /start | /pair | /stop (open shows the panel)
     ctx.subscriptions.push(vscode.window.registerUriHandler({
       handleUri: (uri) => {
         const action = uri.path.replace(/^\/+/, '');
@@ -177,6 +179,14 @@ class PocketPilotService {
     if (holder && holder.pid !== process.pid) this._pollShared();
     else if ((ctx.globalState.get(STATE_ENABLED, false) || this.shared.enabled()) && settings().autoStart) {
       this.start({ interactive: false }).catch((err) => this.logLine('warn', `Auto-start failed: ${err.message}`));
+    }
+    // Right after installing, open the panel once: not everyone spots the new icon in the Activity Bar.
+    if (!ctx.globalState.get(STATE_INTRODUCED, false)) {
+      ctx.globalState.update(STATE_INTRODUCED, true);
+      if (!this.store.list().length && !ctx.globalState.get(STATE_ENABLED, false)) {
+        const t = setTimeout(() => Promise.resolve(vscode.commands.executeCommand('pocketPilot.panel.focus')).catch(() => {}), 1500);
+        t.unref?.();
+      }
     }
   }
 
@@ -396,7 +406,7 @@ class PocketPilotService {
       allowedOrigins: () => this.allowedOrigins(),
       policy: () => {
         const s = settings();
-        return { requireApproval: s.requireApproval, passkey: s.passkey, passkeyGraceHours: s.passkeyGraceHours };
+        return { requireApproval: s.requireApproval, passkey: s.passkey, passkeyGraceHours: s.passkeyGraceHours, allowTotp: s.allowTotp };
       },
       welcomeExtras: (device) => ({ vapidPublicKey: this.vapid.publicKey, rendezvous: this._rendezvousFor(device), pwaUrl: settings().pwaUrl || null }),
       isReadAllowed: (uri) => this._isReadAllowed(uri),
@@ -408,7 +418,7 @@ class PocketPilotService {
     });
     this.relay.on('connections', () => this.changed());
     this.relay.on('paired', (d) => {
-      vscode.window.showInformationMessage(`Pocket Pilot: "${d.name}" is paired${d.passkey ? ' and protected by a passkey' : ''}.`);
+      vscode.window.showInformationMessage(`Pocket Pilot: "${d.name}" is paired${d.passkey ? ' and protected by a passkey' : d.totp ? ' and protected by an authenticator app' : ''}.`);
       this.changed();
     });
     this.relay.on('pairing-token-used', () => setTimeout(() => this.newPairingCode(), 1500));
@@ -881,9 +891,10 @@ class PocketPilotService {
         online: online.has(d.id),
         visible: !!online.get(d.id)?.visible,
         passkey: !!d.passkey,
+        totp: !!d.totp,
         push: !!d.push,
       })),
-      settings: { passkey: s.passkey, requireApproval: s.requireApproval, pwaUrl: s.pwaUrl, pwaFallback: !!this.pwaFallback },
+      settings: { passkey: s.passkey, allowTotp: s.allowTotp, requireApproval: s.requireApproval, pwaUrl: s.pwaUrl, pwaFallback: !!this.pwaFallback },
     };
   }
 

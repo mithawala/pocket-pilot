@@ -10,9 +10,19 @@ const agentHost = require('./agentHost');
 const webauthn = require('./webauthn');
 const push = require('./push');
 const { deviceIdFor } = require('./store');
-const { loadSecureChannel } = require('./identity');
+const { loadSecureChannel, loadTotp } = require('./identity');
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
+
+// How long the PC waits while the phone sets up or answers its second factor: people may try a
+// passkey a few times, or add Pocket Pilot to an authenticator app first.
+const FACTOR_TIMEOUT_MS = 10 * 60 * 1000;
+// Authenticator-app codes: wrong codes per connection, then per device before a lockout that doubles
+// each time (15 minutes up to a day). A stolen device key alone can't guess its way in.
+const TOTP_TRIES_PER_CONNECTION = 5;
+const TOTP_LOCK_AFTER = 10;
+const TOTP_LOCK_MS = 15 * 60 * 1000;
+const TOTP_LOCK_MAX_MS = 24 * 3600 * 1000;
 
 // JSON-RPC methods a phone may send to the agent host. Everything else is refused by the relay.
 const ALLOWED_REQUESTS = new Set([
@@ -116,7 +126,7 @@ class RelayServer extends EventEmitter {
    * @param {() => object|null} o.getAgentEndpoint
    * @param {(info: object) => Promise<boolean>} o.approveDevice
    * @param {() => string[]} o.allowedOrigins
-   * @param {() => {requireApproval:boolean, passkey:'required'|'optional'|'off', passkeyGraceHours:number}} o.policy
+   * @param {() => {requireApproval:boolean, passkey:'required'|'optional'|'off', passkeyGraceHours:number, allowTotp?:boolean}} o.policy
    * @param {(device: object) => Promise<object>|object} o.welcomeExtras
    * @param {(uri: string) => boolean} [o.isReadAllowed]
    * @param {(req: object) => Promise<{uri:string, path:string}>} [o.saveUpload]
@@ -136,6 +146,7 @@ class RelayServer extends EventEmitter {
 
   async listen(port = 0, host = '127.0.0.1') {
     this.sc = await loadSecureChannel();
+    this.totp = await loadTotp();
     this.server = http.createServer((req, res) => this._http(req, res));
     this.server.on('upgrade', (req, socket, head) => this._upgrade(req, socket, head));
     this.server.on('clientError', (err, socket) => socket.destroy());
@@ -457,7 +468,7 @@ class DeviceConnection extends EventEmitter {
       throw new RelayError('unknown-device', 'Unknown device', { quiet: true, closeCode: 4401 });
     }
     if (hello.mode === 'pair') device = await this._pair(hello, auth);
-    else device = await this._verifyReturning(device);
+    else device = await this._verifyReturning(device, auth);
     this.deviceId = device.id;
     this._assertStillPaired(device.id);
     const fresh = o.store.update(device.id, { lastSeenAt: Date.now(), lastIp: this.meta.ip, appVersion: sanitizeText(auth.appVersion, 20) });
@@ -471,6 +482,7 @@ class DeviceConnection extends EventEmitter {
       deviceName: fresh.name,
       host: { id: o.identity.hostId, name: o.identity.name },
       passkey: !!fresh.passkey,
+      factor: fresh.passkey ? 'passkey' : fresh.totp ? 'totp' : null,
       ...extras,
     });
     this.log('info', `Device "${fresh.name}" connected from ${this.meta.ip}`);
@@ -491,27 +503,8 @@ class DeviceConnection extends EventEmitter {
       }
     }
     let passkey = null;
-    if (policy.passkey !== 'off') {
-      const challenge = b64u(crypto.randomBytes(32));
-      await this.sendControl({ t: 'passkey.register', challenge, userId: id, userName: name });
-      const reply = await this._recvControl(180000);
-      if (reply.t === 'passkey.registered') {
-        try {
-          passkey = webauthn.verifyRegistration(reply.credential, { challenge, allowedOrigins: this.relay.allowedOrigins() });
-          passkey.createdAt = Date.now();
-          passkey.lastVerifiedAt = Date.now();
-        } catch (err) {
-          this.log('warn', `Passkey registration failed: ${err.message}`);
-          if (policy.passkey === 'required') {
-            await this.sendControl({ t: 'error', code: 'passkey-failed', message: `Passkey setup failed: ${err.message}` });
-            throw new RelayError('passkey-failed', err.message, { quiet: true });
-          }
-        }
-      } else if (policy.passkey === 'required') {
-        await this.sendControl({ t: 'error', code: 'passkey-required', message: `This PC requires a passkey (Face ID / fingerprint). ${sanitizeText(reply.reason, 200)}` });
-        throw new RelayError('passkey-required', 'Passkey required', { quiet: true });
-      }
-    }
+    let totp = null;
+    if (policy.passkey !== 'off') ({ passkey = null, totp = null } = await this._enrollFactor({ id, name, policy }));
     const device = {
       id,
       name,
@@ -521,26 +514,77 @@ class DeviceConnection extends EventEmitter {
       lastSeenAt: Date.now(),
       pwaOrigin: this.meta.origin,
       passkey,
+      ...(totp ? { totp } : {}),
       push: null,
     };
     o.store.add(device);
     this.relay.emit('paired', device);
-    this.log('info', `Paired new device "${name}" (${platform || 'unknown platform'})`);
+    this.log('info', `Paired new device "${name}" (${platform || 'unknown platform'})${totp ? ' with an authenticator app' : passkey ? ' with a passkey' : ''}`);
     return device;
   }
 
-  async _verifyReturning(device) {
+  /**
+   * The device's second factor: a passkey, or where the PC allows it a code from an authenticator app.
+   * The phone may try the passkey several times before it answers (this pairing stays open), or send the
+   * authenticator setup it prepared: its setup key and the current code, after the person entered a
+   * matching code from their authenticator app.
+   */
+  async _enrollFactor({ id, name, policy }) {
+    const allowTotp = policy.allowTotp !== false;
+    const challenge = b64u(crypto.randomBytes(32));
+    await this.sendControl({ t: 'passkey.register', challenge, userId: id, userName: name, alternatives: allowTotp ? ['totp'] : [] });
+    const reply = await this._recvControl(FACTOR_TIMEOUT_MS);
+    if (reply.t === 'passkey.registered') {
+      try {
+        const passkey = webauthn.verifyRegistration(reply.credential, { challenge, allowedOrigins: this.relay.allowedOrigins() });
+        passkey.createdAt = Date.now();
+        passkey.lastVerifiedAt = Date.now();
+        return { passkey };
+      } catch (err) {
+        this.log('warn', `Passkey registration failed: ${err.message}`);
+        if (policy.passkey === 'required') {
+          await this.sendControl({ t: 'error', code: 'passkey-failed', message: `Passkey setup failed: ${err.message}` });
+          throw new RelayError('passkey-failed', err.message, { quiet: true });
+        }
+        return {};
+      }
+    }
+    if (reply.t === 'totp.enroll' && allowTotp) {
+      const { totp } = this.relay;
+      const step = totp.isSecret(reply.secret) ? await totp.verifyCode(reply.secret, reply.code) : null;
+      if (step === null) {
+        await this.sendControl({ t: 'error', code: 'totp-failed', message: "The authenticator code didn't match on your PC. Check that the date and time are set automatically on your PC and this device, then scan a new QR code." });
+        throw new RelayError('totp-failed', 'Authenticator setup code did not match', { quiet: true });
+      }
+      const now = Date.now();
+      return { totp: { secret: reply.secret, createdAt: now, lastVerifiedAt: now, lastStep: step } };
+    }
+    if (policy.passkey === 'required') {
+      const reason = sanitizeText(reply.reason, 200);
+      const need = allowTotp ? 'a passkey (Face ID / fingerprint) or an authenticator app code' : 'a passkey (Face ID / fingerprint)';
+      await this.sendControl({ t: 'error', code: 'passkey-required', message: `This PC requires ${need}.${reason ? ` ${reason}` : ''}` });
+      throw new RelayError('passkey-required', 'Second factor required', { quiet: true });
+    }
+    return {};
+  }
+
+  async _verifyReturning(device, auth) {
     const policy = this.relay.o.policy();
     if (policy.passkey === 'off') return device;
-    if (!device.passkey) {
+    const allowTotp = policy.allowTotp !== false;
+    if (!device.passkey && !(device.totp && allowTotp)) {
       if (policy.passkey === 'required') {
-        await this.sendControl({ t: 'error', code: 'passkey-missing', message: 'This PC now requires a passkey. Remove the PC in the app and pair again.' });
-        throw new RelayError('passkey-missing', 'Passkey missing', { quiet: true });
+        const message = device.totp
+          ? 'Your PC no longer accepts authenticator app codes. Remove the PC in the app and pair again with a passkey.'
+          : `This PC now requires ${allowTotp ? 'a passkey or an authenticator app code' : 'a passkey'}. Remove the PC in the app and pair again.`;
+        await this.sendControl({ t: 'error', code: 'passkey-missing', message });
+        throw new RelayError('passkey-missing', 'Second factor missing', { quiet: true });
       }
       return device;
     }
     const graceMs = Math.max(0, Number(policy.passkeyGraceHours) || 0) * 3600 * 1000;
-    if (Date.now() - (device.passkey.lastVerifiedAt || 0) < graceMs) return device;
+    if (Date.now() - ((device.passkey || device.totp).lastVerifiedAt || 0) < graceMs) return device;
+    if (!device.passkey) return this._verifyTotp(device, auth);
     const challenge = b64u(crypto.randomBytes(32));
     await this.sendControl({ t: 'passkey.challenge', challenge, credentialId: device.passkey.credentialId, rpId: device.passkey.rpId });
     const reply = await this._recvControl(180000);
@@ -560,6 +604,61 @@ class DeviceConnection extends EventEmitter {
     const updated = this.relay.o.store.update(device.id, (d) => ({ passkey: { ...d.passkey, signCount: r.signCount, lastVerifiedAt: Date.now() } }));
     if (!updated) throw new RelayError('revoked', 'Device was removed', { quiet: true, closeCode: 4401 });
     return updated;
+  }
+
+  /**
+   * Asks for a code from the device's authenticator app. The app can also send one it collected up
+   * front (auth.totpCode): people switch to their authenticator app to read the code, and iOS may drop
+   * the connection meanwhile, so the code arrives with the next one.
+   */
+  async _verifyTotp(device, auth) {
+    const { store } = this.relay.o;
+    const { totp } = this.relay;
+    const lockedFor = (device.totp.lockedUntil || 0) - Date.now();
+    if (lockedFor > 0) {
+      const minutes = Math.ceil(lockedFor / 60000);
+      await this.sendControl({ t: 'error', code: 'passkey-failed', message: `Too many wrong codes. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` });
+      throw new RelayError('passkey-failed', 'Authenticator codes locked', { quiet: true });
+    }
+    let code = typeof auth?.totpCode === 'string' ? auth.totpCode : null;
+    let wrong = false;
+    for (let tries = 0; tries < TOTP_TRIES_PER_CONNECTION; tries++) {
+      if (!code) {
+        await this.sendControl({ t: 'totp.challenge', wrong });
+        const reply = await this._recvControl(FACTOR_TIMEOUT_MS);
+        this._assertStillPaired(device.id);
+        if (reply.t !== 'totp.code') {
+          await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Verification was cancelled.' });
+          throw new RelayError('passkey-failed', 'Authenticator code cancelled', { quiet: true });
+        }
+        code = reply.code;
+      }
+      const current = store.get(device.id);
+      if (!current?.totp) throw new RelayError('revoked', 'Device was removed', { quiet: true, closeCode: 4401 });
+      const step = await totp.verifyCode(current.totp.secret, code, { after: current.totp.lastStep ?? -1 });
+      code = null;
+      if (step !== null) {
+        const updated = store.update(device.id, (d) => ({ totp: { ...d.totp, lastStep: step, lastVerifiedAt: Date.now(), failures: 0, lockouts: 0, lockedUntil: 0 } }));
+        if (!updated) throw new RelayError('revoked', 'Device was removed', { quiet: true, closeCode: 4401 });
+        return updated;
+      }
+      this.relay._recordFailure(this.meta.ip);
+      const failed = store.update(device.id, (d) => {
+        const failures = (d.totp.failures || 0) + 1;
+        if (failures < TOTP_LOCK_AFTER) return { totp: { ...d.totp, failures } };
+        const lockouts = (d.totp.lockouts || 0) + 1;
+        return { totp: { ...d.totp, failures: 0, lockouts, lockedUntil: Date.now() + Math.min(TOTP_LOCK_MAX_MS, TOTP_LOCK_MS * 2 ** (lockouts - 1)) } };
+      });
+      if ((failed?.totp.lockedUntil || 0) > Date.now()) {
+        this.log('warn', `Too many wrong authenticator codes from "${device.name}"; locked until ${new Date(failed.totp.lockedUntil).toLocaleTimeString()}`);
+        const minutes = Math.ceil((failed.totp.lockedUntil - Date.now()) / 60000);
+        await this.sendControl({ t: 'error', code: 'passkey-failed', message: `Too many wrong codes. Try again in ${minutes} minutes.` });
+        throw new RelayError('passkey-failed', 'Authenticator codes locked', { quiet: true });
+      }
+      wrong = true;
+    }
+    await this.sendControl({ t: 'error', code: 'passkey-failed', message: 'Too many wrong codes. Check that the date and time are set automatically on this device, then try again.' });
+    throw new RelayError('passkey-failed', 'Too many wrong authenticator codes', { quiet: true });
   }
 
   // ---------------------------------------------------------- secure messaging

@@ -2,7 +2,7 @@
   "name": "pocket-pilot",
   "displayName": "Pocket Pilot",
   "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone, tablet or another computer. Free, end-to-end encrypted, passkey-protected. No servers.",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "publisher": "mithawala",
   "author": {
     "name": "Asif Mithawala",
@@ -150,12 +150,17 @@
           "type": "string",
           "enum": ["required", "optional", "off"],
           "enumDescriptions": [
-            "Devices must register a passkey (Face ID / Touch ID / fingerprint / Windows Hello / device PIN) and re-verify it periodically.",
-            "Use a passkey when the device supports it.",
-            "Do not use passkeys (device keys + end-to-end encryption only)."
+            "Devices must confirm it's you with a passkey (Face ID / Touch ID / fingerprint / Windows Hello / device PIN), or with a code from an authenticator app if allowed below, and do so again periodically.",
+            "Use a passkey or an authenticator app when the device supports it.",
+            "No second factor (device keys + end-to-end encryption only)."
           ],
           "default": "required",
-          "description": "Biometric protection for paired devices."
+          "description": "How paired devices confirm it's you: a passkey or, if allowed, an authenticator app code."
+        },
+        "pocketPilot.security.authenticatorApp": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let devices use 6-digit codes from an authenticator app (Google Authenticator, Microsoft Authenticator, the Passwords app, 1Password…) instead of a passkey. Turn off to accept passkeys only. Devices already set up with an authenticator app then need to pair again."
         },
         "pocketPilot.security.passkeyGraceHours": {
           "type": "number",

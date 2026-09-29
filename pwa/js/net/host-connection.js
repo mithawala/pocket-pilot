@@ -2,10 +2,13 @@
 // running inside the end-to-end encrypted channel.
 import * as sc from '../core/secure-channel.js';
 import { b64u, unb64u } from '../core/bytes.js';
+import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.6.0';
+// How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
+const CODE_REUSE_MS = 75 * 1000;
 
 export class PairingError extends Error {
   constructor(code, message, { untrusted = false, peerCode = '' } = {}) {
@@ -65,14 +68,21 @@ function createMessenger(sock, cipher, compress) {
 
 /**
  * Pairs this phone with a PC using a scanned QR link.
+ *
+ * `factor(request)` answers the PC's request for a second factor: it resolves to `{ credential }`
+ * (a new passkey) or `{ totp: { secret, code } }` (an authenticator app set up on this device), and
+ * may take its time: the pairing stays open while the person retries a passkey or sets up an app.
+ * Rejecting gives up. Without it, `webauthn.register` makes the passkey.
  * @returns {Promise<object>} host record to persist
  */
-export async function pairWithHost({ fragment, deviceName, platform, webauthn, WebSocketImpl, onStatus = () => {} }) {
+export async function pairWithHost({ fragment, deviceName, platform, webauthn, factor, WebSocketImpl, onStatus = () => {} }) {
   const p = sc.decodePairingFragment(fragment);
   if (!p) throw new PairingError('bad-link', 'This pairing link is invalid. Scan the QR code on your PC again.');
+  const answer = factor || (async (req) => ({ credential: await webauthn.register(req) }));
   const deviceKeys = await sc.generateKeyPair(false);
   onStatus('connecting');
   const sock = await openSocket(wsUrl(p.url), { WebSocketImpl });
+  let factorKind = null;
   try {
     const hello = await sc.createClientHello({ mode: 'pair', deviceKeys, pairingToken: p.token });
     sock.send(hello.helloText);
@@ -87,16 +97,20 @@ export async function pairWithHost({ fragment, deviceName, platform, webauthn, W
     const ch = createMessenger(sock, done.cipher, done.peerCompression);
     await ch.sendControl({ t: 'auth', device: { name: deviceName, platform }, appVersion: APP_VERSION, visible: true });
     for (;;) {
-      const m = await ch.recvControl(200000);
+      const m = await ch.recvControl(12 * 60 * 1000);
       if (m.t === 'pending') onStatus('approval');
       else if (m.t === 'passkey.register') {
         onStatus('passkey');
+        let reply;
         try {
-          const credential = await webauthn.register({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'PC'} · Pocket Pilot`, displayName: deviceName });
-          await ch.sendControl({ t: 'passkey.registered', credential });
+          const r = await answer({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'PC'} · Pocket Pilot`, displayName: deviceName, hostName: p.name || 'your PC', alternatives: Array.isArray(m.alternatives) ? m.alternatives : [] });
+          reply = r.totp ? { t: 'totp.enroll', secret: r.totp.secret, code: r.totp.code } : { t: 'passkey.registered', credential: r.credential };
+          factorKind = r.totp ? 'totp' : 'passkey';
         } catch (err) {
-          await ch.sendControl({ t: 'passkey.unavailable', reason: String(err?.message || err).slice(0, 200) });
+          reply = { t: 'passkey.unavailable', reason: String(err?.message || err).slice(0, 200) };
         }
+        if (sock.closed) throw new PairingError('connection-lost', 'The connection to your PC was lost while this device was being set up.');
+        await ch.sendControl(reply);
         onStatus('finishing');
       } else if (m.t === 'welcome') {
         return {
@@ -111,6 +125,7 @@ export async function pairWithHost({ fragment, deviceName, platform, webauthn, W
           vapidPublicKey: m.vapidPublicKey || null,
           pwaUrl: m.pwaUrl || null,
           passkey: !!m.passkey,
+          factor: m.factor || (m.passkey ? 'passkey' : factorKind),
           hostKind: m.hostKind || 'vscode',
           pairedAt: Date.now(),
         };
@@ -158,11 +173,12 @@ class SecureAhpTransport {
  * Events: 'state' {state, detail}, 'ready' {transport, welcome}, 'control' {message}, 'record' {record}
  */
 export class HostConnection extends EventTarget {
-  constructor(record, { WebSocketImpl, webauthn, fetchImpl, isVisible = () => true } = {}) {
+  constructor(record, { WebSocketImpl, webauthn, askCode, fetchImpl, isVisible = () => true } = {}) {
     super();
     this.record = record;
     this.WebSocketImpl = WebSocketImpl;
     this.webauthn = webauthn;
+    this.askCode = askCode || (() => Promise.reject(new Error('No way to enter a code here')));
     this.fetchImpl = fetchImpl;
     this.isVisible = isVisible;
     this.state = 'idle';
@@ -205,7 +221,7 @@ export class HostConnection extends EventTarget {
   /** Reconnect immediately (e.g. when the app returns to the foreground). */
   poke() {
     if (this.stopped) return;
-    if (this.state === 'online' || this.state === 'connecting' || this.state === 'authenticating') return;
+    if (['online', 'connecting', 'authenticating', 'passkey', 'code'].includes(this.state)) return;
     this.attempt = 0;
     this._schedule(0);
   }
@@ -237,10 +253,14 @@ export class HostConnection extends EventTarget {
       const done = await hello.complete(first.text, { hostPublicKey: unb64u(this.record.hostPublicKey) });
       const ch = createMessenger(sock, done.cipher, done.peerCompression);
       this.ch = ch;
-      await ch.sendControl({ t: 'auth', appVersion: APP_VERSION, visible: this.isVisible() });
+      // A code typed in the last minute goes along: iOS may have dropped the connection that asked for it
+      // while the person was reading it in their authenticator app.
+      const code = this._code && Date.now() - this._code.at < CODE_REUSE_MS ? this._code.code : null;
+      this._code = null;
+      await ch.sendControl({ t: 'auth', appVersion: APP_VERSION, visible: this.isVisible(), ...(code ? { totpCode: code } : {}) });
       let welcome;
       for (;;) {
-        const m = await ch.recvControl(200000);
+        const m = await ch.recvControl(12 * 60 * 1000);
         if (m.t === 'passkey.challenge') {
           this._setState('passkey');
           try {
@@ -250,6 +270,18 @@ export class HostConnection extends EventTarget {
             await ch.sendControl({ t: 'passkey.cancelled', reason: String(err?.message || err).slice(0, 200) });
           }
           this._setState('authenticating');
+        } else if (m.t === 'totp.challenge') {
+          this._setState('code');
+          let typed = null;
+          try {
+            typed = normalizeCode(await this.askCode({ hostName: this.record.hostName, deviceName: this.record.deviceName, wrong: !!m.wrong }));
+          } catch {
+            /* cancelled */
+          }
+          if (typed) this._code = { code: typed, at: Date.now() };
+          if (sock.closed && typed) throw new Error('Reconnecting to check the code');
+          await ch.sendControl(typed ? { t: 'totp.code', code: typed } : { t: 'totp.cancel' });
+          this._setState('authenticating');
         } else if (m.t === 'welcome') {
           welcome = m;
           break;
@@ -257,9 +289,10 @@ export class HostConnection extends EventTarget {
         else if (m.t === 'error') throw new PairingError(m.code, m.message);
       }
       this.welcome = welcome;
+      this._code = null;
       this.failures = 0;
       this.attempt = 0;
-      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey, hostKind: welcome.hostKind || this.record.hostKind || 'vscode' });
+      this._updateRecord({ rendezvous: welcome.rendezvous || this.record.rendezvous, vapidPublicKey: welcome.vapidPublicKey || this.record.vapidPublicKey, hostName: welcome.host?.name || this.record.hostName, passkey: !!welcome.passkey, factor: welcome.factor || this.record.factor || (welcome.passkey ? 'passkey' : null), hostKind: welcome.hostKind || this.record.hostKind || 'vscode' });
       const transport = new SecureAhpTransport((text) => ch.messenger.send(text), () => sock.close(1000, 'client closed'));
       this.transport = transport;
       sock.onclose = (e) => this._onClosed(e);
@@ -279,6 +312,11 @@ export class HostConnection extends EventTarget {
       if (code === 'passkey-failed') {
         this._setState('locked', err.message);
         this.stopped = true;
+        return;
+      }
+      if (this._code && Date.now() - this._code.at < CODE_REUSE_MS) {
+        // Straight back with the code the person just typed.
+        this._schedule(250);
         return;
       }
       this.failures++;

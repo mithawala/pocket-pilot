@@ -83,7 +83,7 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
           <div class="grow">
             <div><b>${h.hostName}</b>${current?.hostId === h.hostId ? html` <span class="muted small">· current</span>` : ''}</div>
             <div class="kv">Fingerprint <${HostFingerprint} host=${h} /></div>
-            <div class="kv">${h.passkey ? 'Passkey protected' : 'No passkey'} · ${h.rendezvous ? 'Auto-reconnect' : 'Manual reconnect'}</div>
+            <div class="kv">${h.passkey || h.factor === 'passkey' ? 'Passkey protected' : h.factor === 'totp' ? 'Authenticator app codes' : 'No passkey'} · ${h.rendezvous ? 'Auto-reconnect' : 'Manual reconnect'}</div>
           </div>
           <div class="stack" style="gap:6px">
             ${current?.hostId !== h.hostId && html`<button class="btn sm" onClick=${() => app.selectHost(h.hostId)}>Use</button>`}

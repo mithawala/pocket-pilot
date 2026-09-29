@@ -34,6 +34,7 @@ const files = [
   { pkg: 'dompurify@3.4.16', from: 'dist/purify.es.mjs', to: 'pwa/vendor/dompurify/purify.es.js' },
   { pkg: 'dompurify@3.4.16', from: 'LICENSE', to: 'pwa/vendor/dompurify/LICENSE' },
   { pkg: 'qrcode-generator@2.0.4', from: 'dist/qrcode.js', to: 'media/vendor/qrcode.js' },
+  { pkg: 'qrcode-generator@2.0.4', from: 'dist/qrcode.mjs', to: 'pwa/vendor/qrcode/qrcode.mjs' },
   { pkg: 'jsqr@1.4.0', from: 'dist/jsQR.js', to: 'pwa/vendor/jsqr/jsQR.js' },
   { pkg: 'jsqr@1.4.0', from: 'LICENSE', to: 'pwa/vendor/jsqr/LICENSE' },
   { pkg: HLJS, from: 'es/core.min.js', to: 'pwa/vendor/hljs/core.min.js' },

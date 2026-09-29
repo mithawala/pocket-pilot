@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pairWithHost, HostConnection } from '../pwa/js/net/host-connection.js';
 import { encodePairingFragment, createClientHello, SecureMessenger } from '../pwa/js/core/secure-channel.js';
+import { newSecret, codeAt, stepAt } from '../pwa/js/core/totp.js';
 import { AhpClient } from '../pwa/vendor/ahp/client/index.js';
 
 const waitUntil = async (fn, ms = 3000) => {
@@ -247,7 +248,7 @@ test('declined approval and reused pairing codes fail', async () => {
 });
 
 test('required passkey blocks devices that cannot create one; unknown devices are unpaired', async () => {
-  const env = await setupRelay({ policy: { passkey: 'required' } });
+  const env = await setupRelay({ policy: { passkey: 'required', allowTotp: false } });
   const noPasskey = { register: async () => { throw new Error('NotAllowedError'); }, assert: async () => { throw new Error('no'); } };
   try {
     await assert.rejects(pairWithHost({ fragment: await env.newFragment(), deviceName: 'Old phone', platform: 'x', webauthn: noPasskey }), (e) => e.code === 'passkey-required');
@@ -259,6 +260,112 @@ test('required passkey blocks devices that cannot create one; unknown devices ar
     conn.start();
     await unpaired;
   } finally {
+    await env.cleanup();
+  }
+});
+
+test('authenticator app instead of a passkey: set up while pairing, asked for again after the grace period', async () => {
+  const env = await setupRelay({ policy: { passkey: 'required', passkeyGraceHours: 0 } });
+  const secret = newSecret();
+  const conns = [];
+  try {
+    // The phone offers the setup key it prepared and a matching code.
+    const offered = [];
+    const record = await pairWithHost({
+      fragment: await env.newFragment(), deviceName: 'Linux laptop', platform: 'Linux · Firefox',
+      factor: async (req) => {
+        offered.push(req.alternatives);
+        await new Promise((r) => setTimeout(r, 300)); // the person takes a moment; the pairing waits
+        return { totp: { secret, code: await codeAt(secret, stepAt()) } };
+      },
+    });
+    assert.deepEqual(offered, [['totp']]);
+    assert.equal(record.factor, 'totp');
+    assert.equal(record.passkey, false);
+    const dev = env.store.list()[0];
+    assert.equal(dev.totp.secret, secret);
+    assert.equal(dev.passkey, null);
+
+    // Next connection: a wrong code first, then the next valid one (the enrollment step can't be reused).
+    const asked = [];
+    const answers = ['000000'];
+    const conn = new HostConnection(record, { askCode: async (req) => { asked.push(req); return answers.shift() ?? codeAt(secret, stepAt() + 1); } });
+    conns.push(conn);
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { welcome } = await ready;
+    assert.equal(welcome.factor, 'totp');
+    assert.deepEqual(asked.map((a) => a.wrong), [false, true]);
+    assert.equal(asked[0].hostName, 'Test PC');
+    const after = env.store.list()[0].totp;
+    assert.ok(after.lastStep > dev.totp.lastStep, 'the code used is remembered');
+    assert.equal(after.failures, 0, 'a right code clears the wrong ones');
+    conn.stop();
+
+    // A code typed just before the connection dropped goes along with the next one: no second prompt.
+    const now = stepAt();
+    env.store.update(dev.id, (d) => ({ totp: { ...d.totp, lastStep: now - 2 } }));
+    const quiet = new HostConnection(record, { askCode: async () => { throw new Error('should not ask'); } });
+    conns.push(quiet);
+    quiet._code = { code: await codeAt(secret, now), at: Date.now() };
+    const ready2 = waitEvent(quiet, 'ready');
+    quiet.start();
+    await ready2;
+    assert.equal(env.store.list()[0].totp.lastStep, now);
+    quiet.stop();
+
+    // The same code never works twice.
+    const replay = new HostConnection(record, { askCode: async () => codeAt(secret, now) });
+    conns.push(replay);
+    const locked = waitEvent(replay, 'state', (d) => d.state === 'locked', 15000);
+    replay.start();
+    assert.match((await locked).detail, /Too many wrong codes/);
+    assert.equal(env.store.list()[0].totp.failures, 5);
+  } finally {
+    for (const c of conns) c.stop();
+    await env.cleanup();
+  }
+});
+
+test('authenticator codes lock the device after too many wrong ones, and can be turned off on the PC', async () => {
+  const env = await setupRelay({ policy: { passkey: 'required', passkeyGraceHours: 0 } });
+  const secret = newSecret();
+  const conns = [];
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Tablet', platform: 'x', factor: async () => ({ totp: { secret, code: await codeAt(secret, stepAt()) } }) });
+    const dev = env.store.list()[0];
+    env.store.update(dev.id, (d) => ({ totp: { ...d.totp, failures: 9 } }));
+    const wrong = new HostConnection(record, { askCode: async () => '123456' });
+    conns.push(wrong);
+    let locked = waitEvent(wrong, 'state', (d) => d.state === 'locked');
+    wrong.start();
+    assert.match((await locked).detail, /Try again in 15 minutes/);
+    const t = env.store.list()[0].totp;
+    assert.ok(t.lockedUntil > Date.now() + 14 * 60000, 'locked for 15 minutes');
+    assert.equal(t.lockouts, 1);
+    // While locked, even the right code isn't asked for.
+    const later = new HostConnection(record, { askCode: async () => { throw new Error('should not ask'); } });
+    conns.push(later);
+    locked = waitEvent(later, 'state', (d) => d.state === 'locked');
+    later.start();
+    assert.match((await locked).detail, /Try again in 1[45] minutes/);
+
+    // Authenticator apps turned off on the PC: new pairings get no such option, set-up devices must pair again.
+    env.policy.allowTotp = false;
+    const offered = [];
+    await assert.rejects(
+      pairWithHost({ fragment: await env.newFragment(), deviceName: 'Other', platform: 'x', factor: async (req) => { offered.push(req.alternatives); return { totp: { secret, code: await codeAt(secret, stepAt()) } }; } }),
+      (e) => e.code === 'passkey-required' && /passkey/.test(e.message),
+    );
+    assert.deepEqual(offered, [[]]);
+    env.store.update(dev.id, (d) => ({ totp: { ...d.totp, lockedUntil: 0 } }));
+    const off = new HostConnection(record, { askCode: async () => codeAt(secret, stepAt()) });
+    conns.push(off);
+    const unpaired = waitEvent(off, 'state', (d) => d.state === 'unpaired');
+    off.start();
+    assert.match((await unpaired).detail, /no longer accepts authenticator app codes/);
+  } finally {
+    for (const c of conns) c.stop();
     await env.cleanup();
   }
 });

@@ -9,11 +9,18 @@ const push = require('./push');
 
 const PWA_CORE = path.join(__dirname, '..', '..', 'pwa', 'js', 'core');
 let scPromise;
+let totpPromise;
 
 /** Loads the isomorphic secure-channel ES module shared with the PWA. */
 function loadSecureChannel() {
   if (!scPromise) scPromise = import(pathToFileURL(path.join(PWA_CORE, 'secure-channel.js')).href);
   return scPromise;
+}
+
+/** Loads the authenticator-app code (TOTP) module shared with the PWA. */
+function loadTotp() {
+  if (!totpPromise) totpPromise = import(pathToFileURL(path.join(PWA_CORE, 'totp.js')).href);
+  return totpPromise;
 }
 
 const KEYS = {
@@ -74,4 +81,4 @@ function fingerprintText(fp) {
   return Buffer.from(fp).toString('hex').toUpperCase().match(/.{4}/g).slice(0, 4).join('-');
 }
 
-module.exports = { loadSecureChannel, loadHostIdentity, loadVapid, loadRendezvousKey, resetIdentity, fingerprintText };
+module.exports = { loadSecureChannel, loadTotp, loadHostIdentity, loadVapid, loadRendezvousKey, resetIdentity, fingerprintText };
