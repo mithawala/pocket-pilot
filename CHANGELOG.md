@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.8
+
+- **Pocket Pilot is on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mithawala.pocket-pilot)**, and no longer marked as Preview. Install it there (or run `code --install-extension mithawala.pocket-pilot`) and VS Code keeps it up to date. If you installed the `.vsix` file, VS Code doesn't update it by itself: in the Extensions view, open Pocket Pilot's gear menu and check **Auto Update** once, and VS Code updates it from the Marketplace from then on.
+- The listing describes Pocket Pilot as working with your GitHub Copilot agent sessions. Nothing else changed.
+
 ## 0.7.7
 
 - **`/pocket-pilot` works in the GitHub Copilot app.** With 0.7.6 the app listed it, but running it said *Skill /pocket-pilot is not ready to run. Try again.*, in new and existing chats alike. The app only runs skills and built-in commands from its menu; it doesn't show the commands a plugin's extension registers. Pocket Pilot also registered a `/pocket-pilot` command of its own, and a command with the skill's name hides the skill, so the app couldn't find it. Pocket Pilot now leaves `/pocket-pilot` to the skill, everywhere: the agent reads it and runs the `pocket_pilot` tool, which opens the panel with the QR code, reports the status (`/pocket-pilot status`) or turns remote access off (`/pocket-pilot off`). In the CLI, the QR code also shows in the chat, as before.

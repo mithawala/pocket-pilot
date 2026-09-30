@@ -1,15 +1,14 @@
 {
   "name": "pocket-pilot",
   "displayName": "Pocket Pilot",
-  "description": "Control your VS Code agent sessions (GitHub Copilot, Claude) from your phone, tablet or another computer. Free, end-to-end encrypted, passkey-protected. No servers.",
-  "version": "0.7.7",
+  "description": "Control your GitHub Copilot agent sessions in VS Code from your phone, tablet or another computer. Free, end-to-end encrypted, passkey-protected. No servers.",
+  "version": "0.7.8",
   "publisher": "mithawala",
   "author": {
     "name": "Asif Mithawala",
     "url": "https://github.com/mithawala"
   },
   "license": "SEE LICENSE IN LICENSE",
-  "preview": true,
   "icon": "media/icon.png",
   "galleryBanner": {
     "color": "#21252b",

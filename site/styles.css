@@ -135,6 +135,7 @@ h1 { font-size: clamp(42px, 5.6vw, 72px); line-height: 1.03; letter-spacing: -0.
 .platform-panel[hidden] { display: none; }
 .panel-frame { max-height: 460px; background: #21252b; }
 .step .small.muted { font-size: 14px; color: var(--muted); }
+.step .btn + .small.muted { margin-top: 14px; }
 
 .hero-visual { position: relative; height: 620px; }
 .window { position: absolute; left: 0; top: 24px; width: 94%; height: 440px; display: flex; flex-direction: column; overflow: hidden; border-radius: 14px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55); }

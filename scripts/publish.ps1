@@ -81,7 +81,7 @@ try {
       gh release upload "v$version" dist/pocket-pilot.vsix $vsix --repo $slug --clobber
     } else {
       $notes = @"
-**VS Code:** download **pocket-pilot.vsix**, then run **Extensions → ··· → Install from VSIX…** (or ``code --install-extension pocket-pilot.vsix``).
+**VS Code:** install Pocket Pilot from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mithawala.pocket-pilot) (``code --install-extension $Owner.pocket-pilot``), or download **pocket-pilot.vsix** below and run **Extensions → ··· → Install from VSIX…**.
 
 **GitHub Copilot app & CLI:** in a terminal run ``copilot plugin marketplace add $slug`` and ``copilot plugin install pocket-pilot@pocket-pilot`` (the GitHub Copilot app uses the same plugins; restart it). Then type ``/pocket-pilot`` in a chat.
 
