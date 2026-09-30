@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { fitViewport, isEditing, trackViewport, fullScreenHeight, bottomInset, viewportStuck } from '../pwa/js/lib/viewport.js';
+
+test('viewport: the app page sits below an opaque status bar (WebKit bug 301994)', () => {
+  const html = fs.readFileSync(new URL('../pwa/index.html', import.meta.url), 'utf8');
+  const viewport = html.match(/<meta name="viewport" content="([^"]+)"/)?.[1] || '';
+  assert.ok(viewport.includes('width=device-width'), viewport);
+  assert.doesNotMatch(viewport, /viewport-fit=cover/, 'drawn under the status bar, iOS 26.5+ leaves a band at the bottom of the screen');
+  assert.match(html, /<meta name="apple-mobile-web-app-status-bar-style" content="black" \/>/, 'an opaque status bar, not black-translucent');
+  assert.match(html, /<link rel="manifest" href="\.\/manifest\.webmanifest" \/>/, 'the manifest stays: iOS web push needs it');
+});
 
 /** A fake window: listeners, root style properties, and whatever a test sets on it. */
 function fakeWindow({ standalone = false, screen, innerWidth = 393, innerHeight = 800, safeBottom = 34, shell = null } = {}) {

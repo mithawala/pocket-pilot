@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.5
+
+- **The chat bar sits at the bottom of the iPhone app.** The band under it came from how the app was drawn: under a translucent status bar, with `viewport-fit=cover`. Since iOS 26.5, a Home Screen web app gets a view as tall as the screen minus the status bar (WebKit bug 301994). Drawn under a translucent status bar, that view starts at the top of the screen and stops a status bar's height short of the bottom. The app now uses an opaque status bar and no `viewport-fit=cover`, so its view starts below the status bar and reaches the bottom of the screen. iOS then keeps it clear of the home indicator, and the chat bar sits right above it. The status bar is solid black now instead of showing the app's top bar through it. After the update, close the app in the app switcher and open it again: iOS applies this when it starts the app.
+- The screen test page from 0.7.4 is gone; it isn't needed any more.
+
 ## 0.7.4
 
 - **Less empty space at the bottom of the iPhone app.** Since iOS 26.5, iOS leaves a strip as tall as the status bar (62pt on recent iPhones) at the bottom of Home Screen web apps. The strip is outside the page, so the app can't draw there (WebKit bug 301994, which Apple confirmed again in the iOS 27 beta). On top of that strip, the app kept 34pt of empty room for the home indicator, which it no longer reaches. It now checks how far down it really reaches and only keeps the room it needs, so the message box sits 34pt lower. While you type, it sits right on the keyboard, without the home indicator's room above it. Rotating the phone to landscape and back is reported to bring the whole screen back until the app is closed.

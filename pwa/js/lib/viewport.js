@@ -6,10 +6,11 @@
 // visibility or the page itself changes.
 //
 // Home Screen apps meet two WebKit bugs that leave a band at the bottom of the screen:
-// - iOS 26.5 and later (and the iOS 27 beta; WebKit bug 301994): iOS makes the whole web view as
-//   short as the status bar is tall, from launch. The band below it is drawn by iOS, outside the page,
-//   and nothing in the page can paint there. What the app can do is not add to it: the page then stops
-//   well above the home indicator, so it doesn't keep room for it (--safe-bottom).
+// - iOS 26.5 and later (and the iOS 27 beta; WebKit bug 301994): iOS makes the web view as tall as the
+//   screen minus the status bar. Under a translucent status bar it starts at the top of the screen, and
+//   the band below it is drawn by iOS, outside the page. index.html avoids that with an opaque status
+//   bar and no viewport-fit=cover; if iOS still leaves the app short of the screen, bottomInset() keeps
+//   it from reserving room for a home indicator it doesn't reach (--safe-bottom).
 // - iOS 17 and 18: once the keyboard has been open, WebKit can keep the viewport (innerHeight, 100dvh)
 //   short by the status bar's height. Hiding and showing an element sized by the viewport makes it
 //   measure again, so the app does that when it finds itself shorter than it was.
