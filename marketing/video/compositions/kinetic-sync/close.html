@@ -12,7 +12,6 @@
         #ks-close-st { position: absolute; inset: 0; }
         #ks-close .big { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font: 900 190px/0.9 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; white-space: nowrap; }
         #ks-close .big.two > div, #ks-close .big.one { opacity: 0; }
-        #ks-close-t3 { font-size: 170px; }
         #ks-close-t4 { font-size: 330px; }
         #ks-close-end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
         #ks-close-end > * { opacity: 0; }
@@ -27,7 +26,6 @@
         <div id="ks-close-st">
           <div class="big two" id="ks-close-t1"><div>End-to-end</div><div class="l2">encrypted.</div></div>
           <div class="big two" id="ks-close-t2"><div>Passkey</div><div class="l2">protected.</div></div>
-          <div class="big one" id="ks-close-t3">No accounts.</div>
           <div class="big one" id="ks-close-t4"><span class="grad">Free.</span></div>
           <div id="ks-close-end">
             <div class="logo"></div>
@@ -45,18 +43,17 @@
           const tl = PP.timeline();
           const k = PP.kinetic(tl, { flash: '#ks-close-flash', stage: '#ks-close-st' });
 
-          // 0 – 4 · end-to-end encrypted. passkey protected. no accounts. FREE.
+          // 0 – 4 · end-to-end encrypted. passkey protected. FREE. (held two beats)
           k.snap('#ks-close-t1 > div:first-child', 0, { dx: -180 });
           k.slam('#ks-close-t1 .l2', B);
           k.off('#ks-close-t1', 2 * B - 0.08, 0.08);
           k.rise('#ks-close-t2 > div:first-child', 2 * B);
           k.slam('#ks-close-t2 .l2', 3 * B);
           k.off('#ks-close-t2', 4 * B - 0.08, 0.08);
-          k.slam('#ks-close-t3', 4 * B, { from: 1.4, d: 0.24 });
-          k.off('#ks-close-t3', 6 * B - 0.08, 0.08);
-          k.slam('#ks-close-t4', 6 * B, { from: 1.7, blur: 18, d: 0.3 });
-          k.flash(6 * B, 0.4);
-          k.shake(6 * B, 18);
+          k.slam('#ks-close-t4', 4 * B, { from: 1.7, blur: 18, d: 0.3 });
+          k.flash(4 * B, 0.4);
+          k.shake(4 * B, 18);
+          tl.fromTo('#ks-close-t4', { scale: 1 }, { scale: 1.04, duration: 1.5, ease: 'sine.inOut' }, 4 * B + 0.3);
           k.off('#ks-close-t4', 8 * B - 0.12, 0.12);
 
           // 4 – 10 · the name and the address, a slow breath, then black

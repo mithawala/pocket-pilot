@@ -89,7 +89,6 @@
         </div>
         <div class="big two" id="t1"><div>End-to-end</div><div class="l2">encrypted.</div></div>
         <div class="big two" id="t2"><div>Passkey</div><div class="l2">protected.</div></div>
-        <div class="big mid" id="t3" style="font-size: 170px">No accounts.</div>
         <div class="big mid" id="t5" style="font-size: 330px"><span class="grad">Free.</span></div>
 
         <!-- 36 – 40 · the end card -->
@@ -255,11 +254,11 @@
           tl.fromTo(`${id} .l2`, { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.2, ease: 'power4.out' }, TT + (i + 1) * B);
           off(id, TT + (i + 2) * B - 0.08, 0.08);
         }
-        slam('#t3', TT + 4 * B, { from: 1.4, d: 0.24 }); off('#t3', TT + 6 * B - 0.08, 0.08);
-        slam('#t5', TT + 6 * B, { from: 1.7, d: 0.3 });
-        flash(TT + 6 * B, 0.4);
-        shake(TT + 6 * B, 18);
-        off('#t5', TT + 8 * B - 0.12, 0.12);
+        slam('#t5', TT + 4 * B, { from: 1.7, d: 0.3 });
+        flash(TT + 4 * B, 0.4);
+        shake(TT + 4 * B, 18);
+        tl.fromTo('#t5', { scale: 1 }, { scale: 1.04, duration: 1.5, ease: 'sine.inOut' }, TT + 4 * B + 0.3);
+        tl.fromTo('#t5', { opacity: 1, scale: 1.04 }, { opacity: 0, scale: 0.94, duration: 0.12, ease: 'power2.in' }, TT + 8 * B - 0.12);
 
         // 36 – 40 · the end card
         const TC = TT + 8 * B;

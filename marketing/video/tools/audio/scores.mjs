@@ -127,15 +127,15 @@ export function kinetic(c, I) {
   for (const t of [30.5, 31.0, 31.5]) { I.tom(c, t, { vol: 0.35, n: 45 + (t - 30.5) * 6 }); I.clap(c, t, { vol: 0.12 }); }
   for (const s of range(16)) I.hat(c, 30 + s * 0.125, { vol: s % 2 ? 0.02 : 0.032 });
   I.riser(c, 31.2, 0.8, { vol: 0.1, n: 57 });
-  // 32 – 36 · end-to-end encrypted. passkey protected. no accounts. FREE.
-  const slams = [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60], [55, 59, 62]];
+  // 32 – 36 · end-to-end encrypted. passkey protected. FREE. (held two beats)
+  const slams = [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60]];
   slams.forEach((ch, i) => hit(32 + i * B, ch));
-  for (const e of range(12)) I.bass(c, 32 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
-  I.riser(c, 34.0, 1.0, { vol: 0.14, n: 60 });
-  hit(35.0, [48, 55, 60, 64, 67], true);
-  // 36 – 40 · the end card
-  I.pad(c, 35.0, 4.4, [36, 48, 55, 60, 62, 64, 67], { vol: 0.075, attack: 0.05, release: 1.2, cutoff: 2600, cutoffEnd: 1200 });
-  I.bass(c, 35.0, 4.2, 36, { vol: 0.14, cutoff: 200 });
+  for (const e of range(8)) I.bass(c, 32 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
+  I.riser(c, 33.0, 1.0, { vol: 0.14, n: 60 });
+  hit(34.0, [48, 55, 60, 64, 67], true);
+  // 36 – 40 · the end card (its chord already rings under FREE.)
+  I.pad(c, 34.0, 5.4, [36, 48, 55, 60, 62, 64, 67], { vol: 0.075, attack: 0.05, release: 1.2, cutoff: 2600, cutoffEnd: 1200 });
+  I.bass(c, 34.0, 5.2, 36, { vol: 0.14, cutoff: 200 });
   I.pop(c, 36.0, { vol: 0.08 });
   for (const [k, n] of [72, 76, 79, 84].entries()) I.bell(c, 36.5 + k * 0.15, n, { vol: 0.05, dur: 2.4, ratio: 2, index: 0.9 });
 }
@@ -312,15 +312,15 @@ export function kineticSync(c, I) {
   I.riser(c, 49.0, 1.0, { vol: 0.12, n: 57 });
   I.whoosh(c, 49.45, 0.5, { vol: 0.07, f0: 400, f1: 1400, p0: 0.5, p1: 0.5 });
 
-  // 50 – 54 · end-to-end encrypted. passkey protected. no accounts. FREE.
-  [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60], [55, 59, 62]].forEach((ch, i) => hit(50 + i * B, ch));
-  for (const e of range(12)) I.bass(c, 50 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
-  I.riser(c, 52.0, 1.0, { vol: 0.14, n: 60 });
-  hit(53.0, [48, 55, 60, 64, 67], true);
+  // 50 – 54 · end-to-end encrypted. passkey protected. FREE. (held two beats)
+  [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60]].forEach((ch, i) => hit(50 + i * B, ch));
+  for (const e of range(8)) I.bass(c, 50 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
+  I.riser(c, 51.0, 1.0, { vol: 0.14, n: 60 });
+  hit(52.0, [48, 55, 60, 64, 67], true);
 
-  // 54 – 60 · the name and the address
-  I.pad(c, 53.0, 6.4, [36, 48, 55, 60, 62, 64, 67], { vol: 0.075, attack: 0.05, release: 1.2, cutoff: 2600, cutoffEnd: 1200 });
-  I.bass(c, 53.0, 6.0, 36, { vol: 0.14, cutoff: 200 });
+  // 54 – 60 · the name and the address (the chord already rings under FREE.)
+  I.pad(c, 52.0, 7.4, [36, 48, 55, 60, 62, 64, 67], { vol: 0.075, attack: 0.05, release: 1.2, cutoff: 2600, cutoffEnd: 1200 });
+  I.bass(c, 52.0, 7.0, 36, { vol: 0.14, cutoff: 200 });
   I.pop(c, 54.0, { vol: 0.08 });
   for (const [k, n] of [72, 76, 79, 84].entries()) I.bell(c, 54.5 + k * 0.15, n, { vol: 0.05, dur: 2.4, ratio: 2, index: 0.9 });
 }

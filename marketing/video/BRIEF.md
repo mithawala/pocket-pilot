@@ -26,6 +26,9 @@ onboarding** (install, scan the QR code, allow on the PC, Face ID). Post it on t
 - B's energy and type (120 BPM, beat slams) carries the film; C's typing demo and set-up steps are
   restyled into it.
 - 2026-09-30: "No cloud copy" is removed from every video (A's chip, B's slam, C's tile) and is not in D.
+- 2026-09-30: "No accounts" is removed too, because it creates confusion (you still use your Copilot or
+  Claude). B and D go straight from "Passkey protected." to "FREE.", which holds two beats. C's third
+  tile reads "Free / Uses the Copilot or Claude you already have."
 
 ## Notes
 

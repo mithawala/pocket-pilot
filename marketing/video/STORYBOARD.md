@@ -64,7 +64,7 @@ in the Pocket Pilot panel, the Allow dialog on the PC, the passkey sheet and Fac
 
 ## Frame 5 — Private, free, and the name
 
-- scene: END-TO-END ENCRYPTED. PASSKEY PROTECTED. NO ACCOUNTS. FREE. — the logo, the name, the address
+- scene: END-TO-END ENCRYPTED. PASSKEY PROTECTED. FREE. — the logo, the name, the address
 - duration: 10s
 - transition_in: cut
 - status: animated
@@ -72,4 +72,4 @@ in the Pocket Pilot panel, the Allow dialog on the PC, the passkey sheet and Fac
 - blueprint: kinetic-type-beats → logo-assemble-lockup
 - rules: kinetic-beat-slam, spring-pop-entrance
 
-B's close without "No cloud copy". The end card holds the address for five seconds, then fades.
+B's close without "No cloud copy" and "No accounts" (2026-09-30): "FREE." holds two beats. The end card holds the address for five seconds, then fades.
