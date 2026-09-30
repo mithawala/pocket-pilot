@@ -44,7 +44,7 @@ window.PP = (() => {
     for (const el of root.querySelectorAll('.pp-app .scroll')) el.scrollTop = el.scrollHeight;
   }
 
-  const STATUS = `<div class="status"><span>9:41</span><span class="icons">
+  const STATUS = `<div class="dev-status"><span>9:41</span><span class="icons">
     <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="8" width="3.2" height="4" rx="1" fill="#fff"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1" fill="#fff"/><rect x="10" y="3" width="3.2" height="9" rx="1" fill="#fff"/><rect x="15" y="0" width="3.2" height="12" rx="1" fill="#fff"/></svg>
     <svg width="17" height="12" viewBox="0 0 17 12"><path d="M8.5 2.6c2.3 0 4.4.9 6 2.4l1.2-1.2A10.2 10.2 0 0 0 8.5 1 10.2 10.2 0 0 0 1.3 3.8L2.5 5c1.6-1.5 3.7-2.4 6-2.4zm0 3.4c1.4 0 2.6.5 3.6 1.4l1.2-1.2A6.9 6.9 0 0 0 8.5 4.3 6.9 6.9 0 0 0 3.7 6.2l1.2 1.2c1-.9 2.2-1.4 3.6-1.4zm0 3.4c.5 0 1 .2 1.3.5L8.5 11.2 7.2 9.9c.3-.3.8-.5 1.3-.5z" fill="#fff"/></svg>
     <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".4"/><rect x="2" y="2" width="18" height="9" rx="2" fill="#fff"/><path d="M25 4.5v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z" fill="#fff" fill-opacity=".45"/></svg>
@@ -53,12 +53,12 @@ window.PP = (() => {
   /** An iPhone around `content` (HTML) — by default one captured screen. */
   function phone({ id, screen, content, cls = '' }) {
     return `<div class="iphone ${cls}" id="${id}" data-layout-ignore>
-      <i class="side action"></i><i class="side vol-up"></i><i class="side vol-down"></i><i class="side power"></i>
-      <div class="frame"><div class="bezel"></div>
-        <div class="screen" id="${id}-screen">
+      <i class="dev-side action"></i><i class="dev-side vol-up"></i><i class="dev-side vol-down"></i><i class="dev-side power"></i>
+      <div class="dev-frame"><div class="dev-bezel"></div>
+        <div class="dev-screen" id="${id}-screen">
           ${content ?? app(screen)}
           ${STATUS}
-          <div class="island"></div><div class="home"></div><div class="glare"></div>
+          <div class="dev-island"></div><div class="dev-home"></div><div class="dev-glare"></div>
         </div>
       </div>
     </div>`;

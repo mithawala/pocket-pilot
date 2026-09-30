@@ -31,7 +31,7 @@
       #pcCam { position: absolute; left: 70px; top: 232px; width: 1240px; height: 760px; perspective: 2400px; opacity: 0; }
       #pc { position: absolute; inset: 0; }
       #pc .vsc { inset: 0; }
-      .vsc .chatpane .banner { display: none; }
+      .vsc .chatpane .pp-app .banner { display: none; }
       #vsc-chat .pp-app[data-screen='steer'] { opacity: 0; }
       .vsc .code .cl.add { height: 0; overflow: hidden; opacity: 0; }
       #phoneWrap { position: absolute; left: 1410px; top: 140px; width: 426px; height: 880px; perspective: 1800px; transform: translateY(1100px); }
@@ -47,7 +47,7 @@
       #link { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
       #pulse { opacity: 0; }
       /* setup */
-      .card { position: absolute; opacity: 0; }
+      .vcard { position: absolute; opacity: 0; }
       #market { left: 90px; top: 360px; width: 1180px; padding: 44px; border-radius: 22px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); display: flex; gap: 44px; font-family: 'Inter', sans-serif; }
       #market img { width: 180px; height: 180px; border-radius: 40px; flex: none; }
       #market .nm { font: 700 58px/1.1 'Inter', sans-serif; letter-spacing: -1.5px; color: #fff; }
@@ -134,18 +134,18 @@
       <div id="pcCam"><div id="pc"></div></div>
       <svg id="link" viewBox="0 0 1920 1080"><circle id="pulse" cx="1420" cy="610" r="9" fill="#fff" /></svg>
 
-      <div class="card" id="market">
+      <div class="vcard" id="market">
         <img src="assets/img/icon.svg" alt="" />
         <div>
           <div class="nm">Pocket Pilot</div>
           <div class="pub"><b>Asif Mithawala</b> &nbsp;·&nbsp; mithawala.pocket-pilot &nbsp;·&nbsp; Free</div>
-          <div class="ds">Chat with your Copilot and Claude agent sessions, approve their tool calls and get notified — from your phone.</div>
+          <div class="ds">Chat with your Copilot agent sessions, approve their tool calls and get notified — from your phone.</div>
           <div class="btns"><div class="inst"><span class="s1">Install</span><span class="s2">Installing…</span><span class="s3">✓ Installed</span></div><span class="also">Also a plugin for the GitHub Copilot app &amp; CLI</span></div>
         </div>
       </div>
-      <div class="card" id="panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
+      <div class="vcard" id="panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
       <div id="panelNote">On your phone, open <b>mithawala.github.io/pocket-pilot/app</b> — add it to your Home Screen — and tap <b>Scan the QR code</b>.</div>
-      <div class="card" id="modal">
+      <div class="vcard" id="modal">
         <div class="ic" data-icon="shield"></div>
         <div>
           <div class="msg">Allow “iPhone” to control your agent sessions?</div>
@@ -170,7 +170,7 @@
       <div id="tiles">
         <div class="tile"><div class="ti" data-icon="lock"></div><div class="tt">End-to-end encrypted</div><div class="ts">Even the tunnel only sees ciphertext.</div></div>
         <div class="tile"><div class="ti" data-icon="face"></div><div class="tt">Only devices you approve</div><div class="ts">Face ID, fingerprint or an authenticator code.</div></div>
-        <div class="tile"><div class="ti" data-icon="gift"></div><div class="tt">Free</div><div class="ts">Uses the Copilot or Claude you already have.</div></div>
+        <div class="tile"><div class="ti" data-icon="gift"></div><div class="tt">Free</div><div class="ts">Works with the Copilot you already have.</div></div>
       </div>
 
       <div id="end">
@@ -178,9 +178,9 @@
         <div class="name">Pocket Pilot</div>
         <div class="tag">Your coding agents, <span class="grad">in your pocket.</span></div>
         <div class="chips">
-          <span class="chip" data-icon="code">VS Code</span>
-          <span class="chip" data-icon="github">GitHub Copilot app &amp; CLI</span>
-          <span class="chip" data-icon="gift">Free</span>
+          <span class="vchip" data-icon="code">VS Code</span>
+          <span class="vchip" data-icon="github">GitHub Copilot app &amp; CLI</span>
+          <span class="vchip" data-icon="gift">Free</span>
         </div>
         <div class="url">mithawala.github.io/pocket-pilot</div>
       </div>

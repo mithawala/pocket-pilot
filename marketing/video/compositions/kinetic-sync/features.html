@@ -40,10 +40,10 @@
           const FEATS = [
             { w: 'Approve', s: 'Allow once, for the session — or skip.', screen: 'approval', tap: () => $$('#ft-p-approval .confirm button').find((b) => b.textContent.includes('Allow Once')) },
             { w: 'Answer', s: 'Tap an option, or type your own.', screen: 'question', tap: () => $('#ft-p-question .opt') },
-            { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#ft-p-models .list-item').find((b) => b.textContent.includes('GPT-5.6')) },
+            { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#ft-p-models .list-item').find((b) => b.textContent.includes('GPT-5 mini')) },
             { w: 'Start<br>new work', s: 'New sessions, in any folder on your PC.', screen: 'newSession', tap: () => $$('#ft-p-newSession .sheet .list-item').find((b) => b.textContent.includes('acme-api')) },
             { w: 'See<br>screenshots', s: 'Pinch to zoom, like your photos.', screen: 'viewer' },
-            { w: 'Every<br>session', s: 'Copilot and Claude — what needs you first.', screen: 'home' },
+            { w: 'Every<br>session', s: 'Sorted by what needs you first.', screen: 'home' },
             { w: 'Full<br>history', s: 'Every message, tool call and diff.', screen: 'history' },
             { w: 'Get<br>notified', s: 'When it needs you. When it’s done.', screen: 'lock' },
           ];

@@ -6,7 +6,7 @@ message: "Your coding agents keep working when you walk away — Pocket Pilot pu
 destination: website hero (mithawala.github.io/pocket-pilot) and the /video review page
 aspect: "16:9"
 language: en
-audience: developers who run GitHub Copilot or Claude agent sessions in VS Code or the GitHub Copilot app
+audience: developers who run GitHub Copilot agent sessions in VS Code or the GitHub Copilot app
 length: about 60s
 ---
 
@@ -26,9 +26,15 @@ onboarding** (install, scan the QR code, allow on the PC, Face ID). Post it on t
 - B's energy and type (120 BPM, beat slams) carries the film; C's typing demo and set-up steps are
   restyled into it.
 - 2026-09-30: "No cloud copy" is removed from every video (A's chip, B's slam, C's tile) and is not in D.
-- 2026-09-30: "No accounts" is removed too, because it creates confusion (you still use your Copilot or
-  Claude). B and D go straight from "Passkey protected." to "FREE.", which holds two beats. C's third
-  tile reads "Free / Uses the Copilot or Claude you already have."
+- 2026-09-30: "No accounts" is removed too, because it creates confusion (you still use your Copilot).
+  B and D go straight from "Passkey protected." to "FREE.", which holds two beats.
+- 2026-09-30: the videos don't mention Claude. Captions say Copilot only (end cards: "Your coding agents,
+  in your pocket."; C's tile: "Free / Works with the Copilot you already have."), and the app screens
+  run on GPT-5.6 Sol: tools/capture-ui.mjs picks it in the app's own model picker and fails if a screen
+  still mentions Claude.
+- 2026-09-30: the phone and VS Code screens must look exactly like the app: tools/check-screens.mjs fails
+  if any of the videos' own CSS reaches into them, and tools/check-ui.mjs shows each one next to the real
+  app. The app keeps its own font there.
 
 ## Notes
 

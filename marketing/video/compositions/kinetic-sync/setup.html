@@ -12,15 +12,15 @@
         #ks-setup-works { position: absolute; left: 0; right: 0; top: 250px; text-align: center; }
         #ks-setup-works .wk { font: 900 120px/1 'Inter', sans-serif; letter-spacing: -0.04em; text-transform: uppercase; color: #fff; opacity: 0; }
         #ks-setup-works .row { margin-top: 90px; display: flex; justify-content: center; gap: 34px; }
-        #ks-setup-works .chip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
-        #ks-setup-works .chip svg { width: 56px; height: 56px; }
+        #ks-setup-works .vchip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
+        #ks-setup-works .vchip svg { width: 56px; height: 56px; }
         #ks-setup-kick { position: absolute; left: 80px; top: 52px; opacity: 0; }
         #ks-setup .step { position: absolute; left: 80px; top: 96px; }
         #ks-setup .step .t { display: flex; align-items: center; gap: 24px; font: 900 64px/1 'Inter', sans-serif; letter-spacing: -0.035em; text-transform: uppercase; color: #fff; white-space: nowrap; }
         #ks-setup .step .t b { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 20px; font: 800 42px/1 'Inter', sans-serif; letter-spacing: 0; background: linear-gradient(145deg, #4f78ff, #6d5dfc); box-shadow: 0 12px 30px rgba(79, 120, 255, 0.35); opacity: 0; }
         #ks-setup .step .t span, #ks-setup .step .lede { opacity: 0; }
         #ks-setup .step .lede { margin: 16px 0 0 100px; font-size: 30px; }
-        #ks-setup .card { position: absolute; opacity: 0; }
+        #ks-setup .vcard { position: absolute; opacity: 0; }
         #ks-setup-market { left: 90px; top: 360px; width: 1180px; padding: 44px; border-radius: 22px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); display: flex; gap: 44px; font-family: 'Inter', sans-serif; }
         #ks-setup-market .mk { width: 180px; height: 180px; border-radius: 40px; flex: none; background: url('assets/img/icon.svg') center / cover no-repeat; }
         #ks-setup-market .nm { font: 700 58px/1.1 'Inter', sans-serif; letter-spacing: -1.5px; color: #fff; }
@@ -40,7 +40,7 @@
         #ks-setup-note b { color: #fff; }
         #ks-setup-pcCam { position: absolute; left: 70px; top: 232px; width: 1240px; height: 760px; opacity: 0; }
         #ks-setup-pcCam .vsc { inset: 0; }
-        #ks-setup .vsc .chatpane .banner { display: none; }
+        #ks-setup .vsc .chatpane .pp-app .banner { display: none; }
         #ks-setup-modal { left: 190px; top: 390px; width: 1000px; padding: 40px 44px 36px; border-radius: 14px; background: #252526; border: 1px solid #454545; box-shadow: 0 40px 120px rgba(0, 0, 0, 0.65); font-family: 'Inter', sans-serif; color: #ccc; display: flex; gap: 30px; }
         #ks-setup-modal .ic { flex: none; width: 64px; height: 64px; color: #e5c07b; }
         #ks-setup-modal .ic svg { width: 64px; height: 64px; }
@@ -86,24 +86,24 @@
         <div id="ks-setup-works">
           <div class="wk">Works with</div>
           <div class="row">
-            <span class="chip" data-icon="code">VS Code</span>
-            <span class="chip" data-icon="github">GitHub Copilot app</span>
-            <span class="chip" data-icon="terminal">Copilot CLI</span>
+            <span class="vchip" data-icon="code">VS Code</span>
+            <span class="vchip" data-icon="github">GitHub Copilot app</span>
+            <span class="vchip" data-icon="terminal">Copilot CLI</span>
           </div>
         </div>
         <div id="ks-setup-pcCam"></div>
-        <div class="card" id="ks-setup-market">
+        <div class="vcard" id="ks-setup-market">
           <div class="mk"></div>
           <div>
             <div class="nm">Pocket Pilot</div>
             <div class="pub"><b>Asif Mithawala</b> &nbsp;·&nbsp; mithawala.pocket-pilot &nbsp;·&nbsp; Free</div>
-            <div class="ds">Chat with your Copilot and Claude agent sessions, approve their tool calls and get notified — from your phone.</div>
+            <div class="ds">Chat with your Copilot agent sessions, approve their tool calls and get notified — from your phone.</div>
             <div class="btns"><div id="ks-setup-inst"><span class="s1">Install</span><span class="s2">Installing…</span><span class="s3">✓ Installed</span></div><span class="also">Also a plugin for the GitHub Copilot app &amp; CLI</span></div>
           </div>
         </div>
-        <div class="card" id="ks-setup-panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
+        <div class="vcard" id="ks-setup-panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
         <div id="ks-setup-note">On your phone, open <b>mithawala.github.io/pocket-pilot/app</b> — add it to your Home Screen — and tap <b>Scan the QR code</b>.</div>
-        <div class="card" id="ks-setup-modal">
+        <div class="vcard" id="ks-setup-modal">
           <div class="ic" data-icon="shield"></div>
           <div>
             <div class="msg">Allow “iPhone” to control your agent sessions?</div>
@@ -173,7 +173,7 @@
 
           // 0 – 2 · WORKS WITH, one chip per beat
           k.slam('#ks-setup-works .wk', 0, { from: 1.3 });
-          const chips = $$('#ks-setup-works .chip');
+          const chips = $$('#ks-setup-works .vchip');
           k.pop(chips[0], B, { from: 0.6, d: 0.35 });
           k.rise(chips[1], 2 * B, { dy: 60, rot: 0, d: 0.28 });
           k.snap(chips[2], 3 * B, { dx: 140 });

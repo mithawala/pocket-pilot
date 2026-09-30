@@ -404,12 +404,12 @@
 .pp-app .csub .sub.accent { color: var(--accent); }
 .pp-app .pick .model-name { max-width: 128px; }
 .pp-app .att-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 3px 4px; }
-.pp-app .pending-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; max-width: 860px; margin: 0 auto 6px; }
+.pp-app .pending-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; max-width: 860px; max-height: calc(var(--app-h, 100dvh) * 0.4); margin: 0 auto 6px; overflow-y: auto; overscroll-behavior: contain; }
 .pp-app .pending-item { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 5px 4px 5px 10px; font-size: 13px; color: var(--text-2); background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; }
 .pp-app .pending-item > svg { width: 14px; height: 14px; margin-top: 4px; color: var(--muted); flex: none; }
 .pp-app .pending-item .pb { flex: 1; min-width: 0; }
-.pp-app .pending-item .pt { width: 100%; min-width: 0; padding: 2px 0; text-align: left; color: inherit; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; cursor: text; }
-.pp-app .pending-item .pt.open { display: block; -webkit-line-clamp: unset; line-clamp: none; max-height: 40vh; overflow-y: auto; }
+.pp-app .pending-item .pt { min-width: 0; padding: 2px 0; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; max-height: calc(2.9em + 6px); overflow: hidden; cursor: text; }
+.pp-app .pending-item .pt.open { display: block; -webkit-line-clamp: unset; line-clamp: none; max-height: calc(var(--app-h, 100dvh) * 0.28); overflow-y: auto; overscroll-behavior: contain; }
 .pp-app .pending-item .pt b { font-weight: 600; color: var(--muted); margin-right: 2px; }
 .pp-app .pending-item .pt:hover { color: var(--text); }
 .pp-app .pending-item .pa { display: flex; flex: none; gap: 1px; }
@@ -419,7 +419,7 @@
 .pp-app .chip.pic { padding-left: 7px; }
 .pp-app .pending-item.editing { border-color: var(--focus); }
 .pp-app .pending-item .pe { flex: 1; min-width: 0; }
-.pp-app .pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: 240px; padding: 2px 0; font: inherit; font-size: 16px; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }
+.pp-app .pending-item .pe textarea { display: block; width: 100%; min-height: 44px; max-height: min(240px, calc(var(--app-h, 100dvh) * 0.4 - 60px)); padding: 2px 0; font: inherit; font-size: 16px; line-height: 1.45; color: var(--text); background: transparent; border: none; outline: none; resize: none; }
 .pp-app .pending-item .pe-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px; }
 .pp-app .pending-item .pe-bar .muted { flex: 1; min-width: 0; }
 .pp-app .pending-item .pe-bar .btn.sm { height: 28px; padding: 0 10px; }

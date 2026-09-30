@@ -18,7 +18,7 @@
       #pcCam { position: absolute; left: 200px; top: 210px; width: 1520px; height: 820px; perspective: 2400px; opacity: 0; }
       #pc { position: absolute; inset: 0; }
       #pc .vsc { inset: 0; }
-      .vsc .chatpane .banner { display: none; }
+      .vsc .chatpane .pp-app .banner { display: none; }
       #vsc-chat .pp-app[data-screen='approved'] { opacity: 0; }
       #phoneWrap { position: absolute; left: 1300px; top: 100px; width: 426px; height: 880px; perspective: 1800px; transform: translateY(1100px); }
       #phone { left: 0; top: 0; }
@@ -45,8 +45,8 @@
       #trustTitle { position: absolute; left: 0; right: 0; top: 100px; text-align: center; opacity: 0; }
       #trustTitle .display { font-size: 80px; margin-top: 22px; }
       #trustChips { position: absolute; left: 0; right: 0; top: 900px; display: flex; justify-content: center; gap: 22px; }
-      #trustChips .chip { opacity: 0; }
-      #trustChips .chip svg { color: #98c379; }
+      #trustChips .vchip { opacity: 0; }
+      #trustChips .vchip svg { color: #98c379; }
       #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
       #end > * { opacity: 0; }
       #end .logo { width: 170px; height: 170px; border-radius: 40px; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.55); }
@@ -89,8 +89,8 @@
 
       <div id="trustTitle"><div class="kicker">Private by design</div><div class="display">Your phone talks <span class="grad">only to your PC.</span></div></div>
       <div id="trustChips">
-        <span class="chip" data-icon="lock">End-to-end encrypted</span>
-        <span class="chip" data-icon="face">Passkey or authenticator code</span>
+        <span class="vchip" data-icon="lock">End-to-end encrypted</span>
+        <span class="vchip" data-icon="face">Passkey or authenticator code</span>
       </div>
 
       <div id="end">
@@ -98,9 +98,9 @@
         <div class="name">Pocket Pilot</div>
         <div class="tag">Your coding agents, <span class="grad">in your pocket.</span></div>
         <div class="chips">
-          <span class="chip" data-icon="code">VS Code</span>
-          <span class="chip" data-icon="github">GitHub Copilot app &amp; CLI</span>
-          <span class="chip" data-icon="gift">Free</span>
+          <span class="vchip" data-icon="code">VS Code</span>
+          <span class="vchip" data-icon="github">GitHub Copilot app &amp; CLI</span>
+          <span class="vchip" data-icon="gift">Free</span>
         </div>
         <div class="url">mithawala.github.io/pocket-pilot</div>
       </div>
@@ -262,7 +262,7 @@
         tl.fromTo('#lockDot', { opacity: 0, x: 0, scale: 0.6 }, { opacity: 1, x: 0, scale: 1, duration: 0.4, ease: 'back.out(1.8)' }, 30.2);
         tl.fromTo('#lockDot', { x: 0 }, { x: 390, duration: 0.9, repeat: 3, yoyo: true, ease: 'sine.inOut' }, 30.5);
         tl.fromTo('#trustTitle', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 29.9);
-        tl.fromTo('#trustChips .chip', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.35 }, 30.6);
+        tl.fromTo('#trustChips .vchip', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.35 }, 30.6);
         tl.to(['#trustTitle', '#trustChips', '#link', '#lockDot', '#pcCam', '#phoneWrap'], { opacity: 0, duration: 0.5, ease: 'power2.in' }, 33.9);
 
         // 8 · the end card (34.4 – 40)

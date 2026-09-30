@@ -18,7 +18,7 @@
       .two { top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 190px; }
       .two > div { opacity: 0; }
       .two div { white-space: nowrap; }
-      .sub { position: absolute; left: 0; right: 0; text-align: center; font: 600 44px/1.2 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; opacity: 0; }
+      .subline { position: absolute; left: 0; right: 0; text-align: center; font: 600 44px/1.2 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; opacity: 0; }
       #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
       #invert { position: absolute; inset: 0; background: #f5f7ff; opacity: 0; }
       #notifBig { position: absolute; left: 50%; top: 50%; width: 390px; height: 110px; margin: -55px 0 0 -195px; opacity: 0; }
@@ -40,8 +40,8 @@
       #works { position: absolute; left: 0; right: 0; top: 250px; text-align: center; }
       #works .k { font: 900 120px/1 'Inter', sans-serif; letter-spacing: -0.04em; text-transform: uppercase; color: #fff; opacity: 0; }
       #works .row { margin-top: 90px; display: flex; justify-content: center; gap: 34px; }
-      #works .chip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
-      #works .chip svg { width: 56px; height: 56px; }
+      #works .vchip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
+      #works .vchip svg { width: 56px; height: 56px; }
       #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
       #end > * { opacity: 0; }
       #end .logo { width: 170px; height: 170px; border-radius: 40px; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.55); }
@@ -64,7 +64,7 @@
         <div class="big mid" id="w3">needs</div>
         <div class="big mid" id="w4"><span class="grad">you.</span></div>
         <div id="notifBig"></div>
-        <div class="sub" id="nsub" style="top: 770px">It’s waiting for your OK.</div>
+        <div class="subline" id="nsub" style="top: 770px">It’s waiting for your OK.</div>
         <div class="big two" id="w5"><div>Away from</div><div class="l2">your desk?</div></div>
         <div class="big two" id="w6"><div>Answer from</div><div class="l2"><span class="grad">your phone.</span></div></div>
 
@@ -72,7 +72,7 @@
         <div id="logoRing"></div>
         <img id="logo" src="assets/img/icon.svg" alt="" />
         <div id="brand"><span>Pocket</span> <span>Pilot</span></div>
-        <div class="sub" id="tagline">Your coding agents — in your pocket.</div>
+        <div class="subline" id="tagline">Your coding agents — in your pocket.</div>
 
         <!-- 10 – 30 · what it does -->
         <div id="phoneWrap"></div>
@@ -82,9 +82,9 @@
         <div id="works">
           <div class="k">Works with</div>
           <div class="row">
-            <span class="chip" data-icon="code">VS Code</span>
-            <span class="chip" data-icon="github">GitHub Copilot app</span>
-            <span class="chip" data-icon="terminal">Copilot CLI</span>
+            <span class="vchip" data-icon="code">VS Code</span>
+            <span class="vchip" data-icon="github">GitHub Copilot app</span>
+            <span class="vchip" data-icon="terminal">Copilot CLI</span>
           </div>
         </div>
         <div class="big two" id="t1"><div>End-to-end</div><div class="l2">encrypted.</div></div>
@@ -95,7 +95,7 @@
         <div id="end">
           <img class="logo" src="assets/img/icon.svg" alt="" />
           <div class="name">Pocket Pilot</div>
-          <div class="tag">Copilot &amp; Claude sessions, <span class="grad">in your pocket.</span></div>
+          <div class="tag">Your coding agents, <span class="grad">in your pocket.</span></div>
           <div class="url">mithawala.github.io/pocket-pilot</div>
         </div>
       </div>
@@ -119,10 +119,10 @@
           { w: 'Approve', s: 'Allow once, for the session — or skip.', screen: 'approval', tap: () => $$('#p-approval .confirm button').find((b) => b.textContent.includes('Allow Once')) },
           { w: 'Answer', s: 'Tap an option, or type your own.', screen: 'question', tap: () => $('#p-question .opt') },
           { w: 'Steer', s: 'Nudge it while it works. Queue what’s next.', screen: 'steer' },
-          { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#p-models .list-item').find((b) => b.textContent.includes('GPT-5.6')) },
+          { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#p-models .list-item').find((b) => b.textContent.includes('GPT-5 mini')) },
           { w: 'Start<br>new work', s: 'New sessions, in any folder on your PC.', screen: 'newSession', tap: () => $$('#p-newSession .sheet .list-item').find((b) => b.textContent.includes('acme-api')) },
           { w: 'See<br>screenshots', s: 'Pinch to zoom, like your photos.', screen: 'viewer' },
-          { w: 'Every<br>session', s: 'Copilot and Claude — what needs you first.', screen: 'home' },
+          { w: 'Every<br>session', s: 'Sorted by what needs you first.', screen: 'home' },
           { w: 'Full<br>history', s: 'Every message, tool call and diff.', screen: 'history' },
           { w: 'Get<br>notified', s: 'When it needs you. When it’s done.', screen: 'lock' },
           { w: 'Live', s: 'Replies stream in as they happen.', screen: 'approved' },
@@ -243,7 +243,7 @@
 
         // 30 – 32 · works with
         slam('#works .k', TE, { from: 1.3 });
-        $$('#works .chip').forEach((c, i) => slam(c, TE + (i + 1) * B, { from: 1.4, d: 0.22 }));
+        $$('#works .vchip').forEach((c, i) => slam(c, TE + (i + 1) * B, { from: 1.4, d: 0.22 }));
         off('#works', TE + 4 * B - 0.1, 0.1);
 
         // 32 – 36 · trust, and the price

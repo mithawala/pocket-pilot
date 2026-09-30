@@ -3,7 +3,7 @@ format: 1920x1080
 duration: 60s
 message: "Your coding agents keep working when you walk away — Pocket Pilot puts the same live sessions on your phone, set up in a minute, private and free."
 arc: Hook → Name → Demo (in sync) → Features → Set-up → Trust → CTA
-audience: developers who run GitHub Copilot or Claude agent sessions
+audience: developers who run GitHub Copilot agent sessions
 mode: autonomous
 ---
 

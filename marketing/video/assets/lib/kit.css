@@ -17,40 +17,39 @@
 html, body { margin: 0; width: 100%; height: 100%; background: var(--ink); overflow: hidden; }
 body { font-family: 'Inter', sans-serif; color: var(--paper); -webkit-font-smoothing: antialiased; }
 #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ink); }
-.layer { position: absolute; inset: 0; }
-.center { display: flex; align-items: center; justify-content: center; }
 
-/* ---------- the real app, inside a device or a window */
+/* ---------- the real app, inside a device or a window. It keeps its own font (--font from
+   app.scoped.css), and nothing typographic from the video around it may leak in. */
 .pp-app {
   position: absolute; inset: 0; overflow: hidden;
   transform: translateZ(0); /* containing block for the app's position: fixed layers */
   --app-h: 844px; --vv-top: 0px; --safe-top: 47px; --safe-bottom: 30px;
-  --font: 'Inter', sans-serif;
-  font-family: var(--font); font-size: 15px; line-height: 1.5;
+  font-family: var(--font); font-size: 15px; font-weight: 400; font-style: normal; line-height: 1.5;
+  letter-spacing: normal; word-spacing: normal; text-transform: none; text-align: left; text-shadow: none; white-space: normal;
   background: var(--bg); color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
 /* ---------- iPhone */
 .iphone { position: absolute; width: 426px; height: 880px; }
-.iphone .frame {
+.iphone .dev-frame {
   position: absolute; inset: 0; border-radius: 68px; padding: 18px;
   background: linear-gradient(145deg, #5b606b 0%, #2a2d34 18%, #1a1c22 50%, #3a3e47 82%, #6c717c 100%);
   box-shadow: 0 60px 120px rgba(0, 0, 0, 0.55), 0 20px 40px rgba(0, 0, 0, 0.35), inset 0 0 0 1.5px rgba(255, 255, 255, 0.16), inset 0 0 0 4px #0b0c0f;
 }
-.iphone .bezel { position: absolute; inset: 7px; border-radius: 61px; background: #050506; }
-.iphone .screen { position: absolute; left: 18px; top: 18px; width: 390px; height: 844px; border-radius: 52px; overflow: hidden; background: #000; transform: translateZ(0); }
-.iphone .glare { position: absolute; inset: 0; border-radius: 52px; pointer-events: none; background: linear-gradient(115deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 34%, rgba(255, 255, 255, 0) 55%); z-index: 20; }
-.iphone .island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 30; }
-.iphone .home { position: absolute; left: 50%; bottom: 8px; width: 138px; height: 5px; margin-left: -69px; border-radius: 3px; background: rgba(255, 255, 255, 0.82); z-index: 30; }
-.iphone .status { position: absolute; left: 0; right: 0; top: 0; height: 50px; z-index: 25; display: flex; align-items: center; justify-content: space-between; padding: 4px 30px 0 44px; color: #fff; font: 600 16px/1 'Inter', sans-serif; letter-spacing: -0.2px; }
-.iphone .status svg { display: block; }
-.iphone .status .icons { display: flex; align-items: center; gap: 6px; }
-.iphone .side { position: absolute; width: 5px; border-radius: 3px; background: linear-gradient(90deg, #6c717c, #2a2d34); }
-.iphone .side.action { left: -3px; top: 150px; height: 34px; }
-.iphone .side.vol-up { left: -3px; top: 212px; height: 62px; }
-.iphone .side.vol-down { left: -3px; top: 290px; height: 62px; }
-.iphone .side.power { right: -3px; top: 250px; height: 96px; }
+.iphone .dev-bezel { position: absolute; inset: 7px; border-radius: 61px; background: #050506; }
+.iphone .dev-screen { position: absolute; left: 18px; top: 18px; width: 390px; height: 844px; border-radius: 52px; overflow: hidden; background: #000; transform: translateZ(0); }
+.iphone .dev-glare { position: absolute; inset: 0; border-radius: 52px; pointer-events: none; background: linear-gradient(115deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 34%, rgba(255, 255, 255, 0) 55%); z-index: 20; }
+.iphone .dev-island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 30; }
+.iphone .dev-home { position: absolute; left: 50%; bottom: 8px; width: 138px; height: 5px; margin-left: -69px; border-radius: 3px; background: rgba(255, 255, 255, 0.82); z-index: 30; }
+.iphone .dev-status { position: absolute; left: 0; right: 0; top: 0; height: 50px; z-index: 25; display: flex; align-items: center; justify-content: space-between; padding: 4px 30px 0 44px; color: #fff; font: 600 16px/1 'Inter', sans-serif; letter-spacing: -0.2px; }
+.iphone .dev-status svg { display: block; }
+.iphone .dev-status .icons { display: flex; align-items: center; gap: 6px; }
+.iphone .dev-side { position: absolute; width: 5px; border-radius: 3px; background: linear-gradient(90deg, #6c717c, #2a2d34); }
+.iphone .dev-side.action { left: -3px; top: 150px; height: 34px; }
+.iphone .dev-side.vol-up { left: -3px; top: 212px; height: 62px; }
+.iphone .dev-side.vol-down { left: -3px; top: 290px; height: 62px; }
+.iphone .dev-side.power { right: -3px; top: 250px; height: 96px; }
 
 /* ---------- iOS lock screen and notifications */
 .lock { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(520px 520px at 30% 18%, #3b5bdb 0%, rgba(59, 91, 219, 0) 70%), radial-gradient(480px 560px at 90% 80%, #7b3fe4 0%, rgba(123, 63, 228, 0) 70%), linear-gradient(170deg, #111633, #0a0c1b 55%, #140b26); }
@@ -128,8 +127,8 @@ body { font-family: 'Inter', sans-serif; color: var(--paper); -webkit-font-smoot
 .display { font: 800 96px/1.02 'Inter', sans-serif; letter-spacing: -3px; color: #fff; }
 .grad { background: linear-gradient(95deg, #8fb2ff 0%, #b69cff 55%, #f09bd6 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lede { font: 500 34px/1.35 'Inter', sans-serif; letter-spacing: -0.4px; color: var(--dim); }
-.chip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 999px; font: 600 26px/1 'Inter', sans-serif; color: #fff; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); }
-.chip svg { width: 28px; height: 28px; }
+.vchip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 999px; font: 600 26px/1 'Inter', sans-serif; color: #fff; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); }
+.vchip svg { width: 28px; height: 28px; }
 /* words() spans in headlines move as well as fade (transforms need a box) */
 .display .w, .lede .w, .kicker .w, .big .w { display: inline-block; }
 

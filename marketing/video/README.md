@@ -30,7 +30,9 @@ own type and layout, not the app's.
 Node 20+, ffmpeg and the HyperFrames CLI (`npm i -g hyperframes`), from this folder:
 
 ```sh
-node tools/capture-ui.mjs            # only when the app's UI changed
+node tools/capture-ui.mjs            # only when the app's UI changed (also saves renders/ui-real/*.png)
+node tools/check-screens.mjs         # fails if the videos' CSS reaches into the app screens, or they mention Claude
+node tools/check-ui.mjs              # renders/ui-check.png: each screen as the videos show it, next to the real app
 node tools/soundtrack.mjs            # assets/audio/*.wav (generated, not committed)
 node tools/select.mjs kinetic-sync   # copies a composition to index.html for lint / check / snapshot / preview
 hyperframes check .
@@ -45,6 +47,14 @@ For the single-file films, `node tools/probe.mjs <name> --at 1,2.5,9 --sheet` re
 sheet in Edge or Chrome, and `--verify` checks that the timeline gives the same picture whatever order
 frames are rendered in (HyperFrames renders with several workers that each seek on their own). The
 probe doesn't mount sub-compositions; use `hyperframes snapshot` for D.
+
+## Rules for the app screens
+
+- They must look exactly like the app, in its own font. The videos' own class names never match the
+  app's (the phone parts are `dev-*`, the pills `vchip`); a rule meant for the app says `.pp-app` in its
+  selector. `tools/check-screens.mjs` enforces both.
+- The videos don't mention Claude: the capture runs the chats on GPT-5.6 Sol, picked in the app's own
+  model picker, and fails if a screen still mentions Claude.
 
 ## Rules for the timelines
 

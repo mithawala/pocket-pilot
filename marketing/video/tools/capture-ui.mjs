@@ -11,6 +11,7 @@ import { launchBrowser, newPage, sleep } from '../../../scripts/lib/headless.mjs
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const outDir = path.join(repo, 'marketing', 'video', 'assets', 'ui');
+const realDir = path.join(repo, 'marketing', 'video', 'renders', 'ui-real');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp' };
 
 // ------------------------------------------------------------------ CSS scoping
@@ -110,12 +111,29 @@ const PHONE = `(() => {
   return true;
 })()`;
 
+// The videos don't mention Claude (BRIEF.md): the chats run on GPT-5.6 Sol (picked in the app's own
+// model picker before capturing), earlier replies say so too, the model list leaves the Claude models
+// out and New session has no provider switch. A screen that still mentions Claude fails the capture.
+const NO_CLAUDE = `(() => {
+  const shell = document.querySelector('.shell');
+  for (const item of shell.querySelectorAll('.sheet .list-item')) if (/Claude/.test(item.textContent)) item.remove();
+  for (const seg of shell.querySelectorAll('.sheet .seg')) if (/Claude/.test(seg.textContent)) seg.remove();
+  const swap = (s) => s.replaceAll('Claude Opus 5.5', 'GPT-5.6 Sol');
+  const walk = document.createTreeWalker(shell, NodeFilter.SHOW_TEXT);
+  while (walk.nextNode()) if (walk.currentNode.nodeValue.includes('Claude')) walk.currentNode.nodeValue = swap(walk.currentNode.nodeValue);
+  for (const el of shell.querySelectorAll('[aria-label], [title]')) for (const a of ['aria-label', 'title']) if ((el.getAttribute(a) || '').includes('Claude')) el.setAttribute(a, swap(el.getAttribute(a)));
+  const left = shell.outerHTML.match(/.{0,60}Claude.{0,40}/);
+  if (left) throw new Error('a screen still mentions Claude: ' + left[0]);
+  return true;
+})()`;
+
 // The screen as a fragment: blob: pictures inlined, asset paths pointing at the video's assets.
 const EXTRACT = `(async () => {
   document.querySelector('.demo-banner')?.remove();
   const shell = document.querySelector('.shell');
   shell.classList.remove('has-banner');
   for (const t of shell.querySelectorAll('.toast')) t.remove();
+  ${NO_CLAUDE};
   for (const img of shell.querySelectorAll('img[src^="blob:"]')) {
     // The app's CSP has no blob: in connect-src, so no fetch(): draw the loaded picture instead.
     const c = document.createElement('canvas');
@@ -149,9 +167,23 @@ async function main() {
     const save = async (name) => {
       await sleep(250);
       shots[name] = await page.eval(EXTRACT);
+      // The real app, as pixels, next to its fragment: tools/check-ui.mjs compares the two.
+      fs.mkdirSync(realDir, { recursive: true });
+      fs.writeFileSync(path.join(realDir, `${name}.png`), await page.capture());
       console.log(`  ${name.padEnd(12)} ${(shots[name].length / 1024).toFixed(0)} KB`);
     };
     const chat = (id) => `#/s/${encodeURIComponent(`copilotcli:/${id}`)}`;
+    // Switches the open chat to GPT-5.6 Sol in the app's own model picker (see NO_CLAUDE).
+    const useGpt = async () => {
+      const current = await page.eval(`document.querySelector('.composer .pick .model-name')?.textContent || ''`);
+      if (current.includes('GPT-5.6 Sol')) return;
+      await page.eval(click('.composer .pick', 'Model'));
+      await page.waitFor(`[...document.querySelectorAll('.sheet .list-item')].some((b) => b.textContent.includes('GPT-5.6 Sol'))`);
+      await sleep(400);
+      await page.eval(click('.sheet .list-item', 'GPT-5.6 Sol'));
+      await page.waitFor(`!document.querySelector('.sheet') && (document.querySelector('.composer .pick .model-name')?.textContent || '').includes('GPT-5.6 Sol')`);
+      await sleep(500);
+    };
 
     await open();
     await save('home');
@@ -167,25 +199,30 @@ async function main() {
     await save('newSession');
 
     await open(chat('demo-auth'), '.confirm');
+    await useGpt();
     await save('approval');
     await page.eval(click('.composer .pick', 'Model'));
     await page.waitFor('document.querySelector(".sheet .list-item")');
     await sleep(600);
     await save('models');
     await open(chat('demo-auth'), '.confirm');
+    await useGpt();
     await page.eval(click('.confirm button', 'Allow Once'));
     await page.waitFor('document.querySelector(".chat").textContent.includes("open a pull request") && !document.querySelector(".activity-line")', 30000);
     await sleep(600);
     await save('approved');
 
     await open(chat('demo-dates'), '.composer');
+    await useGpt();
     await page.waitFor('document.querySelector(".confirm")');
     await save('question');
 
     await open(chat('demo-flaky'), '.composer');
+    await useGpt();
     await save('history');
 
     await open(chat('demo-dark'), '.composer');
+    await useGpt();
     await page.waitFor('document.querySelector(".thumb.ready img")');
     await save('picture');
     await page.eval(click('.thumb'));
@@ -194,6 +231,7 @@ async function main() {
     await save('viewer');
 
     await open(chat('demo-dark'), '.composer');
+    await useGpt();
     await page.eval(`(() => { const ta = document.querySelector('.composer textarea'); ta.value = 'Also make the toggle remember the system theme'; ta.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     await sleep(300);
     await page.eval(click('.composer .send'));
