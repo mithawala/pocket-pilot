@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.6
+
+- **`/pocket-pilot` is back in the slash menu of the GitHub Copilot app and CLI.** Since 0.7.1 the menu of a new chat didn't offer it. The menu lists skills from the start, but Pocket Pilot's own commands only once it has loaded in the chat, and 0.7.1 had to take Pocket Pilot's skill out of the plugin: VS Code keeps the `skills` folder of every installed Copilot plugin open, and on Windows the app then can't update the plugin. Pocket Pilot now keeps that skill in your own skills folder, `~/.copilot/skills/pocket-pilot`, where it doesn't get in the way of updates. It's written when a chat first loads Pocket Pilot 0.7.6, so after updating, open a chat once, then start a new one (or restart the app). As soon as Pocket Pilot has loaded in a chat, `/pocket-pilot` still runs it directly; before that, the skill has the agent do it.
+- Pocket Pilot keeps the skill up to date with each version. To keep your own version of it, delete its first line; Pocket Pilot then leaves it alone. VS Code reads the same folder, so it lists `/pocket-pilot` too and points you to the Pocket Pilot panel there. If you uninstall the plugin, delete the folder.
+- **The agent can turn remote access off**: asking it to turn Pocket Pilot off now works like `/pocket-pilot off`.
+
 ## 0.7.5
 
 - **The chat bar sits at the bottom of the iPhone app.** The band under it came from how the app was drawn: under a translucent status bar, with `viewport-fit=cover`. Since iOS 26.5, a Home Screen web app gets a view as tall as the screen minus the status bar (WebKit bug 301994). Drawn under a translucent status bar, that view starts at the top of the screen and stops a status bar's height short of the bottom. The app now uses an opaque status bar and no `viewport-fit=cover`, so its view starts below the status bar and reaches the bottom of the screen. iOS then keeps it clear of the home indicator, and the chat bar sits right above it. The status bar is solid black now instead of showing the app's top bar through it. After the update, close the app in the app switcher and open it again: iOS applies this when it starts the app.

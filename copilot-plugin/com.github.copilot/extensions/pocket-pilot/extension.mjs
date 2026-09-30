@@ -13,6 +13,7 @@ import { FILES, PHONE_RUNTIME_ENV, readJson, writeJson, hubAlive, connect, Rpc }
 import { renderQrText } from './lib/qr.mjs';
 import { latestVersion, newer, updateInfo, updateText } from './lib/update.mjs';
 import { takeExpected } from './lib/phone-runtime.mjs';
+import { installSkill, COMMAND_DESCRIPTION } from './lib/skill.mjs';
 
 const { joinSession } = sdk;
 const EXT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -558,6 +559,13 @@ async function hubRequest(op, params = {}, timeoutMs = 60000) {
   }
 }
 
+async function turnOff() {
+  setEnabled(false);
+  const stopped = await hubRequest('stop').catch(() => null);
+  // No hub right now (for example every other chat was closed): end the tunnel it left running.
+  if (!stopped) await createRequire(import.meta.url)('./vendor/extension/core/tunnel.js').PersistentTunnel.end(FILES.tunnel).catch(() => {});
+}
+
 async function onCommand(ctx) {
   const arg = String(ctx?.args || '').trim().toLowerCase();
   try {
@@ -568,10 +576,7 @@ async function onCommand(ctx) {
       return;
     }
     if (arg === 'off' || arg === 'stop') {
-      setEnabled(false);
-      const stopped = await hubRequest('stop').catch(() => null);
-      // No hub right now (for example every other chat was closed): end the tunnel it left running.
-      if (!stopped) await createRequire(import.meta.url)('./vendor/extension/core/tunnel.js').PersistentTunnel.end(FILES.tunnel).catch(() => {});
+      await turnOff();
       await session.log('Pocket Pilot is off: the tunnel is closed and your devices cannot connect until you run /pocket-pilot again.');
       return;
     }
@@ -592,13 +597,17 @@ async function onCommand(ctx) {
 
 const tool = {
   name: 'pocket_pilot',
-  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone, tablet or another computer: the same history, live replies, chat, tool approvals and questions, end-to-end encrypted. Call with action "pair" when the user asks to connect, pair or use their phone or another device (it opens a pairing QR code on this PC for the user to scan; never ask the user to share the link or the code with you), or "status" to report whether remote access is on and which devices are paired. The user can also type /pocket-pilot, /pocket-pilot status or /pocket-pilot off.',
-  parameters: { type: 'object', properties: { action: { type: 'string', enum: ['pair', 'status'], description: 'pair = show the pairing QR code on this PC; status = report remote-access status' } }, required: ['action'] },
+  description: 'Pocket Pilot lets the user continue and control this Copilot session from their phone, tablet or another computer: the same history, live replies, chat, tool approvals and questions, end-to-end encrypted. Call with action "pair" when the user asks to connect, pair or use their phone or another device (it opens a pairing QR code on this PC for the user to scan; never ask the user to share the link or the code with you), "status" to report whether remote access is on and which devices are paired, or "off" when the user asks to turn remote access off. The user can also type /pocket-pilot, /pocket-pilot status or /pocket-pilot off.',
+  parameters: { type: 'object', properties: { action: { type: 'string', enum: ['pair', 'status', 'off'], description: 'pair = show the pairing QR code on this PC; status = report remote-access status; off = turn remote access off (closes the tunnel, devices stay paired)' } }, required: ['action'] },
   handler: async (args) => {
     if (args?.action === 'status') {
       const s = await hubRequest('status').catch(() => null);
       const note = await updateNote();
       return [s ? statusText(s) : 'Pocket Pilot remote access is off. The user can turn it on with the /pocket-pilot command.', note].filter(Boolean).join('\n');
+    }
+    if (args?.action === 'off') {
+      await turnOff();
+      return 'Pocket Pilot remote access is off: the tunnel is closed. Paired devices stay paired and reconnect when the user turns it on again with /pocket-pilot.';
     }
     const s = await pair();
     if (!s) return 'The user declined to turn on Pocket Pilot remote access.';
@@ -611,17 +620,19 @@ const tool = {
 // ------------------------------------------------------------------ start
 
 const VSCODE_NOTE = 'This session runs in VS Code. Pocket Pilot for VS Code handles it: install the "Pocket Pilot" extension (mithawala.pocket-pilot) and click "Start remote access" in its panel. The /pocket-pilot plugin command is for the GitHub Copilot app and CLI.';
+// Keeps /pocket-pilot in the slash menu of new chats (see lib/skill.mjs).
+if (!process.env.POCKET_PILOT_DISABLE) debug(`skill: ${installSkill({ version: VERSION })}`);
 if (process.env.POCKET_PILOT_DISABLE) {
   await joinSession({});
 } else if (insideVsCode()) {
   const s = await joinSession({
     tools: [{ ...tool, handler: async () => VSCODE_NOTE }],
-    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: remote control from your phone', handler: async () => s.log(VSCODE_NOTE) }],
+    commands: [{ name: 'pocket-pilot', description: COMMAND_DESCRIPTION, handler: async () => s.log(VSCODE_NOTE) }],
   });
 } else {
   session = await joinSession({
     tools: [tool],
-    commands: [{ name: 'pocket-pilot', description: 'Pocket Pilot: pair your phone or another device to control this session remotely (pair | status | off)', handler: onCommand }],
+    commands: [{ name: 'pocket-pilot', description: COMMAND_DESCRIPTION, handler: onCommand }],
     canvases: canvases(),
   });
   session.on((e) => forward(e));

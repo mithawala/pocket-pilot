@@ -40,7 +40,9 @@ Pocket Pilot panel says when there's a new version.
 Updating from 0.7.0 or older on Windows, the app may say *Failed to install plugin: Access is denied
 (os error 5)*: VS Code keeps the `skills` folder those versions have open, so Windows won't let the
 app move the plugin's folder. Quit VS Code (or delete that `skills` folder) and click **Update** again.
-Newer versions have no such folder.
+Newer versions have no such folder. Instead, a chat running Pocket Pilot keeps the `/pocket-pilot`
+skill that puts it in the slash menu in your own skills folder, `~/.copilot/skills/pocket-pilot`
+(delete its first line to keep your own version). After uninstalling the plugin, delete that folder.
 
 ## Security
 

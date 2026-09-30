@@ -25,10 +25,12 @@ test('copilot plugin: Agent Plugins 1.0 layout', () => {
   assert.deepEqual(Object.keys(manifest).filter((k) => !allowed.has(k)), [], 'only Agent Plugins 1.0 top-level fields');
   assert.ok(fs.existsSync(path.join(plugin, 'com.github.copilot', 'extensions', 'pocket-pilot', 'extension.mjs')));
   // VS Code watches these folders of every installed Copilot plugin, and on Windows the Copilot app then
-  // can't move the plugin's folder to update it ("Access is denied, os error 5"). The extension's
-  // pocket_pilot tool and /pocket-pilot command do what a skill would.
+  // can't move the plugin's folder to update it ("Access is denied, os error 5"). The extension keeps
+  // its /pocket-pilot skill in the user's skills folder instead (lib/skill.mjs).
   for (const dir of ['skills', 'agents', 'commands', 'hooks', 'rules', 'automations']) assert.equal(fs.existsSync(path.join(plugin, dir)), false, `no ${dir}/ folder`);
-  assert.match(fs.readFileSync(path.join(plugin, 'com.github.copilot', 'extensions', 'pocket-pilot', 'extension.mjs'), 'utf8'), /name: 'pocket_pilot'/);
+  const extension = fs.readFileSync(path.join(plugin, 'com.github.copilot', 'extensions', 'pocket-pilot', 'extension.mjs'), 'utf8');
+  assert.match(extension, /name: 'pocket_pilot'/);
+  assert.match(extension, /installSkill\(\{ version: VERSION \}\)/);
   const market = JSON.parse(fs.readFileSync(path.join(root, '.github', 'plugin', 'marketplace.json'), 'utf8'));
   assert.equal(market.plugins[0].name, 'pocket-pilot');
   assert.equal(market.plugins[0].source, './copilot-plugin');

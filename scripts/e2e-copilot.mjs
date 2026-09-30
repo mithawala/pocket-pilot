@@ -143,7 +143,7 @@ step(`phone has the PC history: "${first.message.text}" -> ${first.responseParts
 debugDump = () => {
   const cs = store.chatState.get(chat);
   console.error('runtime events:', seen.filter((s) => !/delta|partial|usage|model\.|hook\./.test(s)).join(' '));
-  console.error('phone turns:', cs.turns.length, 'active:', JSON.stringify(cs.activeTurn ? { id: cs.activeTurn.id, msg: cs.activeTurn.message.text.slice(0, 40), parts: cs.activeTurn.responseParts.map((p) => p.kind + (p.toolCall ? `:${p.toolCall.toolName}:${p.toolCall.status}` : '')) } : null));
+  console.error('phone turns:', cs?.turns.length, 'active:', JSON.stringify(cs?.activeTurn ? { id: cs.activeTurn.id, msg: cs.activeTurn.message.text.slice(0, 40), parts: cs.activeTurn.responseParts.map((p) => p.kind + (p.toolCall ? `:${p.toolCall.toolName}:${p.toolCall.status}` : '')) } : null));
   console.error('phone errors:', JSON.stringify(store.errors.map((e) => e.message)));
   console.error('pending permission in harness:', !!pendingPermission);
 };
@@ -310,7 +310,17 @@ step('the session started on the phone is there with the newer version too');
 const hubAfter = upgraded;
 
 // 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
-const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, onPermissionRequest: () => new Promise(() => {}) });
+//    The chats' extensions keep the /pocket-pilot skill in the user's skills folder (lib/skill.mjs), so
+//    a new chat lists /pocket-pilot before its extension has loaded; then the extension's command runs it.
+const skillMd = path.join(copilotHome, 'skills', 'pocket-pilot', 'SKILL.md');
+const { managedVersion } = await import(pathToFileURL(path.join(root, 'copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/skill.mjs')).href);
+const skillVersion = managedVersion(fs.existsSync(skillMd) ? fs.readFileSync(skillMd, 'utf8') : '');
+if (skillVersion !== '99.0.0') fail(`the /pocket-pilot skill is missing or wasn't updated by the newer version (${skillVersion}): ${skillMd}`);
+const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, enableConfigDiscovery: true, onPermissionRequest: () => new Promise(() => {}) });
+const skills = (await other.rpc.skills.list()).skills;
+if (!skills.some((s) => s.name === 'pocket-pilot' && s.userInvocable && s.enabled)) fail(`the runtime doesn't list the /pocket-pilot skill: ${JSON.stringify(skills.map((s) => s.name))}`);
+await until(async () => (await other.rpc.commands.list({ includeBuiltins: false, includeSkills: true, includeClientCommands: true })).commands.some((c) => c.name === 'pocket-pilot' && c.kind === 'client'), 'the extension to run /pocket-pilot itself', 15000);
+step('/pocket-pilot is in the slash menu from the start (a skill in the user\'s skills folder), and the extension runs it once loaded');
 await new Promise((r) => setTimeout(r, 1500));
 const statusLog = [];
 other.on((e) => {
