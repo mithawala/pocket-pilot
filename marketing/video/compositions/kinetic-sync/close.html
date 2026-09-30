@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · private, free, the name</title>
+  </head>
+  <body>
+    <template id="ks-close-template">
+      <style>
+        @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+        #ks-close { position: absolute; inset: 0; overflow: hidden; }
+        #ks-close-st { position: absolute; inset: 0; }
+        #ks-close .big { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font: 900 190px/0.9 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+        #ks-close .big.two > div, #ks-close .big.one { opacity: 0; }
+        #ks-close-t3 { font-size: 170px; }
+        #ks-close-t4 { font-size: 330px; }
+        #ks-close-end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #ks-close-end > * { opacity: 0; }
+        #ks-close-end .logo { width: 170px; height: 170px; border-radius: 40px; background: url('assets/img/icon.svg') center / cover no-repeat; box-shadow: 0 30px 90px rgba(79, 120, 255, 0.55); }
+        #ks-close-end .name { margin-top: 40px; font: 900 140px/1 'Inter', sans-serif; letter-spacing: -0.05em; color: #fff; }
+        #ks-close-end .tag { margin-top: 22px; font: 600 50px/1.2 'Inter', sans-serif; letter-spacing: -1px; color: #d8def0; }
+        #ks-close-end .url { margin-top: 56px; font: 700 40px/1 'Inter', sans-serif; letter-spacing: 0.5px; color: #8fb2ff; }
+        #ks-close-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+        #ks-close-fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+      </style>
+      <div id="ks-close" data-composition-id="ks-close" data-width="1920" data-height="1080" data-duration="10">
+        <div id="ks-close-st">
+          <div class="big two" id="ks-close-t1"><div>End-to-end</div><div class="l2">encrypted.</div></div>
+          <div class="big two" id="ks-close-t2"><div>Passkey</div><div class="l2">protected.</div></div>
+          <div class="big one" id="ks-close-t3">No accounts.</div>
+          <div class="big one" id="ks-close-t4"><span class="grad">Free.</span></div>
+          <div id="ks-close-end">
+            <div class="logo"></div>
+            <div class="name">Pocket Pilot</div>
+            <div class="tag">Copilot &amp; Claude sessions, <span class="grad">in your pocket.</span></div>
+            <div class="url">mithawala.github.io/pocket-pilot</div>
+          </div>
+        </div>
+        <div id="ks-close-flash"></div>
+        <div id="ks-close-fade"></div>
+      </div>
+      <script>
+        document.fonts.ready.then(() => {
+          const B = 0.5;
+          const tl = PP.timeline();
+          const k = PP.kinetic(tl, { flash: '#ks-close-flash', stage: '#ks-close-st' });
+
+          // 0 – 4 · end-to-end encrypted. passkey protected. no accounts. FREE.
+          k.snap('#ks-close-t1 > div:first-child', 0, { dx: -180 });
+          k.slam('#ks-close-t1 .l2', B);
+          k.off('#ks-close-t1', 2 * B - 0.08, 0.08);
+          k.rise('#ks-close-t2 > div:first-child', 2 * B);
+          k.slam('#ks-close-t2 .l2', 3 * B);
+          k.off('#ks-close-t2', 4 * B - 0.08, 0.08);
+          k.slam('#ks-close-t3', 4 * B, { from: 1.4, d: 0.24 });
+          k.off('#ks-close-t3', 6 * B - 0.08, 0.08);
+          k.slam('#ks-close-t4', 6 * B, { from: 1.7, blur: 18, d: 0.3 });
+          k.flash(6 * B, 0.4);
+          k.shake(6 * B, 18);
+          k.off('#ks-close-t4', 8 * B - 0.12, 0.12);
+
+          // 4 – 10 · the name and the address, a slow breath, then black
+          k.pop('#ks-close-end .logo', 8 * B, { from: 0.5, d: 0.6 });
+          k.slam('#ks-close-end .name', 9 * B, { from: 1.3, blur: 10, d: 0.3 });
+          k.rise('#ks-close-end .tag', 10 * B, { dy: 24, rot: 0, d: 0.5 });
+          k.rise('#ks-close-end .url', 11 * B, { dy: 16, rot: 0, d: 0.5 });
+          tl.fromTo('#ks-close-end', { scale: 1 }, { scale: 1.015, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 12 * B);
+          tl.fromTo('#ks-close-fade', { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power1.in' }, 9.4);
+
+          window.__timelines['ks-close'] = tl;
+        });
+      </script>
+    </template>
+  </body>
+</html>

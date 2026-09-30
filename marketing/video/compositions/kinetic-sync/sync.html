@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · in sync</title>
+  </head>
+  <body>
+    <template id="ks-sync-template">
+      <style>
+        @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+        #ks-sync { position: absolute; inset: 0; overflow: hidden; }
+        #ks-sync .cap { position: absolute; left: 80px; top: 44px; font: 900 76px/0.98 'Inter', sans-serif; letter-spacing: -0.04em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+        #ks-sync .cap > div { opacity: 0; }
+        #ks-sync-pcCam { position: absolute; left: 70px; top: 232px; width: 1240px; height: 760px; perspective: 2400px; opacity: 0; }
+        #ks-sync-pc { position: absolute; inset: 0; }
+        #ks-sync-pc .vsc { inset: 0; }
+        #ks-sync .vsc .chatpane .banner { display: none; }
+        #sy-vsc-chat .pp-app[data-screen='steer'] { opacity: 0; }
+        #ks-sync .vsc .code .cl.add { height: 0; overflow: hidden; opacity: 0; }
+        #ks-sync-phoneWrap { position: absolute; left: 1410px; top: 140px; width: 426px; height: 880px; perspective: 1800px; opacity: 0; }
+        #sy-phone { left: 0; top: 0; }
+        #ks-sync .scr { position: absolute; inset: 0; opacity: 0; }
+        #ks-sync-p-picture { opacity: 1; }
+        #ks-sync .scr .pp-app { position: absolute; inset: 0; }
+        #ks-sync .typed { position: absolute; z-index: 5; box-sizing: border-box; padding: 11px 12px; font: 15px/20px 'Inter', sans-serif; color: #e6e9f2; border-radius: 12px; opacity: 0; }
+        #ks-sync .typed .ch { opacity: 0; }
+        #ks-sync .typed .caret { position: absolute; left: 0; top: 0; width: 2px; height: 20px; background: #61afef; }
+        #sy-kb { opacity: 0; }
+        #ks-sync-link { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+        #ks-sync-pulse { opacity: 0; }
+        #ks-sync-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+      </style>
+      <div id="ks-sync" data-composition-id="ks-sync" data-width="1920" data-height="1080" data-duration="10">
+        <div id="ks-sync-pcCam"><div id="ks-sync-pc"></div></div>
+        <svg id="ks-sync-link" viewBox="0 0 1920 1080"><circle id="ks-sync-pulse" cx="1420" cy="610" r="9" fill="#fff" /></svg>
+        <div id="ks-sync-phoneWrap"></div>
+        <div class="cap" id="ks-sync-c1"><div>Type on</div><div class="l2"><span class="grad">your phone.</span></div></div>
+        <div class="cap" id="ks-sync-c2"><div>It’s on your PC.</div><div class="l2"><span class="grad">Instantly.</span></div></div>
+        <div class="cap" id="ks-sync-c3"><div>Same chat.</div><div class="l2"><span class="grad">Live on both.</span></div></div>
+        <div id="ks-sync-flash"></div>
+      </div>
+      <script>
+        document.fonts.ready.then(() => {
+          const R = document.getElementById('ks-sync');
+          const $ = (s, r = R) => r.querySelector(s);
+          const $$ = (s, r = R) => [...r.querySelectorAll(s)];
+          const lastOf = (root, sel) => $$(sel, root).pop();
+          const B = 0.5;
+
+          // ---------------------------------------------------------------- the scene (C's demo session)
+          $('#ks-sync-pc').innerHTML = PP.vscode({ id: 'sy-vsc', chat: 'picture', chatWidth: 480, ...PP.themeToggle() });
+          $('#sy-vsc-chat').insertAdjacentHTML('beforeend', PP.app('steer', 'vsc-chat'));
+          for (const n of [8, 9]) $(`#sy-vsc-l${n}`).classList.add('add');
+          $('#ks-sync-phoneWrap').innerHTML = PP.phone({
+            id: 'sy-phone',
+            content: ['picture', 'steer'].map((s) => `<div class="scr" id="ks-sync-p-${s}">${PP.app(s)}</div>`).join('') + PP.keyboard({ id: 'sy-kb' }),
+          });
+          for (const a of $$('.vsc .pp-app')) a.style.setProperty('--app-h', `${a.parentElement.clientHeight}px`);
+          PP.settle(R);
+
+          // The steering message, typed on the phone's keyboard.
+          const MSG = 'Also make the toggle remember the system theme';
+          const KB = 300;
+          const screenEl = $('#sy-phone-screen');
+          const inScreen = (el) => {
+            const s = screenEl.getBoundingClientRect();
+            const r = el.getBoundingClientRect();
+            return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height, cx: r.left - s.left + r.width / 2, cy: r.top - s.top + r.height / 2 };
+          };
+          const phPic = $('#ks-sync-p-picture .pp-app');
+          const area = inScreen($('textarea', phPic));
+          const typed = document.createElement('div');
+          typed.className = 'typed';
+          Object.assign(typed.style, { left: `${area.x}px`, bottom: `${844 - (area.y + area.h) + KB}px`, width: `${area.w}px`, minHeight: `${area.h}px`, background: getComputedStyle($('.composer', phPic)).backgroundColor });
+          typed.innerHTML = [...MSG].map((c) => `<span class="ch">${c}</span>`).join('') + '<i class="caret"></i>';
+          screenEl.appendChild(typed);
+          const chars = $$('.ch', typed);
+          const caret = $('.caret', typed);
+          const caretAt = [{ x: 12, y: 11 }, ...chars.map((c) => ({ x: c.offsetLeft + c.offsetWidth, y: c.offsetTop }))];
+          const sendPos = inScreen($('.send', phPic) || lastOf(phPic, '.cbar button'));
+          const phScroll = $('.scroll', phPic);
+          const phScroll0 = phScroll.scrollTop;
+
+          // The agent's answer, in both chats, hidden until it streams in.
+          const REPLY = 'Done — the toggle now follows your system theme until you pick one, and remembers your choice.';
+          const answer = (root) => {
+            const lastTurn = lastOf($('.chat', root), '.turn');
+            const tools = document.createElement('div');
+            tools.className = 'tools';
+            const done = $$('.tool', root).find((t) => t.textContent.includes('Created')).cloneNode(true);
+            done.querySelector('.tt').innerHTML = 'Edited <a class="file-link">ThemeToggle.tsx</a>';
+            tools.appendChild(done);
+            const reply = document.createElement('div');
+            reply.className = 'assistant';
+            reply.innerHTML = `<div class="md"><p>${REPLY}</p></div>`;
+            const scroll = $('.scroll', root);
+            const s0 = scroll.scrollHeight - scroll.clientHeight;
+            lastTurn.append(tools, reply);
+            const s1 = scroll.scrollHeight - scroll.clientHeight;
+            scroll.scrollTop = s0;
+            tools.style.opacity = '0';
+            return { tools, words: PP.words(reply), scroll, s0, s1, pending: $('.pending-item', root) };
+          };
+          const phA = answer($('#ks-sync-p-steer .pp-app'));
+          const pcPic = $('#sy-vsc-chat .pp-app[data-screen="picture"]');
+          const pcSteer = $('#sy-vsc-chat .pp-app[data-screen="steer"]');
+          const pcA = answer(pcSteer);
+
+          // ---------------------------------------------------------------- the timeline
+          const tl = PP.timeline();
+          const k = PP.kinetic(tl, { flash: '#ks-sync-flash' });
+          const cut = (from, to, t, d = 0.25) => {
+            tl.fromTo(from, { opacity: 1 }, { opacity: 0, duration: d, ease: 'power1.inOut' }, t);
+            tl.fromTo(to, { opacity: 0 }, { opacity: 1, duration: d, ease: 'power1.inOut' }, t);
+          };
+
+          // 0 – 1 · VS Code and the phone arrive
+          tl.fromTo('#ks-sync-pcCam', { opacity: 0, x: -240 }, { opacity: 1, x: 0, duration: 0.7, ease: 'power4.out' }, 0);
+          tl.fromTo('#ks-sync-pc', { rotationY: 16, rotationX: 4 }, { rotationY: 5, rotationX: 1, duration: 1.2, ease: 'power2.out' }, 0);
+          tl.fromTo('#ks-sync-phoneWrap', { opacity: 0, y: 900, rotation: 6, scale: 0.95 }, { opacity: 1, y: 0, rotation: 0, scale: 0.95, duration: 0.7, ease: 'power4.out' }, 0.05);
+          tl.fromTo('#sy-phone', { rotationY: -24 }, { rotationY: -8, duration: 1.1, ease: 'power2.out' }, 0.05);
+          k.snap('#ks-sync-c1 > div:first-child', B);
+          k.slam('#ks-sync-c1 .l2', 2 * B, { from: 1.25 });
+
+          // 0.6 – 3.5 · the keyboard comes up and the phone types
+          tl.fromTo('#sy-kb', { opacity: 0, y: KB }, { opacity: 1, y: 0, duration: 0.35, ease: 'power3.out' }, 0.6);
+          tl.fromTo(phPic, { '--app-h': '844px' }, { '--app-h': `${844 - KB}px`, duration: 0.35, ease: 'power3.out' }, 0.6);
+          tl.fromTo(phScroll, { scrollTop: phScroll0 }, { scrollTop: phScroll0 + KB, duration: 0.35, ease: 'power3.out' }, 0.6);
+          tl.fromTo(typed, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0.9);
+          tl.fromTo(caret, { x: caretAt[0].x, y: caretAt[0].y }, { x: caretAt[0].x, y: caretAt[0].y, duration: 0.01 }, 0.9);
+          const T0 = 1.0;
+          const PER = 0.046;
+          chars.forEach((c, i) => {
+            const t = T0 + i * PER;
+            tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: 'none' }, t);
+            tl.fromTo(caret, { x: caretAt[i].x, y: caretAt[i].y }, { x: caretAt[i + 1].x, y: caretAt[i + 1].y, duration: 0.01, ease: 'none' }, t);
+            const key = MSG[i] === ' ' ? $('#sy-kb-space') : $(`#sy-kb-${MSG[i].toLowerCase()}`);
+            if (key) tl.fromTo(key, { backgroundColor: '#8d8d93' }, { backgroundColor: '#5c5c60', duration: 0.14, ease: 'power1.out' }, t);
+          });
+          tl.fromTo(caret, { opacity: 1 }, { opacity: 0, duration: 0.2, repeat: 1, yoyo: true, ease: 'steps(1)' }, T0 + MSG.length * PER + 0.05);
+
+          // 3.5 · send — it's on the PC at once
+          const TS = 7 * B;
+          PP.tap(tl, screenEl, sendPos.cx, sendPos.cy - KB, TS);
+          k.off('#ks-sync-c1', TS - 0.1, 0.1);
+          tl.fromTo(typed, { opacity: 1 }, { opacity: 0, duration: 0.12 }, TS + 0.08);
+          tl.fromTo('#sy-kb', { y: 0 }, { y: KB, duration: 0.35, ease: 'power3.in' }, TS + 0.12);
+          tl.fromTo(phPic, { '--app-h': `${844 - KB}px` }, { '--app-h': '844px', duration: 0.35, ease: 'power3.in' }, TS + 0.12);
+          cut('#ks-sync-p-picture', '#ks-sync-p-steer', TS + 0.15);
+          tl.fromTo('#ks-sync-pulse', { attr: { cx: 1420, cy: 610 }, opacity: 1 }, { attr: { cx: 1290, cy: 640 }, opacity: 1, duration: 0.35, ease: 'power2.in' }, TS + 0.2);
+          tl.fromTo('#ks-sync-pulse', { opacity: 1 }, { opacity: 0, duration: 0.12 }, TS + 0.55);
+          cut(pcPic, pcSteer, 8 * B, 0.2);
+          k.slam('#ks-sync-c2 > div:first-child', 8 * B);
+          k.slam('#ks-sync-c2 .l2', 9 * B, { from: 1.3 });
+          k.flash(9 * B, 0.12);
+          for (const a of [phA, pcA]) tl.fromTo(a.pending, { boxShadow: '0 0 0 0px rgba(97,175,239,0)' }, { boxShadow: '0 0 0 4px rgba(97,175,239,0.55)', duration: 0.4, repeat: 2, yoyo: true, ease: 'sine.inOut' }, 8.4 * B);
+
+          // 5.5 – 9 · the agent takes it: the code changes on the PC, the answer streams to both
+          for (const a of [phA, pcA]) {
+            tl.fromTo(a.pending, { opacity: 1 }, { opacity: 0, duration: 0.3 }, 11 * B);
+            tl.fromTo(a.tools, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3 }, 12 * B);
+            tl.fromTo(a.scroll, { scrollTop: a.s0 }, { scrollTop: a.s1, duration: 0.9, ease: 'power2.inOut' }, 12 * B);
+            tl.fromTo(a.words, { opacity: 0 }, { opacity: 1, duration: 0.05, stagger: 0.075, ease: 'none' }, 12.6 * B);
+          }
+          for (const [n, t] of [[8, 11.2 * B], [9, 11.7 * B]]) tl.fromTo(`#sy-vsc-l${n}`, { height: 0, opacity: 0 }, { height: 23.8, opacity: 1, duration: 0.3, ease: 'power2.out' }, t);
+          k.off('#ks-sync-c2', 12 * B - 0.1, 0.1);
+          k.rise('#ks-sync-c3 > div:first-child', 12 * B);
+          k.snap('#ks-sync-c3 .l2', 13 * B, { dx: -120 });
+          tl.fromTo('#ks-sync-pcCam', { scale: 1 }, { scale: 1.025, duration: 3.2, ease: 'sine.inOut' }, 12 * B);
+
+          // 9.1 – 10 · VS Code leaves; the phone takes the first feature's place (the next scene starts there)
+          k.off('#ks-sync-c3', 9.1, 0.1);
+          tl.fromTo('#ks-sync-pcCam', { x: 0, opacity: 1 }, { x: -1600, opacity: 0, duration: 0.6, ease: 'power3.in' }, 9.2);
+          tl.fromTo('#ks-sync-phoneWrap', { x: 0, y: 0, scale: 0.95 }, { x: -233, y: -40, scale: 1, duration: 0.65, ease: 'power3.inOut' }, 9.3);
+          tl.fromTo('#sy-phone', { rotationY: -8 }, { rotationY: -16, duration: 0.65, ease: 'power3.inOut' }, 9.3);
+
+          window.__timelines['ks-sync'] = tl;
+        });
+      </script>
+    </template>
+  </body>
+</html>

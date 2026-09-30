@@ -4,6 +4,7 @@
 .cut video { width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #000; display: block; }
 .cut h3 { margin: 0 0 10px; font-size: 26px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 12px; }
 .cut h3 span { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; font-size: 18px; color: #fff; background: var(--grad); }
+.cut h3 .new { padding: 3px 10px; border-radius: 999px; font: 600 12.5px/1.4 var(--font); font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; color: #cfe0ff; background: rgba(79, 120, 255, 0.18); border: 1px solid rgba(143, 178, 255, 0.35); }
 .cut p { margin: 0 0 12px; color: var(--text-2); }
 .cut .meta { color: var(--muted); font-size: 14.5px; }
 .back { margin-top: 40px; text-align: center; }

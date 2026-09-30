@@ -30,9 +30,13 @@ window.PP = (() => {
   };
   const icon = (name, extra = '') => svg(ICONS[name] || '', extra);
 
-  /** A captured app screen (assets/ui/fragments.js) inside the scoped `.pp-app` container. */
+  /**
+   * A captured app screen (assets/ui/fragments.js) inside the scoped `.pp-app` container. Captured and
+   * rebuilt interfaces are marked data-layout-ignore: their layering (sheets, sticky bars) and their
+   * colors are the real app's, so HyperFrames' layout and contrast audits skip them.
+   */
   function app(screen, cls = '') {
-    return `<div class="pp-app ${cls}" data-screen="${esc(screen)}">${window.PP_UI[screen]}</div>`;
+    return `<div class="pp-app ${cls}" data-screen="${esc(screen)}" data-layout-ignore>${window.PP_UI[screen]}</div>`;
   }
 
   /** Scrolls every captured chat to its end, like the app pins it (scroll positions aren't in the markup). */
@@ -48,7 +52,7 @@ window.PP = (() => {
 
   /** An iPhone around `content` (HTML) — by default one captured screen. */
   function phone({ id, screen, content, cls = '' }) {
-    return `<div class="iphone ${cls}" id="${id}">
+    return `<div class="iphone ${cls}" id="${id}" data-layout-ignore>
       <i class="side action"></i><i class="side vol-up"></i><i class="side vol-down"></i><i class="side power"></i>
       <div class="frame"><div class="bezel"></div>
         <div class="screen" id="${id}-screen">
@@ -61,7 +65,7 @@ window.PP = (() => {
   }
 
   function notif({ id, title, body, time = 'now' }) {
-    return `<div class="notif" id="${id}"><img src="assets/img/icon.svg" alt="">
+    return `<div class="notif" id="${id}" data-layout-ignore><img src="assets/img/icon.svg" alt="">
       <div class="txt"><div class="top"><span>POCKET PILOT</span><span>${esc(time)}</span></div>
       <div class="title">${esc(title)}</div><div class="body">${esc(body)}</div></div></div>`;
   }
@@ -99,7 +103,7 @@ window.PP = (() => {
   function vscode({ id, chat = 'approval', chatWidth = 440, title = 'token-service.ts — acme-api', tabs = ['middleware.ts', '*token-service.ts', 'login.ts'], code = CODE.map(([l]) => l), explorer = EXPLORER }) {
     const lines = code.map((l, i) => `<div class="cl" id="${id}-l${i + 1}"><span class="ln">${i + 1}</span>${l}</div>`).join('');
     const tabHtml = tabs.map((t) => (t.startsWith('*') ? `<span class="on">${t.slice(1)}</span>` : `<span>${t}</span>`)).join('');
-    return `<div class="vsc" id="${id}">
+    return `<div class="vsc" id="${id}" data-layout-ignore>
       <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span class="name">${title} — Visual Studio Code</span></div>
       <div class="main">
         <div class="activity">
@@ -239,9 +243,9 @@ window.PP = (() => {
     </div>`;
   }
 
-  /** A mouse pointer for clicks on the PC. Move it with x/y; `click()` animates a press. */
+  /** A mouse pointer for clicks on the PC. Move it with x/y; `click()` animates a press. It enters and leaves through the frame edge. */
   function pointer({ id }) {
-    return `<div class="pointer" id="${id}"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M5 2.5v17.2l4.3-4.1 2.8 6.4 3-1.3-2.8-6.3 6-.3z" fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round"/></svg><i></i></div>`;
+    return `<div class="pointer" id="${id}" data-layout-allow-overflow><svg width="30" height="30" viewBox="0 0 24 24"><path d="M5 2.5v17.2l4.3-4.1 2.8 6.4 3-1.3-2.8-6.3 6-.3z" fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round"/></svg><i></i></div>`;
   }
 
   function click(tl, el, at) {
@@ -251,5 +255,68 @@ window.PP = (() => {
       .fromTo(ring, { opacity: 0.8, scale: 0.3 }, { opacity: 0, scale: 1.6, duration: 0.45, ease: 'power2.out' }, at + 0.02);
   }
 
-  return { esc, icon, app, settle, phone, notif, lock, vscode, keyboard, pointer, click, timeline, words, focus, center, rng, tap };
+  /**
+   * Kinetic type on one beat grid (the kinetic-beat-slam rule): entrances vary by axis and ease —
+   * slam (scale + blur), snap (from the side), rise (up with a tilt) — and exits are quick cuts.
+   * `flash` is a full-frame white layer, `stage` the element a shake moves.
+   */
+  function kinetic(tl, { flash, stage } = {}) {
+    const k = {
+      slam: (el, t, { from = 1.4, blur = 12, d = 0.24, ease = 'power4.out' } = {}) =>
+        tl.fromTo(el, { opacity: 0, scale: from, filter: `blur(${blur}px)` }, { opacity: 1, scale: 1, filter: 'blur(0px)', duration: d, ease }, t),
+      snap: (el, t, { dx = -160, d = 0.24, ease = 'expo.out' } = {}) =>
+        tl.fromTo(el, { opacity: 0, x: dx }, { opacity: 1, x: 0, duration: d, ease }, t),
+      rise: (el, t, { dy = 90, rot = 4, d = 0.32, ease = 'circ.out' } = {}) =>
+        tl.fromTo(el, { opacity: 0, y: dy, rotation: rot }, { opacity: 1, y: 0, rotation: 0, duration: d, ease }, t),
+      pop: (el, t, { from = 0.5, d = 0.45 } = {}) =>
+        tl.fromTo(el, { opacity: 0, scale: from }, { opacity: 1, scale: 1, duration: d, ease: 'back.out(2)' }, t),
+      off: (el, t, d = 0.1) => tl.fromTo(el, { opacity: 1 }, { opacity: 0, duration: d, ease: 'power2.in' }, t),
+      flash: (t, a = 0.2) => flash && tl.fromTo(flash, { opacity: a }, { opacity: 0, duration: 0.28, ease: 'power2.out' }, t),
+      shake: (t, amp = 10) => {
+        if (!stage) return;
+        const r = rng(Math.round(t * 1000) + 7);
+        const p = [0, 1, 2, 3].map((i) => ({ x: (r() - 0.5) * 2 * amp * (1 - i / 4), y: (r() - 0.5) * 2 * amp * (1 - i / 4) }));
+        let from = { x: 0, y: 0 };
+        [...p, { x: 0, y: 0 }].forEach((to, i) => {
+          tl.fromTo(stage, from, { ...to, duration: i ? 0.05 : 0.04, ease: 'none' }, t + (i ? 0.04 + (i - 1) * 0.05 : 0));
+          from = to;
+        });
+      },
+    };
+    return k;
+  }
+
+  /** The ThemeToggle.tsx window of the "add dark mode" demo session (acme-web). Spread into vscode(). */
+  function themeToggle() {
+    const K = (s) => `<span class="k">${s}</span>`, S = (s) => `<span class="s">${s}</span>`, F = (s) => `<span class="f">${s}</span>`, T = (s) => `<span class="t">${s}</span>`;
+    return {
+      title: 'ThemeToggle.tsx — acme-web',
+      tabs: ['Page.tsx', '*ThemeToggle.tsx'],
+      code: [
+        `${K('import')} { useEffect, useState } ${K('from')} ${S("'react'")};`,
+        '',
+        `${K('type')} ${T('Theme')} = ${S("'light'")} | ${S("'dark'")};`,
+        '',
+        `${K('export function')} ${F('ThemeToggle')}() {`,
+        `  ${K('const')} [theme, setTheme] = ${F('useState')}&lt;${T('Theme')}&gt;(() =&gt;`,
+        `    (localStorage.${F('getItem')}(${S("'theme'")}) ${K('as')} ${T('Theme')})`,
+        `      ?? (${F('matchMedia')}(${S("'(prefers-color-scheme: dark)'")}).matches`,
+        `        ? ${S("'dark'")} : ${S("'light'")}));`,
+        '',
+        `  ${F('useEffect')}(() =&gt; {`,
+        `    document.documentElement.dataset.theme = theme;`,
+        `    localStorage.${F('setItem')}(${S("'theme'")}, theme);`,
+        `  }, [theme]);`,
+        '',
+        `  ${K('return')} &lt;${T('Toggle')} checked={theme === ${S("'dark'")}}`,
+        `    onChange={(on) =&gt; ${F('setTheme')}(on ? ${S("'dark'")} : ${S("'light'")})} /&gt;;`,
+        '}',
+      ],
+      explorer: `<div class="f d">⌄ acme-web</div><div class="f d">&nbsp;&nbsp;⌄ src</div><div class="f d">&nbsp;&nbsp;&nbsp;&nbsp;⌄ settings</div>
+          <div class="f">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Page.tsx <b>M</b></div><div class="f sel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ThemeToggle.tsx <b>U</b></div>
+          <div class="f d">&nbsp;&nbsp;&nbsp;&nbsp;› components</div><div class="f">&nbsp;&nbsp;package.json</div><div class="f">&nbsp;&nbsp;README.md</div>`,
+    };
+  }
+
+  return { esc, icon, app, settle, phone, notif, lock, vscode, themeToggle, keyboard, pointer, click, kinetic, timeline, words, focus, center, rng, tap };
 })();

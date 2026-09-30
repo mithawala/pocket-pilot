@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · works with, set up in a minute</title>
+  </head>
+  <body>
+    <template id="ks-setup-template">
+      <style>
+        @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+        #ks-setup { position: absolute; inset: 0; overflow: hidden; }
+        #ks-setup-works { position: absolute; left: 0; right: 0; top: 250px; text-align: center; }
+        #ks-setup-works .wk { font: 900 120px/1 'Inter', sans-serif; letter-spacing: -0.04em; text-transform: uppercase; color: #fff; opacity: 0; }
+        #ks-setup-works .row { margin-top: 90px; display: flex; justify-content: center; gap: 34px; }
+        #ks-setup-works .chip { font-size: 50px; padding: 28px 44px; gap: 20px; border-radius: 30px; opacity: 0; }
+        #ks-setup-works .chip svg { width: 56px; height: 56px; }
+        #ks-setup-kick { position: absolute; left: 80px; top: 52px; opacity: 0; }
+        #ks-setup .step { position: absolute; left: 80px; top: 96px; }
+        #ks-setup .step .t { display: flex; align-items: center; gap: 24px; font: 900 64px/1 'Inter', sans-serif; letter-spacing: -0.035em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+        #ks-setup .step .t b { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 20px; font: 800 42px/1 'Inter', sans-serif; letter-spacing: 0; background: linear-gradient(145deg, #4f78ff, #6d5dfc); box-shadow: 0 12px 30px rgba(79, 120, 255, 0.35); opacity: 0; }
+        #ks-setup .step .t span, #ks-setup .step .lede { opacity: 0; }
+        #ks-setup .step .lede { margin: 16px 0 0 100px; font-size: 30px; }
+        #ks-setup .card { position: absolute; opacity: 0; }
+        #ks-setup-market { left: 90px; top: 360px; width: 1180px; padding: 44px; border-radius: 22px; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); display: flex; gap: 44px; font-family: 'Inter', sans-serif; }
+        #ks-setup-market .mk { width: 180px; height: 180px; border-radius: 40px; flex: none; background: url('assets/img/icon.svg') center / cover no-repeat; }
+        #ks-setup-market .nm { font: 700 58px/1.1 'Inter', sans-serif; letter-spacing: -1.5px; color: #fff; }
+        #ks-setup-market .pub { margin-top: 12px; font-size: 27px; color: #9da5b4; }
+        #ks-setup-market .pub b { color: #61afef; font-weight: 600; }
+        #ks-setup-market .ds { margin-top: 18px; font-size: 30px; line-height: 1.35; color: #d7dae0; }
+        #ks-setup-market .btns { margin-top: 30px; display: flex; gap: 16px; align-items: center; }
+        #ks-setup-inst { position: relative; height: 62px; min-width: 250px; border-radius: 8px; background: #3a6ee8; color: #fff; font: 600 28px/62px 'Inter', sans-serif; text-align: center; }
+        #ks-setup-inst span { position: absolute; inset: 0; }
+        #ks-setup-inst .s2, #ks-setup-inst .s3 { opacity: 0; }
+        #ks-setup-inst .s3 { background: #2d3139; border-radius: 8px; color: #98c379; }
+        #ks-setup-market .also { margin-left: 18px; font-size: 25px; color: #9da5b4; }
+        #ks-setup-panel { left: 170px; top: 290px; width: 460px; height: 760px; border-radius: 18px; overflow: hidden; background: #21252b; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5); }
+        #ks-setup-panel .ph { height: 44px; display: flex; align-items: center; padding: 0 18px; font: 600 16px/1 'Inter', sans-serif; letter-spacing: 1px; color: #9da5b4; border-bottom: 1px solid #181a1f; }
+        #ks-setup-panel img { display: block; width: 460px; }
+        #ks-setup-note { position: absolute; left: 700px; top: 540px; width: 560px; font: 500 30px/1.4 'Inter', sans-serif; color: var(--dim); opacity: 0; }
+        #ks-setup-note b { color: #fff; }
+        #ks-setup-pcCam { position: absolute; left: 70px; top: 232px; width: 1240px; height: 760px; opacity: 0; }
+        #ks-setup-pcCam .vsc { inset: 0; }
+        #ks-setup .vsc .chatpane .banner { display: none; }
+        #ks-setup-modal { left: 190px; top: 390px; width: 1000px; padding: 40px 44px 36px; border-radius: 14px; background: #252526; border: 1px solid #454545; box-shadow: 0 40px 120px rgba(0, 0, 0, 0.65); font-family: 'Inter', sans-serif; color: #ccc; display: flex; gap: 30px; }
+        #ks-setup-modal .ic { flex: none; width: 64px; height: 64px; color: #e5c07b; }
+        #ks-setup-modal .ic svg { width: 64px; height: 64px; }
+        #ks-setup-modal .msg { font: 700 36px/1.3 'Inter', sans-serif; color: #fff; letter-spacing: -0.5px; }
+        #ks-setup-modal .where { margin-top: 16px; font-size: 26px; color: #9da5b4; }
+        #ks-setup-modal .det { margin-top: 14px; font-size: 26px; line-height: 1.45; color: #c5c8ce; }
+        #ks-setup-modal .btns { margin-top: 30px; display: flex; justify-content: flex-end; gap: 14px; }
+        #ks-setup-modal .btns span { padding: 14px 30px; border-radius: 6px; font: 600 26px/1 'Inter', sans-serif; background: #3a3d41; color: #fff; }
+        #ks-setup-modal .btns span.primary { background: #0e639c; }
+        #ks-setup-phoneWrap { position: absolute; left: 1410px; top: 140px; width: 426px; height: 880px; perspective: 1800px; opacity: 0; }
+        #su-phone { left: 0; top: 0; }
+        #ks-setup .scr { position: absolute; inset: 0; opacity: 0; }
+        #su-p-welcome { opacity: 1; }
+        #ks-setup .scr .pp-app { position: absolute; inset: 0; }
+        #ks-setup .ov { position: absolute; inset: 0; z-index: 15; opacity: 0; }
+        #su-scan { background: #000; overflow: hidden; }
+        #su-scan .feed { position: absolute; left: 50%; top: 50%; width: 635px; height: 1100px; margin: -560px 0 0 -317px; background: url('assets/img/vscode-sidebar.webp') top center / 635px auto no-repeat; filter: brightness(0.82) contrast(1.05); }
+        #su-scan .finder { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -170px 0 0 -150px; border-radius: 24px; box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.55); }
+        #su-scan .finder span { position: absolute; inset: 0; border: 3px solid rgba(255, 255, 255, 0.92); border-radius: 24px; }
+        #su-scan .finder span.ok { border-color: #5fd38d; box-shadow: 0 0 0 6px rgba(95, 211, 141, 0.25); opacity: 0; }
+        #su-scan .hint { position: absolute; left: 16px; right: 16px; bottom: 66px; text-align: center; font: 600 16px/1.35 'Inter', sans-serif; color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+        #su-scan .hint.h2 { opacity: 0; }
+        #su-scan .x { position: absolute; top: 57px; right: 12px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(0, 0, 0, 0.45); }
+        #su-scan .x svg { width: 20px; height: 20px; }
+        #su-sheet { top: auto; height: 400px; bottom: 0; background: transparent; }
+        #su-sheet .sh { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 380px; border-radius: 38px; background: #1c1c1e; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; align-items: center; padding: 34px 26px 0; text-align: center; font-family: 'Inter', sans-serif; color: #fff; }
+        #su-sheet .pk { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; background: #2c2c2e; color: #fff; }
+        #su-sheet .pk svg { width: 36px; height: 36px; }
+        #su-sheet .st { margin-top: 18px; font: 700 19px/1.3 'Inter', sans-serif; }
+        #su-sheet .ss { margin-top: 10px; font-size: 14px; line-height: 1.4; color: #a1a1a6; }
+        #su-sheet .acct { margin-top: 18px; width: 100%; padding: 12px 14px; border-radius: 12px; background: #2c2c2e; font-size: 15px; text-align: left; }
+        #su-sheet .acct small { display: block; color: #a1a1a6; font-size: 13px; margin-top: 2px; }
+        #su-go { margin-top: 18px; width: 100%; height: 50px; border-radius: 14px; background: #0a84ff; font: 600 17px/50px 'Inter', sans-serif; }
+        #su-fid { top: 50%; left: 50%; width: 170px; height: 170px; margin: -85px 0 0 -85px; border-radius: 34px; background: rgba(44, 44, 46, 0.94); display: grid; place-items: center; }
+        #su-fid .g, #su-fid .ok { position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; }
+        #su-fid .g { color: #fff; }
+        #su-fid .ok { color: #5fd38d; opacity: 0; }
+        #su-fid svg { width: 92px; height: 92px; }
+        #su-fid .lbl { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 600 14px/1 'Inter', sans-serif; color: #e6e6ea; }
+        #su-ptr { opacity: 0; }
+      </style>
+      <div id="ks-setup" data-composition-id="ks-setup" data-width="1920" data-height="1080" data-duration="14">
+        <div id="ks-setup-works">
+          <div class="wk">Works with</div>
+          <div class="row">
+            <span class="chip" data-icon="code">VS Code</span>
+            <span class="chip" data-icon="github">GitHub Copilot app</span>
+            <span class="chip" data-icon="terminal">Copilot CLI</span>
+          </div>
+        </div>
+        <div id="ks-setup-pcCam"></div>
+        <div class="card" id="ks-setup-market">
+          <div class="mk"></div>
+          <div>
+            <div class="nm">Pocket Pilot</div>
+            <div class="pub"><b>Asif Mithawala</b> &nbsp;·&nbsp; mithawala.pocket-pilot &nbsp;·&nbsp; Free</div>
+            <div class="ds">Chat with your Copilot and Claude agent sessions, approve their tool calls and get notified — from your phone.</div>
+            <div class="btns"><div id="ks-setup-inst"><span class="s1">Install</span><span class="s2">Installing…</span><span class="s3">✓ Installed</span></div><span class="also">Also a plugin for the GitHub Copilot app &amp; CLI</span></div>
+          </div>
+        </div>
+        <div class="card" id="ks-setup-panel"><div class="ph">POCKET PILOT</div><img src="assets/img/vscode-sidebar.webp" alt="" /></div>
+        <div id="ks-setup-note">On your phone, open <b>mithawala.github.io/pocket-pilot/app</b> — add it to your Home Screen — and tap <b>Scan the QR code</b>.</div>
+        <div class="card" id="ks-setup-modal">
+          <div class="ic" data-icon="shield"></div>
+          <div>
+            <div class="msg">Allow “iPhone” to control your agent sessions?</div>
+            <div class="where">iPhone · Safari · from 192.0.2.44</div>
+            <div class="det">The device will be able to read your sessions, chat with the agents and approve their tool calls. Only allow this if you just scanned the QR code yourself.</div>
+            <div class="btns"><span class="primary" id="ks-setup-allow">Allow</span><span>Cancel</span></div>
+          </div>
+        </div>
+        <div id="ks-setup-phoneWrap"></div>
+        <div class="kicker" id="ks-setup-kick">Set up in a minute</div>
+        <div class="step" id="ks-setup-st1"><div class="t"><b>1</b><span>Install it on your PC</span></div><div class="lede">The VS Code extension — or the plugin for the GitHub Copilot app &amp; CLI.</div></div>
+        <div class="step" id="ks-setup-st2"><div class="t"><b>2</b><span>Scan the QR code</span></div><div class="lede">It pairs your phone with this PC — nothing else.</div></div>
+        <div class="step" id="ks-setup-st3"><div class="t"><b>3</b><span>Allow it, then Face ID</span></div><div class="lede">Only the devices you approve can ever connect.</div></div>
+      </div>
+      <script>
+        document.fonts.ready.then(() => {
+          const R = document.getElementById('ks-setup');
+          const $ = (s, r = R) => r.querySelector(s);
+          const $$ = (s, r = R) => [...r.querySelectorAll(s)];
+          const B = 0.5;
+
+          // ---------------------------------------------------------------- the scene (C's onboarding)
+          for (const el of $$('[data-icon]')) el.insertAdjacentHTML('afterbegin', PP.icon(el.dataset.icon));
+          $('#ks-setup-pcCam').innerHTML = PP.vscode({ id: 'su-vsc', chat: 'steer', chatWidth: 480, ...PP.themeToggle() });
+          $('#ks-setup-phoneWrap').innerHTML = PP.phone({
+            id: 'su-phone',
+            content: ['welcome', 'home'].map((s) => `<div class="scr" id="su-p-${s}">${PP.app(s)}</div>`).join('')
+              + `<div class="ov" id="su-scan"><div class="feed"></div><div class="finder"><span></span><span class="ok"></span></div><div class="x">${PP.icon('plus', 'style="transform: rotate(45deg)"')}</div><div class="hint h1">Point your camera at the QR code on your PC</div><div class="hint h2">Pairing with Studio PC…</div></div>`
+              + `<div class="ov" id="su-sheet"><div class="sh"><div class="pk">${PP.icon('key')}</div><div class="st">Save a passkey for “Pocket Pilot”?</div><div class="ss">It stays in your iCloud Keychain, protected by Face ID.</div><div class="acct">Pocket Pilot · Studio PC<small>mithawala.github.io</small></div><div id="su-go">Continue</div></div></div>`
+              + `<div class="ov" id="su-fid"><div class="g">${PP.icon('face')}</div><div class="ok">${PP.icon('check')}</div><div class="lbl">Face ID</div></div>`,
+          });
+          R.insertAdjacentHTML('beforeend', PP.pointer({ id: 'su-ptr' }));
+          for (const a of $$('.vsc .pp-app')) a.style.setProperty('--app-h', `${a.parentElement.clientHeight}px`);
+          PP.settle(R);
+          for (const s of $$('#su-p-welcome .scroll, #su-p-home .scroll')) s.scrollTop = 0; // pages, not chats
+
+          const screenEl = $('#su-phone-screen');
+          const inScreen = (el) => {
+            const s = screenEl.getBoundingClientRect();
+            const r = el.getBoundingClientRect();
+            return { cx: r.left - s.left + r.width / 2, cy: r.top - s.top + r.height / 2 };
+          };
+          const inFrame = (el) => {
+            const f = R.getBoundingClientRect();
+            const r = el.getBoundingClientRect();
+            return { x: r.left - f.left + r.width * 0.55, y: r.top - f.top + r.height * 0.55 };
+          };
+          const scanBtn = inScreen($$('#su-p-welcome .btn.primary').find((b) => b.textContent.includes('Scan')));
+          const goPos = inScreen($('#su-go'));
+          const inst = inFrame($('#ks-setup-inst'));
+          const allow = inFrame($('#ks-setup-allow'));
+
+          // ---------------------------------------------------------------- the timeline
+          const tl = PP.timeline();
+          const k = PP.kinetic(tl);
+          const cut = (from, to, t, d = 0.3) => {
+            tl.fromTo(from, { opacity: 1 }, { opacity: 0, duration: d, ease: 'power1.inOut' }, t);
+            tl.fromTo(to, { opacity: 0 }, { opacity: 1, duration: d, ease: 'power1.inOut' }, t);
+          };
+          // A click presses the cursor and the button together (cursor-click-ripple).
+          const press = (el, t) => tl.fromTo(el, { scale: 1 }, { scale: 0.95, duration: 0.08, ease: 'power1.in', yoyo: true, repeat: 1 }, t);
+          const step = (n, t) => {
+            k.pop(`#ks-setup-st${n} .t b`, t, { from: 0.4, d: 0.4 });
+            k.snap(`#ks-setup-st${n} .t span`, t + 0.05, { dx: -120 });
+            k.rise(`#ks-setup-st${n} .lede`, t + B, { dy: 20, rot: 0, d: 0.35 });
+          };
+
+          // 0 – 2 · WORKS WITH, one chip per beat
+          k.slam('#ks-setup-works .wk', 0, { from: 1.3 });
+          const chips = $$('#ks-setup-works .chip');
+          k.pop(chips[0], B, { from: 0.6, d: 0.35 });
+          k.rise(chips[1], 2 * B, { dy: 60, rot: 0, d: 0.28 });
+          k.snap(chips[2], 3 * B, { dx: 140 });
+          k.off('#ks-setup-works', 4 * B - 0.1, 0.1);
+
+          // 2 – 5.4 · 1 · install
+          tl.fromTo('#ks-setup-kick', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4 }, 4 * B);
+          step(1, 4 * B);
+          tl.fromTo('#ks-setup-phoneWrap', { opacity: 0, y: 900, rotation: 6, scale: 0.95 }, { opacity: 1, y: 0, rotation: 0, scale: 0.95, duration: 0.6, ease: 'power4.out' }, 4 * B);
+          tl.fromTo('#su-phone', { rotationY: -24 }, { rotationY: -8, duration: 1.0, ease: 'power2.out' }, 4 * B);
+          tl.fromTo('#ks-setup-market', { opacity: 0, x: -110 }, { opacity: 1, x: 0, duration: 0.5, ease: 'expo.out' }, 2.1);
+          tl.fromTo('#su-ptr', { opacity: 0 }, { opacity: 1, duration: 0.01 }, 2.85);
+          tl.fromTo('#su-ptr', { x: inst.x + 420, y: 1150 }, { x: inst.x, y: inst.y, duration: 0.8, ease: 'power2.out' }, 2.9);
+          PP.click(tl, $('#su-ptr'), 3.75);
+          press('#ks-setup-inst', 3.75);
+          cut('#ks-setup-inst .s1', '#ks-setup-inst .s2', 3.85, 0.15);
+          cut('#ks-setup-inst .s2', '#ks-setup-inst .s3', 4.5, 0.2);
+          tl.fromTo('#su-ptr', { x: inst.x, y: inst.y }, { x: inst.x + 320, y: 1150, duration: 0.55, ease: 'power2.in' }, 4.55);
+          k.off('#ks-setup-st1', 5.1, 0.12);
+          tl.fromTo('#ks-setup-market', { opacity: 1, x: 0 }, { opacity: 0, x: -110, duration: 0.35, ease: 'power2.in' }, 5.05);
+
+          // 5.5 – 8.9 · 2 · scan the QR code
+          step(2, 11 * B);
+          tl.fromTo('#ks-setup-panel', { opacity: 0, x: -110 }, { opacity: 1, x: 0, duration: 0.5, ease: 'expo.out' }, 11 * B);
+          tl.fromTo('#ks-setup-note', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.45 }, 5.9);
+          PP.tap(tl, screenEl, scanBtn.cx, scanBtn.cy, 6.4);
+          tl.fromTo('#su-scan', { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.3 }, 6.6);
+          tl.fromTo('#su-scan .feed', { x: 70, y: 150, rotation: -9, scale: 0.46 }, { x: 0, y: -95, rotation: -3, scale: 0.58, duration: 1.4, ease: 'power2.out' }, 6.6);
+          tl.fromTo('#su-scan .feed', { x: 0, y: -95 }, { x: 4, y: -89, duration: 0.5, repeat: 2, yoyo: true, ease: 'sine.inOut' }, 8.0);
+          tl.fromTo('#su-scan .finder .ok', { opacity: 0 }, { opacity: 1, duration: 0.15 }, 7.95);
+          tl.fromTo('#su-scan .finder', { scale: 1 }, { scale: 0.94, duration: 0.15, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 7.95);
+          cut('#su-scan .h1', '#su-scan .h2', 8.0, 0.2);
+          k.off('#ks-setup-st2', 8.9, 0.12);
+          tl.fromTo(['#ks-setup-panel', '#ks-setup-note'], { opacity: 1, x: 0 }, { opacity: 0, x: -110, duration: 0.35, ease: 'power2.in' }, 8.85);
+
+          // 9 – 14 · 3 · allow it on the PC, then Face ID
+          step(3, 18 * B);
+          tl.fromTo('#ks-setup-pcCam', { opacity: 0 }, { opacity: 0.3, duration: 0.4 }, 8.9);
+          k.pop('#ks-setup-modal', 9.1, { from: 0.94, d: 0.4 });
+          tl.fromTo('#su-ptr', { x: allow.x + 420, y: 1150 }, { x: allow.x, y: allow.y, duration: 0.8, ease: 'power2.out' }, 9.6);
+          PP.click(tl, $('#su-ptr'), 10.55);
+          press('#ks-setup-allow', 10.55);
+          tl.fromTo('#su-ptr', { x: allow.x, y: allow.y }, { x: allow.x + 320, y: 1150, duration: 0.5, ease: 'power2.in' }, 10.75);
+          tl.fromTo('#ks-setup-modal', { opacity: 1 }, { opacity: 0, duration: 0.3 }, 10.8);
+          tl.fromTo('#ks-setup-pcCam', { opacity: 0.3 }, { opacity: 0, duration: 0.3 }, 10.8);
+          tl.fromTo('#su-scan', { opacity: 1 }, { opacity: 0, duration: 0.25 }, 10.7);
+          tl.fromTo('#su-sheet', { opacity: 1, y: 420 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 10.75);
+          PP.tap(tl, screenEl, goPos.cx, goPos.cy, 11.55);
+          tl.fromTo('#su-sheet', { y: 0 }, { y: 420, duration: 0.35, ease: 'power3.in' }, 11.7);
+          tl.fromTo('#su-fid', { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.25 }, 11.75);
+          tl.fromTo('#su-fid .g', { scale: 1 }, { scale: 0.92, duration: 0.25, repeat: 1, yoyo: true, ease: 'sine.inOut' }, 11.95);
+          cut('#su-fid .g', '#su-fid .ok', 12.45, 0.2);
+          tl.fromTo('#su-fid', { opacity: 1, scale: 1 }, { opacity: 0, scale: 0.9, duration: 0.25 }, 13.0);
+          cut('#su-p-welcome', '#su-p-home', 12.95, 0.3);
+          k.off(['#ks-setup-st3', '#ks-setup-kick'], 13.3, 0.12);
+          tl.fromTo('#ks-setup-phoneWrap', { y: 0, rotation: 0 }, { y: 1100, rotation: -6, duration: 0.45, ease: 'power3.in' }, 13.5);
+
+          window.__timelines['ks-setup'] = tl;
+        });
+      </script>
+    </template>
+  </body>
+</html>

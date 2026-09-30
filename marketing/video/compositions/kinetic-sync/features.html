@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · features</title>
+  </head>
+  <body>
+    <template id="ks-features-template">
+      <style>
+        @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+        #ks-features { position: absolute; inset: 0; overflow: hidden; }
+        /* Where sync.html leaves the phone: the right side of the first feature. */
+        #ks-features-phoneWrap { position: absolute; left: 1177px; top: 100px; width: 426px; height: 880px; perspective: 1800px; }
+        #ft-phone { left: 0; top: 0; }
+        #ks-features .scr { position: absolute; inset: 0; opacity: 0; }
+        #ft-p-approval { opacity: 1; }
+        #ft-nq, #ft-nd { opacity: 0; }
+        #ks-features .scr .pp-app { position: absolute; inset: 0; }
+        #ks-features .feat { position: absolute; top: 0; bottom: 0; width: 900px; display: flex; flex-direction: column; justify-content: center; opacity: 0; }
+        #ks-features .feat.l { left: 150px; }
+        #ks-features .feat.r { left: 900px; align-items: flex-start; }
+        #ks-features .feat .n { font: 700 30px/1 'Inter', sans-serif; letter-spacing: 6px; color: #7f9cff; margin-bottom: 26px; }
+        #ks-features .feat .fw { font: 900 150px/0.88 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+        #ks-features .feat .s { margin-top: 30px; font: 600 42px/1.25 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; max-width: 760px; opacity: 0; }
+        #ks-features-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+      </style>
+      <div id="ks-features" data-composition-id="ks-features" data-width="1920" data-height="1080" data-duration="16">
+        <div id="ks-features-phoneWrap"></div>
+        <div id="ks-features-labels"></div>
+        <div id="ks-features-flash"></div>
+      </div>
+      <script>
+        document.fonts.ready.then(() => {
+          const R = document.getElementById('ks-features');
+          const $ = (s, r = R) => r.querySelector(s);
+          const $$ = (s, r = R) => [...r.querySelectorAll(s)];
+          const B = 0.5;
+
+          // Steering and live replies were the typing demo; the rest of B's list, one per bar.
+          const FEATS = [
+            { w: 'Approve', s: 'Allow once, for the session — or skip.', screen: 'approval', tap: () => $$('#ft-p-approval .confirm button').find((b) => b.textContent.includes('Allow Once')) },
+            { w: 'Answer', s: 'Tap an option, or type your own.', screen: 'question', tap: () => $('#ft-p-question .opt') },
+            { w: 'Switch<br>models', s: 'Any model — with its thinking level.', screen: 'models', tap: () => $$('#ft-p-models .list-item').find((b) => b.textContent.includes('GPT-5.6')) },
+            { w: 'Start<br>new work', s: 'New sessions, in any folder on your PC.', screen: 'newSession', tap: () => $$('#ft-p-newSession .sheet .list-item').find((b) => b.textContent.includes('acme-api')) },
+            { w: 'See<br>screenshots', s: 'Pinch to zoom, like your photos.', screen: 'viewer' },
+            { w: 'Every<br>session', s: 'Copilot and Claude — what needs you first.', screen: 'home' },
+            { w: 'Full<br>history', s: 'Every message, tool call and diff.', screen: 'history' },
+            { w: 'Get<br>notified', s: 'When it needs you. When it’s done.', screen: 'lock' },
+          ];
+          const screenHtml = (s) => s === 'lock'
+            ? PP.lock({ id: 'ft-lock', children: PP.notif({ id: 'ft-nq', title: '🔔 Pick a date library for the booking form', body: 'The agent has a question: which library should I add?' }) + PP.notif({ id: 'ft-nd', title: '✅ Fix flaky checkout e2e test', body: 'It now passes 50/50 runs locally.', time: '2m ago' }) })
+            : PP.app(s);
+          $('#ks-features-phoneWrap').innerHTML = PP.phone({ id: 'ft-phone', content: FEATS.map((f) => `<div class="scr" id="ft-p-${f.screen}">${screenHtml(f.screen)}</div>`).join('') });
+          $('#ft-nq').style.top = '262px';
+          $('#ft-nd').style.top = '376px';
+          $('#ks-features-labels').innerHTML = FEATS.map((f, i) => `<div class="feat ${i % 2 ? 'r' : 'l'}" id="ft-f${i}"><div class="n">${String(i + 1).padStart(2, '0')} / ${String(FEATS.length).padStart(2, '0')}</div><div class="fw">${f.w}</div><div class="s">${f.s}</div></div>`).join('');
+          PP.settle(R);
+          for (const s of $$('#ft-p-home .scroll, #ft-p-history .scroll')) s.scrollTop = 0;
+          // Long words shrink to fit their half of the frame.
+          for (const w of $$('.feat .fw')) {
+            const size = parseFloat(getComputedStyle(w).fontSize);
+            const widest = Math.max(...w.innerHTML.split('<br>').map((line) => {
+              const m = document.createElement('span');
+              m.innerHTML = line;
+              m.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:inherit;letter-spacing:inherit;text-transform:inherit';
+              w.appendChild(m);
+              const x = m.offsetWidth;
+              m.remove();
+              return x;
+            }));
+            if (widest > 820) w.style.fontSize = `${Math.floor((size * 820) / widest)}px`;
+          }
+          const screenEl = $('#ft-phone-screen');
+          const inScreen = (el) => {
+            const s = screenEl.getBoundingClientRect();
+            const r = el.getBoundingClientRect();
+            return [r.left - s.left + r.width / 2, r.top - s.top + r.height / 2];
+          };
+          const taps = FEATS.map((f) => { const el = f.tap && f.tap(); return el ? inScreen(el) : null; });
+          const history = $('#ft-p-history .scroll');
+          const historyMax = history ? history.scrollHeight - history.clientHeight : 0;
+          const viewerImg = $('#ft-p-viewer .viewer-stage img');
+
+          // ---------------------------------------------------------------- the timeline
+          const tl = PP.timeline();
+          const k = PP.kinetic(tl, { flash: '#ks-features-flash' });
+          const pose = (i) => (i % 2 === 0 ? { x: 0, rotationY: -16, rotationZ: i ? -2 : 0 } : { x: -860, rotationY: 16, rotationZ: 2 });
+          tl.fromTo('#ft-phone', { rotationY: -16, rotationZ: 0 }, { rotationY: -16, rotationZ: 0, duration: 0.01 }, 0);
+          FEATS.forEach((f, i) => {
+            const t = i * 4 * B;
+            const right = i % 2 === 0; // the phone's side
+            const label = `#ft-f${i}`;
+            if (i > 0) {
+              const [a, b] = [pose(i - 1), pose(i)];
+              tl.fromTo('#ks-features-phoneWrap', { x: a.x }, { x: b.x, duration: 0.42, ease: 'power3.inOut' }, t - 0.21);
+              tl.fromTo('#ft-phone', { rotationY: a.rotationY, rotationZ: a.rotationZ }, { rotationY: b.rotationY, rotationZ: b.rotationZ, duration: 0.42, ease: 'power3.inOut' }, t - 0.21);
+              tl.fromTo(`#ft-p-${FEATS[i - 1].screen}`, { opacity: 1 }, { opacity: 0, duration: 0.06, ease: 'none' }, t - 0.03);
+              tl.fromTo(`#ft-p-${f.screen}`, { opacity: 0 }, { opacity: 1, duration: 0.06, ease: 'none' }, t - 0.03);
+            }
+            if (i % 2) k.slam(label, t, { from: 1.12, blur: 8 });
+            else k.snap(label, t, { dx: right ? -120 : 120 });
+            k.rise(`${label} .s`, t + B, { dy: 24, rot: 0, d: 0.3 });
+            k.off(label, t + 4 * B - 0.16, 0.14);
+            if (taps[i]) PP.tap(tl, screenEl, taps[i][0], taps[i][1], t + 2 * B);
+            if (!right) k.flash(t, 0.08);
+          });
+          const at = (i) => i * 4 * B;
+          if (viewerImg) tl.fromTo(viewerImg, { scale: 1 }, { scale: 1.7, duration: 0.8, ease: 'power2.inOut' }, at(4) + 0.6).fromTo(viewerImg, { scale: 1.7 }, { scale: 1, duration: 0.5, ease: 'power2.inOut' }, at(4) + 1.45);
+          if (history && historyMax > 0) tl.fromTo(history, { scrollTop: 0 }, { scrollTop: historyMax, duration: 1.6, ease: 'power2.inOut' }, at(6) + 0.1);
+          tl.fromTo('#ft-nq', { opacity: 0, y: -120, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.5)' }, at(7) + 0.2);
+          tl.fromTo('#ft-nd', { opacity: 0, y: -120, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.5)' }, at(7) + 2 * B);
+          tl.fromTo('#ks-features-phoneWrap', { y: 0, rotation: 0 }, { y: 1100, rotation: -6, duration: 0.42, ease: 'power3.in' }, 16 - 0.44);
+
+          window.__timelines['ks-features'] = tl;
+        });
+      </script>
+    </template>
+  </body>
+</html>

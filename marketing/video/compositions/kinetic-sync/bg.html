@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · background</title>
+  </head>
+  <body>
+    <template id="ks-bg-template">
+      <style>
+        #ks-bg { position: absolute; inset: 0; overflow: hidden; background: #06070b; }
+      </style>
+      <div id="ks-bg" data-composition-id="ks-bg" data-width="1920" data-height="1080" data-duration="60">
+        <div class="glow" id="ks-bg-g1" data-layout-allow-overflow style="width: 1100px; height: 1100px; left: 900px; top: -500px; background: rgba(79, 120, 255, 0.34)"></div>
+        <div class="glow" id="ks-bg-g2" data-layout-allow-overflow style="width: 1000px; height: 1000px; left: -400px; top: 500px; background: rgba(150, 90, 252, 0.3)"></div>
+        <div class="bg-grid" id="ks-bg-grid" data-layout-allow-overflow></div>
+      </div>
+      <script>
+        (() => {
+          // One continuous world under every scene: the glows drift and the grid slides, never cut.
+          const tl = PP.timeline();
+          tl.fromTo('#ks-bg-g1', { x: 0, y: 0, scale: 1 }, { x: -380, y: 160, scale: 1.2, duration: 30, ease: 'sine.inOut' }, 0)
+            .fromTo('#ks-bg-g1', { x: -380, y: 160, scale: 1.2 }, { x: -60, y: 40, scale: 1.05, duration: 30, ease: 'sine.inOut' }, 30);
+          tl.fromTo('#ks-bg-g2', { x: 0, y: 0 }, { x: 420, y: -180, duration: 30, ease: 'sine.inOut' }, 0)
+            .fromTo('#ks-bg-g2', { x: 420, y: -180 }, { x: 120, y: -40, duration: 30, ease: 'sine.inOut' }, 30);
+          tl.fromTo('#ks-bg-grid', { y: 0 }, { y: 192, duration: 60, ease: 'none' }, 0);
+          window.__timelines['ks-bg'] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

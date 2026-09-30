@@ -61,7 +61,7 @@ export function walkAway(c, I) {
   for (const k of range(23)) I.hat(c, 29.7 + k * 0.2, { vol: 0.03 });
   I.whoosh(c, 29.35, 0.9, { vol: 0.08 });
   I.click(c, 30.2, { vol: 0.12, p: 0 });
-  for (const t of [30.6, 30.95, 31.3]) I.pop(c, t, { vol: 0.08 });
+  for (const t of [30.6, 30.95]) I.pop(c, t, { vol: 0.08 });
   I.riser(c, 33.2, 1.3, { vol: 0.13, n: 62 });
   // 34.4 – 40 · the end card
   I.impact(c, 34.5, { vol: 0.75 });
@@ -127,8 +127,8 @@ export function kinetic(c, I) {
   for (const t of [30.5, 31.0, 31.5]) { I.tom(c, t, { vol: 0.35, n: 45 + (t - 30.5) * 6 }); I.clap(c, t, { vol: 0.12 }); }
   for (const s of range(16)) I.hat(c, 30 + s * 0.125, { vol: s % 2 ? 0.02 : 0.032 });
   I.riser(c, 31.2, 0.8, { vol: 0.1, n: 57 });
-  // 32 – 36 · end-to-end encrypted. passkey protected. no accounts. no cloud copy. FREE.
-  const slams = [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60], [55, 59, 62], [55, 59, 62]];
+  // 32 – 36 · end-to-end encrypted. passkey protected. no accounts. FREE.
+  const slams = [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60], [55, 59, 62]];
   slams.forEach((ch, i) => hit(32 + i * B, ch));
   for (const e of range(12)) I.bass(c, 32 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
   I.riser(c, 34.0, 1.0, { vol: 0.14, n: 60 });
@@ -206,8 +206,128 @@ export function inSync(c, I) {
   for (const [k, n] of [77, 81, 84, 89].entries()) I.bell(c, 36.25 + k * 0.17, n, { vol: 0.045, dur: 2.4, ratio: 2, index: 0.8 });
 }
 
+export function kineticSync(c, I) {
+  const B = 0.5;
+  const hit = (t, notes, big = false) => {
+    I.kick(c, t, { vol: big ? 0.85 : 0.7 });
+    I.stab(c, t, notes, { vol: big ? 0.15 : 0.11 });
+    I.clap(c, t, { vol: big ? 0.2 : 0.14, rev: 0.25 });
+    if (big) I.impact(c, t, { vol: 0.45 });
+  };
+  // A lighter half-time bar with an electric piano, under the demos (typing, set-up).
+  const light = (t, ch, root, { last = false } = {}) => {
+    for (const n of ch) I.ep(c, t, n, { vol: 0.07, dur: 2.0, p: (n - 60) / 20 });
+    I.pad(c, t, 2, ch, { vol: 0.032, attack: 0.2, release: 0.5, cutoff: 1300 });
+    I.bass(c, t, 0.9, root, { vol: 0.18, cutoff: 240 });
+    if (!last) I.bass(c, t + 1.25, 0.6, root + 7, { vol: 0.13, cutoff: 240 });
+    I.kick(c, t, { vol: 0.58, decay: 7 });
+    if (!last) I.kick(c, t + 1.25, { vol: 0.4, decay: 8 });
+    I.clap(c, t + 1.0, { vol: 0.15, tone: 2000 });
+    for (const e of range(8)) I.shaker(c, t + e * 0.25, { vol: e % 2 ? 0.026 : 0.04 });
+  };
+  const soft = [[57, 60, 64, 67], [53, 57, 60, 64], [48, 55, 60, 64], [55, 59, 62, 67]];
+  const softRoots = [33, 29, 36, 31];
+
+  // 0 – 10 · hook and name: B's opening
+  hit(0, [57, 60, 64]); hit(0.5, [57, 60, 64]); hit(1.0, [55, 59, 62]); hit(1.5, [53, 57, 60, 65], true);
+  I.riser(c, 0.6, 0.9, { vol: 0.07, n: 57 });
+  I.chime(c, 2.05, { vol: 0.15, p: 0 });
+  I.buzz(c, 2.35, { vol: 0.07, p: 0 });
+  I.pad(c, 2.0, 2.0, [33, 45], { vol: 0.06, attack: 0.2, release: 0.3, cutoff: 320 });
+  I.riser(c, 2.5, 1.5, { vol: 0.09, n: 52 });
+  I.pop(c, 3.0, { vol: 0.07 });
+  [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]].forEach((ch, i) => { hit(4 + i * B, ch); I.whoosh(c, 4 + i * B - 0.1, 0.2, { vol: 0.07, f0: 1500, f1: 5000, p0: i % 2 ? 0.6 : -0.6, p1: 0 }); });
+  I.riser(c, 5.0, 1.0, { vol: 0.13, n: 57 });
+  I.impact(c, 6.0, { vol: 0.9 });
+  I.pad(c, 6.0, 4.0, [45, 52, 59, 60, 64], { vol: 0.065, attack: 0.05, release: 0.6, cutoff: 1100, cutoffEnd: 3400 });
+  I.bass(c, 6.0, 3.9, 33, { vol: 0.15, cutoff: 200 });
+  I.pop(c, 6.5, { vol: 0.08 }); I.pop(c, 7.0, { vol: 0.08 });
+  for (const [k, n] of [76, 81, 84, 88].entries()) I.bell(c, 8.0 + k * 0.12, n, { vol: 0.05, dur: 2, ratio: 2, index: 0.9 });
+  const arpA = [69, 72, 76, 79, 83, 79, 76, 72];
+  for (const k of range(16)) I.pluck(c, 6.0 + k * 0.25, arpA[k % 8], { vol: 0.05, p: k % 2 ? 0.4 : -0.4, dur: 0.8 });
+  for (const k of range(8)) I.hat(c, 8.0 + k * 0.25, { vol: 0.04 });
+  I.riser(c, 9.0, 1.0, { vol: 0.13, n: 57 });
+
+  // 10 – 20 · in sync: half time under the typing, the send lands on the bar
+  for (const bar of range(5)) light(10 + bar * 2, bar === 4 ? soft[0] : soft[bar % 4], bar === 4 ? softRoots[0] : softRoots[bar % 4]);
+  I.whoosh(c, 9.95, 0.6, { vol: 0.1, f0: 300, f1: 1800, p0: -0.8, p1: 0 });
+  I.whoosh(c, 10.6, 0.35, { vol: 0.05, f0: 800, f1: 2500, p0: 0.4, p1: 0.5 });
+  for (const k of range(46)) I.tick(c, 11.0 + k * 0.046, { vol: 0.045, p: 0.45 });
+  I.tap(c, 13.5, { vol: 0.13, p: 0.45 });
+  I.whoosh(c, 13.5, 0.35, { vol: 0.08, f0: 900, f1: 4200, p0: 0.5, p1: 0.2 });
+  I.blip(c, 13.7, { vol: 0.055, dur: 0.35, p0: 0.5, p1: -0.3 });
+  I.ding(c, 14.0, { vol: 0.09, p: -0.3 });
+  I.stab(c, 14.5, [57, 60, 64, 69], { vol: 0.06, rev: 0.4 });
+  for (const t of [15.6, 15.85]) I.pop(c, t, { vol: 0.05, p: -0.4 });
+  I.tick(c, 16.0, { vol: 0.05, p: 0 });
+  I.whoosh(c, 19.2, 0.7, { vol: 0.1, f0: 300, f1: 1600, p0: 0, p1: -0.9 });
+  I.riser(c, 19.0, 1.0, { vol: 0.11, n: 57 });
+
+  // 20 – 36 · features: B's groove, one feature per bar
+  const prog = [[57, 60, 64, 69], [53, 57, 60, 65], [48, 55, 60, 64], [55, 59, 62, 67]];
+  const roots = [33, 29, 36, 31];
+  for (const bar of range(8)) {
+    const t = 20 + bar * 2;
+    const ch = prog[bar % 4];
+    I.pad(c, t, 2, ch, { vol: 0.04, attack: 0.02, release: 0.3, cutoff: 2600 });
+    for (const b of range(4)) I.kick(c, t + b * B, { vol: 0.62 });
+    I.clap(c, t + B, { vol: 0.2 }); I.clap(c, t + 3 * B, { vol: 0.22 });
+    for (const s of range(16)) I.hat(c, t + s * 0.125, { vol: s % 4 === 2 ? 0.05 : s % 2 ? 0.022 : 0.034, open: s === 14 });
+    const pat = [0, 0, 12, 0, 0, 12, 0, 12];
+    for (const e of range(8)) I.bass(c, t + e * 0.25, 0.2, roots[bar % 4] + pat[e], { vol: 0.19 });
+    const arp = [ch[0] + 12, ch[1] + 12, ch[2] + 12, ch[3] + 12, ch[2] + 12, ch[1] + 12, ch[3] + 12, ch[2] + 12];
+    for (const e of range(8)) I.pluck(c, t + e * 0.25, arp[e], { vol: 0.045, p: e % 2 ? 0.4 : -0.4, dur: 0.7 });
+    if (bar > 0) I.whoosh(c, t - 0.25, 0.4, { vol: 0.08, f0: 700, f1: 3800, p0: bar % 2 ? 0.6 : -0.6, p1: bar % 2 ? -0.6 : 0.6 });
+    if (bar < 4) I.tap(c, t + 1.0, { vol: 0.15 });
+  }
+  I.chime(c, 34.2, { vol: 0.1 }); I.buzz(c, 34.2);
+  I.chime(c, 35.0, { vol: 0.09 }); I.buzz(c, 35.0);
+  I.whoosh(c, 35.5, 0.5, { vol: 0.08, f0: 400, f1: 1400, p0: -0.5, p1: -0.5 });
+
+  // 36 – 38 · works with
+  I.kick(c, 36.0, { vol: 0.75 }); I.stab(c, 36.0, [53, 57, 60, 65], { vol: 0.12 });
+  I.pad(c, 36.0, 1.0, [53, 57, 60, 65], { vol: 0.04, attack: 0.02, cutoff: 2000 });
+  I.pad(c, 37.0, 1.0, [55, 59, 62, 67], { vol: 0.045, attack: 0.02, cutoff: 2400 });
+  for (const t of [36.5, 37.0, 37.5]) { I.tom(c, t, { vol: 0.35, n: 45 + (t - 36.5) * 6 }); I.clap(c, t, { vol: 0.12 }); }
+  for (const s of range(16)) I.hat(c, 36 + s * 0.125, { vol: s % 2 ? 0.02 : 0.032 });
+  I.riser(c, 37.2, 0.8, { vol: 0.1, n: 57 });
+
+  // 38 – 50 · set up in a minute: the light groove again, with the clicks, taps and chimes
+  for (const bar of range(6)) light(38 + bar * 2, bar === 5 ? soft[0] : soft[bar % 4], bar === 5 ? softRoots[0] : softRoots[bar % 4], { last: bar === 5 });
+  for (const t of [38.0, 41.5, 45.0]) I.pop(c, t, { vol: 0.07, p: -0.5 });
+  I.whoosh(c, 38.0, 0.5, { vol: 0.07, f0: 400, f1: 1600, p0: 0.6, p1: 0.5 });
+  I.click(c, 39.75);
+  I.ding(c, 40.5, { vol: 0.08, p: -0.3 });
+  I.whoosh(c, 41.05, 0.4, { vol: 0.05, p0: 0, p1: -0.7 });
+  I.tap(c, 42.4, { vol: 0.12, p: 0.45 });
+  I.whoosh(c, 42.55, 0.4, { vol: 0.05, f0: 600, f1: 2200, p0: 0.5, p1: 0.5 });
+  I.bell(c, 43.95, 91, { vol: 0.06, dur: 0.7, ratio: 1, index: 0.3, p: 0.45 });
+  I.bell(c, 44.05, 98, { vol: 0.05, dur: 0.9, ratio: 1, index: 0.3, p: 0.45 });
+  I.whoosh(c, 44.85, 0.45, { vol: 0.05, p0: 0, p1: -0.7 });
+  I.pop(c, 45.1, { vol: 0.05, from: 700, to: 450, p: -0.3 });
+  I.click(c, 46.55);
+  I.whoosh(c, 46.75, 0.45, { vol: 0.06, f0: 500, f1: 1800, p0: 0.5, p1: 0.5 });
+  I.tap(c, 47.55, { vol: 0.12, p: 0.45 });
+  I.ding(c, 48.45, { vol: 0.09, p: 0.4 });
+  I.riser(c, 49.0, 1.0, { vol: 0.12, n: 57 });
+  I.whoosh(c, 49.45, 0.5, { vol: 0.07, f0: 400, f1: 1400, p0: 0.5, p1: 0.5 });
+
+  // 50 – 54 · end-to-end encrypted. passkey protected. no accounts. FREE.
+  [[57, 60, 64], [57, 60, 64], [53, 57, 60], [53, 57, 60], [55, 59, 62]].forEach((ch, i) => hit(50 + i * B, ch));
+  for (const e of range(12)) I.bass(c, 50 + e * 0.25, 0.2, 33 + (e % 2 ? 12 : 0), { vol: 0.16 });
+  I.riser(c, 52.0, 1.0, { vol: 0.14, n: 60 });
+  hit(53.0, [48, 55, 60, 64, 67], true);
+
+  // 54 – 60 · the name and the address
+  I.pad(c, 53.0, 6.4, [36, 48, 55, 60, 62, 64, 67], { vol: 0.075, attack: 0.05, release: 1.2, cutoff: 2600, cutoffEnd: 1200 });
+  I.bass(c, 53.0, 6.0, 36, { vol: 0.14, cutoff: 200 });
+  I.pop(c, 54.0, { vol: 0.08 });
+  for (const [k, n] of [72, 76, 79, 84].entries()) I.bell(c, 54.5 + k * 0.15, n, { vol: 0.05, dur: 2.4, ratio: 2, index: 0.9 });
+}
+
 export const SCORES = {
   'walk-away': { score: walkAway, delay: { time: 0.3, feedback: 0.35 }, reverb: { room: 0.86, damp: 0.35 }, wet: 1.0 },
   kinetic: { score: kinetic, delay: { time: 0.375, feedback: 0.3 }, reverb: { room: 0.8, damp: 0.4 }, wet: 0.8 },
   'in-sync': { score: inSync, delay: { time: 0.46875, feedback: 0.32 }, reverb: { room: 0.84, damp: 0.4 }, wet: 0.9 },
+  'kinetic-sync': { score: kineticSync, duration: 60, delay: { time: 0.375, feedback: 0.3 }, reverb: { room: 0.82, damp: 0.4 }, wet: 0.85 },
 };

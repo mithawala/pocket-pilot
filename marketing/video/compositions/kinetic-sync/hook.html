@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pocket Pilot — D · hook and name</title>
+  </head>
+  <body>
+    <template id="ks-hook-template">
+      <style>
+        @font-face { font-family: 'Inter'; src: url('assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+        #ks-hook { position: absolute; inset: 0; overflow: hidden; }
+        #ks-hook-st { position: absolute; inset: 0; }
+        #ks-hook .big { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font: 900 250px/0.9 'Inter', sans-serif; letter-spacing: -0.045em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+        #ks-hook .big.one { opacity: 0; }
+        #ks-hook .big.two { font-size: 190px; }
+        #ks-hook .big.two > div { opacity: 0; }
+        #ks-hook .sub { position: absolute; left: 0; right: 0; text-align: center; font: 600 44px/1.2 'Inter', sans-serif; letter-spacing: -0.5px; color: #c9d2ea; opacity: 0; }
+        #ks-hook-notif { position: absolute; left: 765px; top: 485px; width: 390px; height: 110px; opacity: 0; }
+        #ks-hook-notif .notif { position: absolute; left: 0; right: 0; top: 0; }
+        #ks-hook-name { position: absolute; inset: 0; }
+        #ks-hook-ring { position: absolute; left: 810px; top: 235px; width: 300px; height: 300px; border-radius: 50%; border: 6px solid rgba(143, 178, 255, 0.8); opacity: 0; }
+        #ks-hook-logo { position: absolute; left: 845px; top: 270px; width: 230px; height: 230px; border-radius: 54px; background: url('assets/img/icon.svg') center / cover no-repeat; box-shadow: 0 40px 120px rgba(79, 120, 255, 0.6); opacity: 0; }
+        #ks-hook-brand { position: absolute; left: 0; right: 0; top: 560px; text-align: center; font: 900 190px/1 'Inter', sans-serif; letter-spacing: -0.05em; color: #fff; }
+        #ks-hook-brand span { display: inline-block; opacity: 0; }
+        #ks-hook-tag { top: 800px; }
+        #ks-hook-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+        #ks-hook-fade { position: absolute; inset: 0; background: #000; pointer-events: none; }
+      </style>
+      <div id="ks-hook" data-composition-id="ks-hook" data-width="1920" data-height="1080" data-duration="10">
+        <div id="ks-hook-st">
+          <div class="big one" id="ks-hook-w1">Your</div>
+          <div class="big one" id="ks-hook-w2">AI agent</div>
+          <div class="big one" id="ks-hook-w3">needs</div>
+          <div class="big one" id="ks-hook-w4"><span class="grad">you.</span></div>
+          <div id="ks-hook-notif"></div>
+          <div class="sub" id="ks-hook-nsub" style="top: 770px">It’s waiting for your OK.</div>
+          <div class="big two" id="ks-hook-w5"><div>Away from</div><div class="l2">your desk?</div></div>
+          <div class="big two" id="ks-hook-w6"><div>Answer from</div><div class="l2"><span class="grad">your phone.</span></div></div>
+          <div id="ks-hook-name">
+            <div id="ks-hook-ring"></div>
+            <div id="ks-hook-logo"></div>
+            <div id="ks-hook-brand"><span>Pocket</span> <span>Pilot</span></div>
+            <div class="sub" id="ks-hook-tag">Your coding agents — in your pocket.</div>
+          </div>
+        </div>
+        <div id="ks-hook-flash"></div>
+        <div id="ks-hook-fade"></div>
+      </div>
+      <script>
+        document.fonts.ready.then(() => {
+          const B = 0.5; // a beat at 120 BPM
+          document.getElementById('ks-hook-notif').innerHTML = PP.notif({ id: 'ks-hook-n', title: '🔔 Refactor auth module & update tests', body: 'Run in terminal? Run the full test suite with coverage' });
+          const brand = [...document.querySelectorAll('#ks-hook-brand span')];
+
+          const tl = PP.timeline();
+          const k = PP.kinetic(tl, { flash: '#ks-hook-flash', stage: '#ks-hook-st' });
+          tl.fromTo('#ks-hook-fade', { opacity: 1 }, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0);
+
+          // 0 – 2 · YOUR / AI AGENT / NEEDS / YOU. — four hits, four different entrances
+          k.slam('#ks-hook-w1', 0);
+          k.off('#ks-hook-w1', B - 0.08, 0.08);
+          k.snap('#ks-hook-w2', B, { dx: -220 });
+          k.off('#ks-hook-w2', 2 * B - 0.08, 0.08);
+          k.rise('#ks-hook-w3', 2 * B);
+          k.off('#ks-hook-w3', 3 * B - 0.08, 0.08);
+          k.slam('#ks-hook-w4', 3 * B, { from: 1.7, blur: 18, d: 0.28 });
+          k.flash(3 * B, 0.3);
+          k.shake(3 * B, 16);
+          k.off('#ks-hook-w4', 4 * B - 0.08, 0.08);
+
+          // 2 – 4 · the phone lights up with it
+          tl.fromTo('#ks-hook-notif', { opacity: 0, scale: 1.4, y: -200 }, { opacity: 1, scale: 2.7, y: 0, duration: 0.35, ease: 'back.out(1.4)' }, 4 * B);
+          k.shake(4 * B + 0.3, 12);
+          tl.fromTo('#ks-hook-notif', { rotation: 0 }, { rotation: 1.2, duration: 0.06, repeat: 7, yoyo: true, ease: 'sine.inOut' }, 4 * B + 0.35);
+          tl.fromTo('#ks-hook-notif', { scale: 2.7 }, { scale: 2.9, duration: 1.4, ease: 'none' }, 4 * B + 0.35);
+          k.rise('#ks-hook-nsub', 6 * B, { dy: 30, rot: 0, d: 0.3 });
+          k.off(['#ks-hook-notif', '#ks-hook-nsub'], 8 * B - 0.1, 0.1);
+
+          // 4 – 6 · away from your desk? answer from your phone.
+          k.snap('#ks-hook-w5 > div:first-child', 8 * B, { dx: -160 });
+          k.snap('#ks-hook-w5 .l2', 9 * B, { dx: 160 });
+          k.off('#ks-hook-w5', 10 * B - 0.08, 0.08);
+          k.rise('#ks-hook-w6 > div:first-child', 10 * B, { dy: -80, rot: -3, d: 0.26 });
+          k.slam('#ks-hook-w6 .l2', 11 * B, { from: 1.25 });
+          k.flash(11 * B, 0.15);
+          k.off('#ks-hook-w6', 12 * B - 0.1, 0.1);
+
+          // 6 – 10 · Pocket Pilot
+          k.flash(12 * B, 0.5);
+          k.shake(12 * B, 18);
+          tl.fromTo('#ks-hook-logo', { opacity: 0, scale: 0.2, rotation: -25 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.6, ease: 'back.out(1.8)' }, 12 * B);
+          tl.fromTo('#ks-hook-ring', { opacity: 0.9, scale: 0.6 }, { opacity: 0, scale: 3.2, duration: 1.1, ease: 'power2.out' }, 12 * B);
+          k.slam(brand[0], 13 * B, { from: 1.5 });
+          k.snap(brand[1], 14 * B, { dx: 240 });
+          k.shake(14 * B, 8);
+          k.rise('#ks-hook-tag', 16 * B, { dy: 30, rot: 0, d: 0.5 });
+          tl.fromTo('#ks-hook-name', { y: 0 }, { y: -20, duration: 3.6, ease: 'none' }, 12 * B);
+          k.off('#ks-hook-name', 20 * B - 0.14, 0.14);
+
+          window.__timelines['ks-hook'] = tl;
+        });
+      </script>
+    </template>
+  </body>
+</html>
