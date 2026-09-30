@@ -109,6 +109,44 @@
       }
     }
 
+    // The product film plays muted while it's on screen, and not at all for people who asked for less
+    // motion. Its controls turn the sound on. A pause from the visitor sticks.
+    const film = document.querySelector('video[data-autoplay]');
+    if (film && !reduced && 'IntersectionObserver' in window) {
+      let userPaused = false;
+      let ours = false;
+      film.addEventListener('pause', () => {
+        if (!ours) userPaused = true;
+        ours = false;
+      });
+      film.addEventListener('play', () => { userPaused = false; });
+      new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio >= 0.35) {
+            if (!userPaused && film.paused) film.play().catch(() => {});
+          } else if (!film.paused) {
+            ours = true;
+            film.pause();
+          }
+        }
+      }, { threshold: [0, 0.35] }).observe(film);
+    }
+    // More videos: nothing loads until the list is opened, and closing it stops whatever plays in it.
+    document.querySelectorAll('details.more-vid').forEach((d) => d.addEventListener('toggle', () => {
+      const videos = d.querySelectorAll('video');
+      if (!d.open) {
+        videos.forEach((v) => v.pause());
+        return;
+      }
+      videos.forEach((v) => {
+        const source = v.querySelector('source[data-src]');
+        if (source && !source.getAttribute('src')) {
+          source.setAttribute('src', source.dataset.src);
+          v.load();
+        }
+      });
+    }));
+
     // Copy buttons.
     document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
       try {

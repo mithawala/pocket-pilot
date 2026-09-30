@@ -1,7 +1,7 @@
 # Product videos
 
-The sources of the product videos in [`site/video/`](../../site/video/) (review page:
-<https://mithawala.github.io/pocket-pilot/video/>). They're HTML + [GSAP](https://gsap.com), rendered
+The sources of the product videos in [`site/video/`](../../site/video/). The product page shows D at the top
+and A, B and C under *More videos* at the bottom (<https://mithawala.github.io/pocket-pilot/>). They're HTML + [GSAP](https://gsap.com), rendered
 frame by frame to MP4 with [HyperFrames](https://github.com/heygen-com/hyperframes). What each film is
 for and how it's put together: [`BRIEF.md`](BRIEF.md) and [`STORYBOARD.md`](STORYBOARD.md).
 

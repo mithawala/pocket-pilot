@@ -3,7 +3,7 @@ workflow: general-video
 flow: automation
 storyboard: no
 message: "Your coding agents keep working when you walk away — Pocket Pilot puts the same live sessions on your phone, set up in a minute, private and free."
-destination: website hero (mithawala.github.io/pocket-pilot) and the /video review page
+destination: the product page (mithawala.github.io/pocket-pilot): D right under the hero, A–C under More videos
 aspect: "16:9"
 language: en
 audience: developers who run GitHub Copilot agent sessions in VS Code or the GitHub Copilot app

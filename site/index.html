@@ -174,6 +174,17 @@
       </div>
     </section>
 
+    <section class="film" id="video" aria-label="Pocket Pilot in one minute">
+      <div class="wrap">
+        <div class="film-frame">
+          <video data-autoplay muted loop playsinline controls preload="metadata" poster="./video/pocket-pilot-kinetic-sync.jpg" width="1920" height="1080" aria-label="Pocket Pilot in one minute">
+            <source src="./video/pocket-pilot-kinetic-sync.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <p class="film-note">Pocket Pilot in one minute. Turn the sound on: it's better with it.</p>
+      </div>
+    </section>
+
     <section class="strip">
       <div class="wrap strip-grid">
         <div><svg class="ic"><use href="#i-lock" /></svg><span><b>End-to-end encrypted</b>even the tunnel can't read it</span></div>
@@ -576,6 +587,28 @@
           <a class="btn btn-primary btn-lg" href="#copilot-app"><svg class="ic"><use href="#i-sparkles" /></svg>Get it for the GitHub Copilot app</a>
           <a class="btn btn-ghost btn-lg" href="https://github.com/mithawala/pocket-pilot"><svg class="ic"><use href="#i-github" /></svg>View on GitHub</a>
         </div>
+      </div>
+    </section>
+
+    <section id="more-videos" class="more-videos" aria-label="More videos">
+      <div class="wrap">
+        <details class="more-vid">
+          <summary><svg class="ic"><use href="#i-play" /></svg><span><b>More videos</b>Three shorter cuts of the same story, 40 seconds each</span></summary>
+          <div class="vid-list">
+            <figure>
+              <video controls playsinline preload="none" poster="./video/pocket-pilot-walk-away.jpg" width="1920" height="1080" aria-label="Walk away"><source data-src="./video/pocket-pilot-walk-away.mp4" type="video/mp4" /></video>
+              <figcaption><b>Walk away</b>The agent needs an approval while you're away. Your phone buzzes, you tap Allow Once, and both screens carry on.</figcaption>
+            </figure>
+            <figure>
+              <video controls playsinline preload="none" poster="./video/pocket-pilot-kinetic.jpg" width="1920" height="1080" aria-label="Kinetic"><source data-src="./video/pocket-pilot-kinetic.mp4" type="video/mp4" /></video>
+              <figcaption><b>Kinetic</b>Big type on the beat: the hook, the name, what you can do from your phone, and why it's safe and free.</figcaption>
+            </figure>
+            <figure>
+              <video controls playsinline preload="none" poster="./video/pocket-pilot-in-sync.jpg" width="1920" height="1080" aria-label="In sync"><source data-src="./video/pocket-pilot-in-sync.mp4" type="video/mp4" /></video>
+              <figcaption><b>In sync</b>Type on your phone and it lands in VS Code at once. Then set-up in three steps: install, scan the QR code, Face ID.</figcaption>
+            </figure>
+          </div>
+        </details>
       </div>
     </section>
   </main>
