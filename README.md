@@ -127,7 +127,7 @@ GitHub Copilot has built-in remote control: `/remote on` (or `copilot --remote`)
 
 | | Copilot remote control (`/remote`) | Pocket Pilot |
 |---|---|---|
-| **Made by** | GitHub; official and supported. | An independent project, in preview, with its source code on GitHub. |
+| **Made by** | GitHub; official and supported. | An independent project, with its source code on GitHub. |
 | **Where you use it** | The GitHub Mobile app and github.com. | An installable web app on iPhone and Android, with a desktop layout in any browser. |
 | **Which sessions** | Copilot CLI sessions, started in the terminal, VS Code or JetBrains. | Every session in VS Code's agent host — and, with the plugin, the chats in the GitHub Copilot app and CLI. |
 | **Turning it on** | Per session with `/remote on` or `copilot --remote` (the CLI can default to it with `"remoteSessions": true`). VS Code also needs the `github.copilot.chat.cli.remote.enabled` setting, and its docs list a workspace that maps to a GitHub repository. | Pair your phone once (in the GitHub Copilot app, start it with `/pocket-pilot`). All sessions show up, including ones you start later. |
@@ -142,7 +142,7 @@ GitHub Copilot has built-in remote control: `/remote on` (or `copilot --remote`)
 
 **Choose `/remote` when** your organization provides it and you want the officially supported route, you also run Copilot in JetBrains, you want everything in GitHub Mobile next to cloud agent sessions and pull requests you can review and merge, or your network doesn't allow tunnels.
 
-**Choose Pocket Pilot when** you want every agent session, in VS Code or the GitHub Copilot app, on your phone without switching each one on, you want to start new sessions on your own PC from your phone (VS Code), you want the phone link end-to-end encrypted with no copy of the session in a cloud, or you want model, thinking level and context size controls or a desktop browser layout.
+**Choose Pocket Pilot when** you want every agent session, in VS Code or the GitHub Copilot app, on your phone without switching each one on, you want to start new sessions on your own PC from your phone, you want the phone link end-to-end encrypted with no copy of the session in a cloud, or you want model, thinking level and context size controls or a desktop browser layout.
 
 They work side by side: a session with `/remote on` still shows up in Pocket Pilot. Either way, your prompts go to the AI model exactly as they do on your PC; what differs is how your phone reaches the session. If your organization has turned remote control off, check with them before using Pocket Pilot for work. It isn't a way around company policy.
 
