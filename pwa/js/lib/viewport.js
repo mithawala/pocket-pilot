@@ -5,12 +5,18 @@
 // follows the visual viewport while something is being edited, and measures again whenever focus,
 // visibility or the page itself changes.
 //
-// Home Screen apps have a worse variant: once the keyboard has been open, WebKit can keep the whole
-// viewport (innerHeight, 100dvh) short by about the status bar's height until the app is closed, a
-// dark band under every screen. Hiding and showing a full-height element makes WebKit measure the
-// viewport again, so the app does that when it finds itself shorter than the screen.
+// Home Screen apps meet two WebKit bugs that leave a band at the bottom of the screen:
+// - iOS 26.5 and later (and the iOS 27 beta; WebKit bug 301994): iOS makes the whole web view as
+//   short as the status bar is tall, from launch. The band below it is drawn by iOS, outside the page,
+//   and nothing in the page can paint there. What the app can do is not add to it: the page then stops
+//   well above the home indicator, so it doesn't keep room for it (--safe-bottom).
+// - iOS 17 and 18: once the keyboard has been open, WebKit can keep the viewport (innerHeight, 100dvh)
+//   short by the status bar's height. Hiding and showing an element sized by the viewport makes it
+//   measure again, so the app does that when it finds itself shorter than it was.
 
 const NO_KEYBOARD = /^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/i;
+// Scroll positions that hiding the app would reset.
+const SCROLLERS = '.scroll, .sheet, .pending-list, .pending-item .pt';
 
 /** Whether the focused element brings up the on-screen keyboard. */
 export function isEditing(doc) {
@@ -45,12 +51,24 @@ export function fullScreenHeight({ standalone, innerWidth, innerHeight, screen }
   return portrait ? long : short;
 }
 
-/** Whether WebKit has left the viewport short of the screen (see the top of this file). */
-export function viewportStuck({ full, innerHeight, editing }) {
-  return !editing && full > 0 && innerHeight < full - 4 && full - innerHeight <= 160;
+/**
+ * The room to keep at the bottom for the home indicator, in px, or null to leave it to CSS
+ * (env(safe-area-inset-bottom)). The keyboard covers the home indicator, and a Home Screen app that iOS
+ * made shorter than the screen stops above it (by `full - innerHeight`), so neither needs the room.
+ * @param {{keyboard: boolean, full: number, innerHeight: number, safeBottom: number}} o
+ */
+export function bottomInset({ keyboard, full, innerHeight, safeBottom }) {
+  if (keyboard) return 0;
+  if (!full) return null;
+  return Math.max(0, Math.round(safeBottom - Math.max(0, full - innerHeight)));
 }
 
-/** Sets --app-h / --vv-top on the root element and keeps them current. Returns the update function. */
+/** Whether WebKit shrank the viewport after the keyboard (iOS 17 and 18, see the top of this file). */
+export function viewportStuck({ tallest, innerHeight, editing }) {
+  return !editing && tallest > 0 && innerHeight < tallest - 4 && tallest - innerHeight <= 160;
+}
+
+/** Sets --app-h, --vv-top and --safe-bottom on the root element and keeps them current. Returns the update function. */
 export function trackViewport(win = window) {
   const doc = win.document;
   const style = doc.documentElement.style;
@@ -60,16 +78,33 @@ export function trackViewport(win = window) {
   let timer = 0;
   let healNext = false;
   let healedAt = 0;
-  // Hide and show the app (a full-height element) so WebKit measures the viewport again. The lists keep
-  // their scroll positions.
+  let probe = null;
+  // The tallest the app has been, per orientation, while nothing was edited.
+  const tallest = { portrait: 0, landscape: 0 };
+  const orientation = () => (win.innerHeight >= win.innerWidth ? 'portrait' : 'landscape');
+  // env(safe-area-inset-bottom), read through an invisible element.
+  const safeBottom = () => {
+    if (!doc.body || !doc.createElement) return 0;
+    if (!probe) {
+      probe = doc.createElement('div');
+      probe.setAttribute('aria-hidden', 'true');
+      probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:env(safe-area-inset-bottom, 0px);visibility:hidden;pointer-events:none';
+      doc.body.appendChild(probe);
+    }
+    return probe.getBoundingClientRect().height || 0;
+  };
+  // Hide and show the app while it's sized by the viewport (100dvh), so WebKit measures the viewport
+  // again. The lists keep their scroll positions.
   const heal = () => {
     const shell = doc.querySelector?.('.shell');
     if (!shell) return;
     healedAt = Date.now();
-    const kept = [...shell.querySelectorAll('.scroll, .sheet')].map((el) => [el, el.scrollTop]);
+    const kept = [...shell.querySelectorAll(SCROLLERS)].map((el) => [el, el.scrollTop]);
+    style.removeProperty?.('--app-h');
     shell.style.display = 'none';
     void shell.offsetHeight;
     shell.style.display = '';
+    void shell.offsetHeight;
     for (const [el, top] of kept) el.scrollTop = top;
   };
   const apply = () => {
@@ -78,15 +113,24 @@ export function trackViewport(win = window) {
     frame = 0;
     timer = 0;
     const editing = isEditing(doc);
+    const o = orientation();
     if (healNext) {
       healNext = false;
-      const full = fullScreenHeight({ standalone, innerWidth: win.innerWidth, innerHeight: win.innerHeight, screen: win.screen });
-      if (Date.now() - healedAt > 1500 && viewportStuck({ full, innerHeight: win.innerHeight, editing })) heal();
+      if (standalone && Date.now() - healedAt > 1500 && viewportStuck({ tallest: tallest[o], innerHeight: win.innerHeight, editing })) {
+        heal();
+        // Once is enough: if WebKit keeps this height, it's the app's height now.
+        tallest[o] = win.innerHeight;
+      }
     }
+    if (!editing) tallest[o] = Math.max(tallest[o], win.innerHeight);
     const fit = fitViewport({ innerHeight: win.innerHeight, vv, editing });
     if (!fit) return;
     style.setProperty('--app-h', `${fit.height}px`);
     style.setProperty('--vv-top', `${fit.top}px`);
+    const full = fullScreenHeight({ standalone, innerWidth: win.innerWidth, innerHeight: win.innerHeight, screen: win.screen });
+    const inset = bottomInset({ keyboard: fit.keyboard, full, innerHeight: win.innerHeight, safeBottom: full ? safeBottom() : 0 });
+    if (inset === null) style.removeProperty?.('--safe-bottom');
+    else style.setProperty('--safe-bottom', `${inset}px`);
     if (!fit.keyboard && (win.scrollY || win.scrollX)) win.scrollTo(0, 0);
   };
   // One update per frame while the keyboard animates. The timer covers frames that never come, as in
@@ -96,7 +140,7 @@ export function trackViewport(win = window) {
     frame = win.requestAnimationFrame ? win.requestAnimationFrame(apply) : 0;
     timer = setTimeout(apply, 150);
   };
-  // Once the keyboard has closed, check that the Home Screen app got its whole screen back.
+  // Once the keyboard has closed, check that the Home Screen app got its height back.
   const checkStuck = () => {
     if (!standalone) return;
     for (const ms of [200, 900]) {
@@ -123,6 +167,5 @@ export function trackViewport(win = window) {
   doc.addEventListener('focusin', settle);
   doc.addEventListener('focusout', settle);
   apply();
-  checkStuck();
   return apply;
 }

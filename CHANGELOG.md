@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.4
+
+- **Less empty space at the bottom of the iPhone app.** Since iOS 26.5, iOS leaves a strip as tall as the status bar (62pt on recent iPhones) at the bottom of Home Screen web apps. The strip is outside the page, so the app can't draw there (WebKit bug 301994, which Apple confirmed again in the iOS 27 beta). On top of that strip, the app kept 34pt of empty room for the home indicator, which it no longer reaches. It now checks how far down it really reaches and only keeps the room it needs, so the message box sits 34pt lower. While you type, it sits right on the keyboard, without the home indicator's room above it. Rotating the phone to landscape and back is reported to bring the whole screen back until the app is closed.
+- The fix from 0.7.0 was for an older bug (iOS 17 and 18, where the app came back short after the keyboard) and never helped with this one. It now only runs when that older bug happens. It also sizes the app by the screen while it measures again, which is what the known workaround for that bug needs.
+- A small Home Screen test page, `mithawala.github.io/pocket-pilot/lab/screen/`, shows whether a web app gets the whole screen. It tests whether the app would get the whole screen without its `apple-*` meta tags.
+
 ## 0.7.3
 
 - **A long queued message no longer covers the chat on iPhone.** Queued and steering messages now show two lines. On iPhone they showed in full: Safari ignored the app's line limit, so *Show less* made a message longer instead of shorter, and it could fill the whole chat. **Show all** now opens a message in a box that scrolls by itself and takes at most about a quarter of the screen; **Show less** closes it and goes back to the start. The list of waiting messages scrolls too and never takes more than 40% of the screen, so you can always see what the agent is doing. *Show all* appears whenever a message doesn't fit in two lines, and editing one keeps it and its **Save** button in view.
