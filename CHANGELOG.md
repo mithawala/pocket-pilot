@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.7
+
+- **`/pocket-pilot` works in the GitHub Copilot app.** With 0.7.6 the app listed it, but running it said *Skill /pocket-pilot is not ready to run. Try again.*, in new and existing chats alike. The app only runs skills and built-in commands from its menu; it doesn't show the commands a plugin's extension registers. Pocket Pilot also registered a `/pocket-pilot` command of its own, and a command with the skill's name hides the skill, so the app couldn't find it. Pocket Pilot now leaves `/pocket-pilot` to the skill, everywhere: the agent reads it and runs the `pocket_pilot` tool, which opens the panel with the QR code, reports the status (`/pocket-pilot status`) or turns remote access off (`/pocket-pilot off`). In the CLI, the QR code also shows in the chat, as before.
+- The first chat after installing or updating Pocket Pilot has `/pocket-pilot` right away, instead of only the next new chat.
+
 ## 0.7.6
 
 - **`/pocket-pilot` is back in the slash menu of the GitHub Copilot app and CLI.** Since 0.7.1 the menu of a new chat didn't offer it. The menu lists skills from the start, but Pocket Pilot's own commands only once it has loaded in the chat, and 0.7.1 had to take Pocket Pilot's skill out of the plugin: VS Code keeps the `skills` folder of every installed Copilot plugin open, and on Windows the app then can't update the plugin. Pocket Pilot now keeps that skill in your own skills folder, `~/.copilot/skills/pocket-pilot`, where it doesn't get in the way of updates. It's written when a chat first loads Pocket Pilot 0.7.6, so after updating, open a chat once, then start a new one (or restart the app). As soon as Pocket Pilot has loaded in a chat, `/pocket-pilot` still runs it directly; before that, the skill has the agent do it.

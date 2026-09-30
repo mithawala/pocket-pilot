@@ -68,7 +68,7 @@ if (copilotSettings.extensions?.disabledExtensions) copilotSettings.extensions.d
 fs.writeFileSync(path.join(copilotHome, 'settings.json'), JSON.stringify(copilotSettings));
 process.env.COPILOT_HOME = copilotHome;
 
-const { CopilotClient, RuntimeConnection } = await import(pathToFileURL(path.join(sdkDir, 'index.js')).href);
+const { CopilotClient, RuntimeConnection, approveAll } = await import(pathToFileURL(path.join(sdkDir, 'index.js')).href);
 const ipc = await import(pathToFileURL(path.join(root, 'copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/ipc.mjs')).href);
 const { pairWithHost, HostConnection } = await import('../pwa/js/net/host-connection.js');
 const { HostStore } = await import('../pwa/js/model/host-store.js');
@@ -309,28 +309,38 @@ await until(() => store.sessions.has(phoneUri), 'the session started on the phon
 step('the session started on the phone is there with the newer version too');
 const hubAfter = upgraded;
 
-// 5. `/pocket-pilot off` works from any chat, even one that is not on the phone (no messages yet).
-//    The chats' extensions keep the /pocket-pilot skill in the user's skills folder (lib/skill.mjs), so
-//    a new chat lists /pocket-pilot before its extension has loaded; then the extension's command runs it.
+// 5. `/pocket-pilot status` and `/pocket-pilot off` work from any chat, even one that is not on the phone
+//    (no messages yet). /pocket-pilot is a skill the chats' extensions keep in the user's skills folder
+//    (lib/skill.mjs): it's listed from the start, and stays a skill once the extension has loaded (an
+//    extension command of the same name would hide it from the GitHub Copilot app, which only runs skills
+//    and built-in commands). Run it like the app: invoke the skill and send its prompt to the agent, which
+//    calls the pocket_pilot tool.
 const skillMd = path.join(copilotHome, 'skills', 'pocket-pilot', 'SKILL.md');
 const { managedVersion } = await import(pathToFileURL(path.join(root, 'copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/skill.mjs')).href);
 const skillVersion = managedVersion(fs.existsSync(skillMd) ? fs.readFileSync(skillMd, 'utf8') : '');
 if (skillVersion !== '99.0.0') fail(`the /pocket-pilot skill is missing or wasn't updated by the newer version (${skillVersion}): ${skillMd}`);
-const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, enableConfigDiscovery: true, onPermissionRequest: () => new Promise(() => {}) });
+const other = await client.createSession({ workingDirectory: ws, model, requestExtensions: true, enableConfigDiscovery: true, onPermissionRequest: approveAll });
+const toolCalls = new Map();
+other.on((e) => {
+  if (e.type === 'tool.execution_start' && e.data?.toolName === 'pocket_pilot') toolCalls.set(e.data.toolCallId, { action: e.data.arguments?.action });
+  if (e.type === 'tool.execution_complete' && toolCalls.has(e.data?.toolCallId)) toolCalls.get(e.data.toolCallId).result = JSON.stringify(e.data.result ?? e.data);
+});
 const skills = (await other.rpc.skills.list()).skills;
 if (!skills.some((s) => s.name === 'pocket-pilot' && s.userInvocable && s.enabled)) fail(`the runtime doesn't list the /pocket-pilot skill: ${JSON.stringify(skills.map((s) => s.name))}`);
-await until(async () => (await other.rpc.commands.list({ includeBuiltins: false, includeSkills: true, includeClientCommands: true })).commands.some((c) => c.name === 'pocket-pilot' && c.kind === 'client'), 'the extension to run /pocket-pilot itself', 15000);
-step('/pocket-pilot is in the slash menu from the start (a skill in the user\'s skills folder), and the extension runs it once loaded');
-await new Promise((r) => setTimeout(r, 1500));
-const statusLog = [];
-other.on((e) => {
-  if (/log|info|message/.test(e.type) && e.data?.message) statusLog.push(String(e.data.message));
-});
-const res = await other.rpc.commands.execute({ commandName: 'pocket-pilot', args: 'status' });
-if (res?.error) fail(`/pocket-pilot status failed: ${res.error}`);
-await until(() => statusLog.some((l) => /Tunnel:/.test(l)), 'the status report in an unattached chat', 15000);
-step(`status from an unattached chat: ${statusLog.find((l) => /Tunnel:/.test(l)).split('\n')[1]}`);
-await other.rpc.commands.execute({ commandName: 'pocket-pilot', args: 'off' });
+const listed = async () => (await other.rpc.commands.list({ includeBuiltins: false, includeSkills: true, includeClientCommands: true })).commands.filter((c) => c.name === 'pocket-pilot').map((c) => c.kind);
+await until(async () => (await other.rpc.extensions.list()).extensions?.some((x) => /pocket-pilot/.test(x.id) && x.status === 'running'), 'the extension to load in a new chat', 30000);
+const kinds = await listed();
+if (kinds.join() !== 'skill') fail(`/pocket-pilot must stay a skill once the extension has loaded, not ${JSON.stringify(kinds)}: the GitHub Copilot app only runs skills and built-in commands`);
+const runSkill = async (input) => {
+  const r = await other.rpc.commands.invoke({ name: 'pocket-pilot', input });
+  if (r?.kind !== 'agent-prompt') fail(`/pocket-pilot ${input} didn't give the agent a prompt: ${JSON.stringify(r).slice(0, 300)}`);
+  await other.sendAndWait({ prompt: r.prompt }, 180000);
+  return [...toolCalls.values()].find((c) => c.action === input && c.result);
+};
+const statusCall = await runSkill('status');
+if (!/Tunnel:/.test(statusCall?.result || '')) fail(`/pocket-pilot status: the agent didn't report the status with the pocket_pilot tool: ${JSON.stringify([...toolCalls.values()])}`);
+step(`/pocket-pilot is a skill in every chat; /pocket-pilot status from an unattached chat ran the pocket_pilot tool: ${/Tunnel: [^\\]*/.exec(statusCall.result)?.[0]}`);
+await runSkill('off');
 await until(() => !fs.existsSync(path.join(home, 'hub.json')), 'the hub to stop after /pocket-pilot off', 20000);
 await until(() => conn.state !== 'online', 'the phone to be disconnected', 20000);
 step(`/pocket-pilot off from an unattached chat stopped the hub (pid ${hubAfter.pid}) and disconnected the phone`);

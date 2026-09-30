@@ -31,6 +31,10 @@ test('copilot plugin: Agent Plugins 1.0 layout', () => {
   const extension = fs.readFileSync(path.join(plugin, 'com.github.copilot', 'extensions', 'pocket-pilot', 'extension.mjs'), 'utf8');
   assert.match(extension, /name: 'pocket_pilot'/);
   assert.match(extension, /installSkill\(\{ version: VERSION \}\)/);
+  // The GitHub Copilot app only runs skills and built-in commands, and an extension command named
+  // pocket-pilot hides the skill from it ("Skill /pocket-pilot is not ready to run"): only a fallback.
+  assert.doesNotMatch(extension, /commands: \[\{ name: 'pocket-pilot'/);
+  assert.match(extension, /skill === 'failed' \? \[\{ name: 'pocket-pilot'/);
   const market = JSON.parse(fs.readFileSync(path.join(root, '.github', 'plugin', 'marketplace.json'), 'utf8'));
   assert.equal(market.plugins[0].name, 'pocket-pilot');
   assert.equal(market.plugins[0].source, './copilot-plugin');

@@ -587,13 +587,16 @@ async function onCommand(ctx) {
     const s = await pair();
     if (!s) return;
     if (s.openedIn === 'panel') await session.log(`Pocket Pilot is open in the panel next to this chat: scan the QR code there with your phone or tablet, or copy the link for another computer. Remote access keeps running when you close or delete this chat.\n\nNo panel? Open the same page in your browser: ${s.pageUrl}`, { ephemeral: true });
-    else await session.log(`Pocket Pilot: scan this code with your phone or tablet (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on the device you want to pair within 10 minutes:\n${s.pairing.link}`, { ephemeral: true });
+    else await session.log(qrNote(s), { ephemeral: true });
     const note = await updateNote();
     if (note) await session.log(`Pocket Pilot: ${note}`, { level: 'warning' });
   } catch (err) {
     await session.log(`Pocket Pilot: ${err.message}`, { level: 'error' });
   }
 }
+
+/** The pairing QR code for chats without the panel (the CLI): shown in the chat, never sent to the model. */
+const qrNote = (s) => `Pocket Pilot: scan this code with your phone or tablet (also on the page that just opened in your browser):\n\n${renderQrText(s.pairing.link)}\n\nOr open this single-use link on the device you want to pair within 10 minutes:\n${s.pairing.link}`;
 
 const tool = {
   name: 'pocket_pilot',
@@ -611,8 +614,9 @@ const tool = {
     }
     const s = await pair();
     if (!s) return 'The user declined to turn on Pocket Pilot remote access.';
+    if (s.openedIn !== 'panel') await session.log(qrNote(s), { ephemeral: true }).catch(() => {});
     // Never hand the pairing link to the model: it only needs to know where the user should look.
-    const where = s.openedIn === 'panel' ? 'in the Pocket Pilot panel next to this chat' : 'on a page in the browser on this PC';
+    const where = s.openedIn === 'panel' ? 'in the Pocket Pilot panel next to this chat' : 'in this chat and on a page in the browser on this PC';
     return `Opened the Pocket Pilot pairing QR code ${where}. Tell the user to scan it with their phone or tablet camera (or open the copied link on another computer) and then allow the device there. The code is single-use and expires in 10 minutes.`;
   },
 };
@@ -620,21 +624,28 @@ const tool = {
 // ------------------------------------------------------------------ start
 
 const VSCODE_NOTE = 'This session runs in VS Code. Pocket Pilot for VS Code handles it: install the "Pocket Pilot" extension (mithawala.pocket-pilot) and click "Start remote access" in its panel. The /pocket-pilot plugin command is for the GitHub Copilot app and CLI.';
-// Keeps /pocket-pilot in the slash menu of new chats (see lib/skill.mjs).
-if (!process.env.POCKET_PILOT_DISABLE) debug(`skill: ${installSkill({ version: VERSION })}`);
+// /pocket-pilot is a skill in the user's skills folder (lib/skill.mjs), which runs the pocket_pilot tool.
+// The GitHub Copilot app only runs skills and built-in commands from its slash menu, and a command of
+// the same name registered here hides the skill from it ("Skill /pocket-pilot is not ready to run"):
+// register one only when the skill can't be written.
+const skill = process.env.POCKET_PILOT_DISABLE ? 'off' : installSkill({ version: VERSION });
+debug(`skill: ${skill}`);
+const commands = (handler) => (skill === 'failed' ? [{ name: 'pocket-pilot', description: COMMAND_DESCRIPTION, handler }] : []);
 if (process.env.POCKET_PILOT_DISABLE) {
   await joinSession({});
 } else if (insideVsCode()) {
   const s = await joinSession({
     tools: [{ ...tool, handler: async () => VSCODE_NOTE }],
-    commands: [{ name: 'pocket-pilot', description: COMMAND_DESCRIPTION, handler: async () => s.log(VSCODE_NOTE) }],
+    commands: commands(async () => s.log(VSCODE_NOTE)),
   });
 } else {
   session = await joinSession({
     tools: [tool],
-    commands: [{ name: 'pocket-pilot', description: COMMAND_DESCRIPTION, handler: onCommand }],
+    commands: commands(onCommand),
     canvases: canvases(),
   });
+  // The runtime looked for skills before this chat's extension wrote a new or updated one.
+  if (skill === 'created' || skill === 'updated') Promise.resolve(session.rpc.skills?.reload?.()).catch((err) => debug(`skills.reload: ${err.message}`));
   session.on((e) => forward(e));
   checkReal().then((isReal) => {
     // Started from a paired device: on the device at once, before its first message.

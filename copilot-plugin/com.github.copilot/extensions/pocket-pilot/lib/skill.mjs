@@ -1,11 +1,11 @@
-// The /pocket-pilot entry in the slash menu of the GitHub Copilot app and CLI. The extension registers
-// a /pocket-pilot command, but only once it has joined a chat, so the menu of a new chat never lists
-// it; a skill of the same name is listed from the start. Up to 0.7.0 the plugin shipped that skill,
+// The /pocket-pilot entry in the slash menu of the GitHub Copilot app and CLI. The menu of a new chat
+// lists skills from the start, and the GitHub Copilot app only runs skills and built-in commands from
+// it: it never shows the commands an extension registers. Up to 0.7.0 the plugin shipped this skill,
 // but VS Code keeps the skills folder of every installed Copilot plugin open, and on Windows the app
-// then can't move the plugin's folder to update it. So the extension keeps an equivalent skill in the
-// user's own skills folder (the one the runtime says to create skills in) instead. The runtime still
-// runs the extension's command for /pocket-pilot whenever it is registered; before that, the skill
-// tells the model to use the pocket_pilot tool.
+// then can't move the plugin's folder to update it. So the extension keeps the skill in the user's own
+// skills folder (the one the runtime says to create skills in) instead. The skill has the agent call
+// the pocket_pilot tool; the extension registers no /pocket-pilot command of its own while the skill
+// exists, since a command of the same name hides the skill from the app.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
