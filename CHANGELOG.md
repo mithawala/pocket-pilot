@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.3
+
+- **A long queued message no longer covers the chat on iPhone.** Queued and steering messages now show two lines. On iPhone they showed in full: Safari ignored the app's line limit, so *Show less* made a message longer instead of shorter, and it could fill the whole chat. **Show all** now opens a message in a box that scrolls by itself and takes at most about a quarter of the screen; **Show less** closes it and goes back to the start. The list of waiting messages scrolls too and never takes more than 40% of the screen, so you can always see what the agent is doing. *Show all* appears whenever a message doesn't fit in two lines, and editing one keeps it and its **Save** button in view.
+- Only the phone app changed, and it updates by itself. Nothing changed on the PC.
+
 ## 0.7.2
 
 - **Start new sessions from your phone with the GitHub Copilot app too.** **New session** now works when your phone is paired with the Copilot app or CLI: pick a folder on your PC (recent ones, or browse), the model, mode and approvals, and say what to do. The app itself only opens a chat from outside after someone clicks *Allow* on the PC, so Pocket Pilot runs these sessions in the background on your PC instead. It uses a Copilot runtime of its own, the same one the app uses, with your sign-in, models, tools and plugins. You follow and control them from your phone like any chat: replies, approvals, questions, model and mode. They keep going when the chat that runs remote access is closed, and come back after an update. They don't open in the app window.

@@ -1,4 +1,4 @@
-import { html, useState, useRef, useEffect } from '../lib/ui.js';
+import { html, useState, useRef, useEffect, useLayoutEffect } from '../lib/ui.js';
 import { Icon, Sheet, toast } from './common.js';
 import { ModelSheet, ModelOptionsSheet, modelSummary, modelChip, optionsChip, hasOptions } from './model-picker.js';
 import { b64 } from '../core/bytes.js';
@@ -42,14 +42,17 @@ const MODE_ICONS = { interactive: 'chat', plan: 'checklist', autopilot: 'rocket'
 const APPROVAL_ICONS = { default: 'shield', assisted: 'shield-check', autoApprove: 'shield-off' };
 
 /**
- * A message waiting for the agent, like VS Code's queue above the chat input: the whole text (clamped,
- * tap to expand), Edit (or tap the text), Send Immediately for queued messages, and Remove.
+ * A message waiting for the agent, like VS Code's queue above the chat input: the text, two lines of it
+ * until Show all, Edit (or tap the text), Send Immediately for queued messages, and Remove. A long
+ * message scrolls inside its box, and so does the list, so the chat above always stays in view.
  */
 function PendingItem({ store, sessionUri, chat, kind, item }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
   const box = useRef(null);
+  const shown = useRef(null);
   const text = item.message?.text || '';
   const { images, others } = splitAttachments(item.message);
   const read = (u) => store.readImage(u);
@@ -70,11 +73,22 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
     store.editPending(chat, kind, item.id, draft);
     setEditing(false);
   });
+  // Keeps the message being edited, Save included, in view in the list (which scrolls, not the page).
+  const reveal = () => {
+    const el = box.current?.closest('.pending-item');
+    const list = el?.parentElement;
+    if (!list) return;
+    const ir = el.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    if (ir.height > lr.height || ir.bottom > lr.bottom) list.scrollTop += ir.bottom - lr.bottom;
+    else if (ir.top < lr.top) list.scrollTop -= lr.top - ir.top;
+  };
   useEffect(() => {
     const el = box.current;
     if (!editing || !el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(240, el.scrollHeight)}px`;
+    reveal();
   }, [editing, draft]);
   useEffect(() => {
     const el = box.current;
@@ -82,7 +96,25 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
       el.focus({ preventScroll: true });
       el.setSelectionRange(el.value.length, el.value.length);
     }
+    // The list gets shorter when the keyboard opens.
+    const list = el?.closest('.pending-list');
+    if (!editing || !list || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(reveal);
+    ro.observe(list);
+    return () => ro.disconnect();
   }, [editing]);
+  // Show all only when two lines don't hold the message: measured, so it follows the width of the screen.
+  useLayoutEffect(() => {
+    const el = shown.current;
+    if (!el || open) return undefined;
+    el.scrollTop = 0; // back to the start after reading an opened message
+    const measure = () => setLong(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open, editing]);
   if (editing) {
     return html`<div class="pending-item editing">
       <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
@@ -103,17 +135,22 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
       </div>
     </div>`;
   }
+  // The text is a div, not a <button>: Safari ignores line clamping on buttons, which showed the whole message.
   return html`<div class="pending-item" title=${hint}>
     <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
     <div class="pb">
-      <button class=${`pt ${open ? 'open' : ''}`} onClick=${startEdit} aria-label=${`${label}: ${text}. Tap to edit`}>
-        <b>${label}</b> ${text}
-      </button>
+      <div ref=${shown} class=${`pt ${open ? 'open' : ''}`} role="button" tabindex="0" onClick=${startEdit}
+        onKeyDown=${(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            startEdit();
+          }
+        }} aria-label=${`${label}: ${text}. Tap to edit`}><b>${label}</b> ${text}</div>
       ${images.length > 0 && html`<${Thumbs} images=${images} read=${read} size="sm" />`}
       ${others.length > 0 && html`<div class="att">${others.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="clip" /><span>${a.label}</span></span>`)}</div>`}
     </div>
     <div class="pa">
-      ${text.length > 160 && html`<button onClick=${() => setOpen(!open)} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}
+      ${(long || open) && html`<button onClick=${() => setOpen(!open)} aria-expanded=${open ? 'true' : 'false'} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}
       <button onClick=${startEdit} aria-label="Edit" title="Edit"><${Icon} name="edit" size="16" /></button>
       ${kind === 'queued' && html`<button onClick=${() => run(() => store.sendPendingNow(sessionUri, chat, item.id))} aria-label="Send immediately" title="Send Immediately"><${Icon} name="send" size="16" /></button>`}
       <button onClick=${() => run(() => store.removePending(chat, kind, item.id))} aria-label=${kind === 'steering' ? 'Remove' : 'Remove from queue'} title=${kind === 'steering' ? 'Remove' : 'Remove from Queue'}><${Icon} name="x" size="16" /></button>
