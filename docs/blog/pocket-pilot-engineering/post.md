@@ -80,7 +80,7 @@ Every chat gets its own extension process, though. So who's in charge?
 - The first one to take a lock file hosts the **hub**: the relay, the tunnel, pairing and push. The others attach to it over an authenticated channel on `127.0.0.1`.
 - Close the chat that hosts the hub, and another one takes over on the same local port, behind the same tunnel. Phones simply reconnect.
 - A newer plugin version asks the old hub to step down, so an update applies without restarting the app.
-- Sessions you start *from your phone* run in a Copilot runtime the hub starts itself, with your sign-in, models, tools and plugins. The app only opens a chat from outside after someone clicks *Allow* on the PC, so this keeps the phone useful when nobody's there.
+- Sessions you start *from your phone* run in a Copilot runtime of their own on your PC, started through the official Copilot SDK with your sign-in, models, tools and plugins. They run in the background and don't open in the app's window.
 
 ![Pairing from the Pocket Pilot panel in VS Code and in the GitHub Copilot app](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/panels-v2.png)
 
@@ -248,4 +248,4 @@ It's free to use, including at work, and the source is on GitHub under the PolyF
 
 {% github mithawala/pocket-pilot no-readme %}
 
-I built Pocket Pilot pair-programming with a Copilot agent, so it was only fair to give those agents a way to reach me. What would you want your agents to be able to do from your phone? Tell me in the comments. And if you find a hole in the security model, I *really* want to hear about it.
+What would you want your agents to be able to do from your phone? Tell me in the comments. And if you find a hole in the security model, I *really* want to hear about it.
