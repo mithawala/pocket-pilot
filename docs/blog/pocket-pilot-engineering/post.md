@@ -1,6 +1,6 @@
 ---
 title: "How I put my Copilot agents in my pocket: zero servers, end-to-end encryption and one nasty iOS bug"
-published: false
+published: true
 description: "Pocket Pilot puts every GitHub Copilot agent session from your PC on your phone. Here's how it's built: no server, end-to-end encryption, passkeys and Web Push."
 tags: showdev, githubcopilot, vscode, security
 cover_image: https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/cover.png
