@@ -28,7 +28,7 @@ This post is about how it's built: the protocol, the crypto, the push notificati
 
 ## 📱 What it does
 
-![Four real Pocket Pilot screens: sessions sorted by what needs you, a tool approval, a question from the agent, and steering a running agent](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/screens.png)
+![Four real Pocket Pilot screens: sessions sorted by what needs you, a tool approval, a question from the agent, and steering a running agent](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/screens-v2.png)
 
 - **Every session, sorted by what needs you.** Anything waiting for your approval or your answer comes first.
 - **The whole conversation**, streaming token by token: thinking, tool calls, code, and even the screenshots you pasted on your PC.
@@ -49,7 +49,7 @@ That one rule creates every interesting problem in this project:
 | Who sends the push notifications? | Your PC, with standard Web Push. |
 | The tunnel address changes after a reboot. Now what? | An encrypted note in a secret gist on your own GitHub account. |
 
-![Architecture: the phone talks to a relay on the PC through a Cloudflare quick tunnel, end-to-end encrypted, and the relay talks to VS Code's agent host and to the GitHub Copilot app](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/architecture.png)
+![Architecture: the phone talks to a relay on the PC through a Cloudflare quick tunnel, end-to-end encrypted, and the relay talks to VS Code's agent host and to the GitHub Copilot app](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/architecture-v2.png)
 
 ## 🔌 Speak the protocol, don't scrape the UI
 
@@ -82,7 +82,7 @@ Every chat gets its own extension process, though. So who's in charge?
 - A newer plugin version asks the old hub to step down, so an update applies without restarting the app.
 - Sessions you start *from your phone* run in a Copilot runtime the hub starts itself, with your sign-in, models, tools and plugins. The app only opens a chat from outside after someone clicks *Allow* on the PC, so this keeps the phone useful when nobody's there.
 
-![Pairing from the Pocket Pilot panel in VS Code and in the GitHub Copilot app](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/panels.png)
+![Pairing from the Pocket Pilot panel in VS Code and in the GitHub Copilot app](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/panels-v2.png)
 
 ## 🔐 Security: assume the URL leaks
 
@@ -90,7 +90,7 @@ A quick tunnel address is a random `https://….trycloudflare.com` URL, and I tr
 
 ### The QR code carries the trust
 
-![Anatomy of the pairing link inside the QR code](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/qr.png)
+![Anatomy of the pairing link inside the QR code](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/qr-v2.png)
 
 Everything after the `#` is a URL fragment, which browsers never send to any server, not even to GitHub Pages, where the app lives. The app reads it and wipes it from the address bar. It holds the tunnel address, a single-use 128-bit token that expires after 10 minutes, and the fingerprint of the PC's public key.
 
@@ -174,7 +174,7 @@ Why go to that trouble? This code holds the keys to your coding agents, and ever
 
 On my iPhone, the chat bar floated above a black band at the bottom of the Home Screen app. I measured insets, wrote a JavaScript guard for it and shipped a release. The band stayed, because it wasn't part of the page at all.
 
-![WebKit bug 301994: before and after](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/ios.png)
+![WebKit bug 301994: before and after](https://raw.githubusercontent.com/mithawala/pocket-pilot/main/docs/blog/pocket-pilot-engineering/ios-v2.png)
 
 It's [WebKit bug 301994](https://bugs.webkit.org/show_bug.cgi?id=301994). Since iOS 26.5, a Home Screen web app gets a view as tall as the screen *minus the status bar*. With the classic full-screen setup, a `black-translucent` status bar and `viewport-fit=cover`, that shorter view is pinned to the top of the screen, so it stops 62 points short of the bottom. Apple has reproduced it in the iOS 27 beta.
 
@@ -231,16 +231,18 @@ They work side by side. And if your organization has turned remote control off, 
 
 ## 🚀 Try it
 
-- **VS Code:** install [Pocket Pilot from the Marketplace](https://marketplace.visualstudio.com/items?itemName=mithawala.pocket-pilot) (or run `code --install-extension mithawala.pocket-pilot`), then click **Start remote access** in the Pocket Pilot panel.
-- **GitHub Copilot app and CLI:** run these, then type `/pocket-pilot` in a chat.
+**VS Code:** install [Pocket Pilot from the Marketplace](https://marketplace.visualstudio.com/items?itemName=mithawala.pocket-pilot) (or run `code --install-extension mithawala.pocket-pilot`), then click **Start remote access** in the Pocket Pilot panel.
 
-  ```bash
-  copilot plugin marketplace add mithawala/pocket-pilot
-  copilot plugin install pocket-pilot@pocket-pilot
-  ```
+**GitHub Copilot app and CLI:** run these, then type `/pocket-pilot` in a chat.
 
-- **Your phone:** open [mithawala.github.io/pocket-pilot/app](https://mithawala.github.io/pocket-pilot/app/), add it to your Home Screen and scan the QR code.
-- **Just looking?** The [demo](https://mithawala.github.io/pocket-pilot/app/?demo) runs in your browser.
+```bash
+copilot plugin marketplace add mithawala/pocket-pilot
+copilot plugin install pocket-pilot@pocket-pilot
+```
+
+**Your phone:** open [mithawala.github.io/pocket-pilot/app](https://mithawala.github.io/pocket-pilot/app/), add it to your Home Screen and scan the QR code.
+
+**Just looking?** The [demo](https://mithawala.github.io/pocket-pilot/app/?demo) runs in your browser.
 
 It's free to use, including at work, and the source is on GitHub under the PolyForm Shield license:
 
