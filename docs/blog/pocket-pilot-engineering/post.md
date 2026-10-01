@@ -244,8 +244,6 @@ copilot plugin install pocket-pilot@pocket-pilot
 
 **Just looking?** The [demo](https://mithawala.github.io/pocket-pilot/app/?demo) runs in your browser.
 
-It's free to use, including at work, and the source is on GitHub under the PolyForm Shield license:
-
 {% github mithawala/pocket-pilot no-readme %}
 
 What would you want your agents to be able to do from your phone? Tell me in the comments. And if you find a hole in the security model, I *really* want to hear about it.
