@@ -227,7 +227,7 @@ GitHub Copilot has its own remote control: `/remote on` streams a Copilot CLI se
 - **New sessions start on your own PC**, rather than as cloud agents.
 - **One app for VS Code's agent sessions and the GitHub Copilot app.**
 
-They work side by side. And if your organization has turned remote control off, ask before using Pocket Pilot for work: it isn't a way around company policy. There's a [full comparison](https://mithawala.github.io/pocket-pilot/#compare) on the product page.
+They work side by side. There's a [full comparison](https://mithawala.github.io/pocket-pilot/#compare) on the product page.
 
 ## 🚀 Try it
 
