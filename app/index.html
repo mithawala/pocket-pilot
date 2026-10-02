@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- No viewport-fit=cover and an opaque status bar (style "black"), on purpose. iOS 26.5+ makes a Home
+       Screen web app exactly as tall as the screen minus the status bar (WebKit bug 301994). Drawn under a
+       translucent status bar, that web view starts at the top of the screen and leaves a band as tall as
+       the status bar at the bottom, outside the page. Below an opaque status bar it fills the rest of the
+       screen, and iOS keeps it inside the safe area, so the chat bar sits right above the home indicator. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' wss: ws://localhost:* ws://127.0.0.1:* https://api.github.com https://gist.githubusercontent.com; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#21252b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Pocket Pilot" />
+  <meta name="description" content="Control your VS Code agent sessions from your phone — end-to-end encrypted, passkey protected, free." />
+  <title>Pocket Pilot</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon.svg?v=f1f73db7" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.png?v=d60c7a8b" type="image/png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png?v=4012de0e" />
+  <link rel="stylesheet" href="./css/app.css" />
+  <link rel="modulepreload" href="./js/ui/app.js" />
+</head>
+<body>
+  <div id="app"></div>
+  <noscript><p style="padding:24px">Pocket Pilot needs JavaScript.</p></noscript>
+  <script type="module" src="./js/boot.js?v=pp-675f9859f66f"></script>
+</body>
+</html>
