@@ -1,26 +1,37 @@
 import { html, useState, useRef, useEffect, useLayoutEffect } from '../lib/ui.js';
-import { Icon, Sheet, toast } from './common.js';
+import { Icon, Sheet, toast, useEscape } from './common.js';
 import { ModelSheet, ModelOptionsSheet, modelSummary, modelChip, optionsChip, hasOptions } from './model-picker.js';
-import { b64 } from '../core/bytes.js';
 import { haptic, providerLabel } from '../lib/format.js';
 import { isImageAttachment, splitAttachments } from '../lib/attachments.js';
+import { MAX_UPLOAD, prepareFile, uploadFile, pastedFiles, filesOnlyText } from '../lib/uploads.js';
 import { Thumbs } from './viewer.js';
 
-const MAX_UPLOAD = 20 * 1024 * 1024;
 const fine = () => window.matchMedia('(pointer: fine)').matches;
 
-async function downscaleImage(file, maxDim = 1600, quality = 0.85) {
-  const bmp = await createImageBitmap(file).catch(() => null);
-  if (!bmp) return null;
-  const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
-  const w = Math.round(bmp.width * scale);
-  const h = Math.round(bmp.height * scale);
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
-  const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', quality));
-  return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+/** What a file input offers: photos and the files an agent can read. */
+export const ATTACH_ACCEPT = 'image/*,.pdf,.txt,.md,.json,.csv,.log,.zip,.png,.jpg,.jpeg,.gif,.webp';
+
+/** Files waiting to be sent, above the text: a picture's thumbnail (or a clip), the name, and Remove. */
+export function AttachmentChips({ list, read, onRemove, busy = 0, busyLabel = 'Uploading…' }) {
+  if (!list.length && !busy) return null;
+  return html`<div class="att-row">
+    ${list.map((a, i) => {
+      const pic = a.items.find(isImageAttachment);
+      return html`<span class=${`chip ${pic ? 'pic' : ''}`} key=${i}>${pic ? html`<${Thumbs} images=${[pic]} read=${read} size="xs" />` : html`<${Icon} name="clip" />`}<span>${a.name}</span><button onClick=${() => onRemove(i)} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`;
+    })}
+    ${busy > 0 && html`<span class="chip"><span class="spinner"></span>${busyLabel}</span>`}
+  </div>`;
+}
+
+/**
+ * The button that makes an input fill the screen, for writing a long text, and brings it back. It keeps
+ * the keyboard open: the input keeps its focus.
+ */
+export function GrowButton({ expanded, onToggle }) {
+  return html`<button type="button" class="grow-btn" onmousedown=${(e) => e.preventDefault()} onClick=${onToggle}
+    aria-pressed=${expanded ? 'true' : 'false'} aria-label=${expanded ? 'Exit full screen' : 'Write in full screen'} title=${expanded ? 'Exit full screen' : 'Write in full screen'}>
+    <${Icon} name=${expanded ? 'minimize' : 'maximize'} size="16" />
+  </button>`;
 }
 
 function OptionSheet({ open, title, options, value, icons, onPick, onClose }) {
@@ -219,21 +230,35 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const [uploading, setUploading] = useState(0);
   const [sheet, setSheet] = useState(null);
   const [menu, setMenu] = useState(false);
+  // Full screen, for a long message, and whether the text already runs over more than one line.
+  const [expanded, setExpanded] = useState(false);
+  const [tall, setTall] = useState(false);
   const ta = useRef(null);
   const fileInput = useRef(null);
   const textRef = useRef(text);
   textRef.current = text;
   const dictation = useDictation(() => textRef.current, setText);
+  useEscape(expanded, () => setExpanded(false));
 
   useEffect(() => {
     if (text) sessionStorage.setItem(draftKey, text);
     else sessionStorage.removeItem(draftKey);
     const el = ta.current;
     if (el) {
+      // Full screen, the input takes the room it gets; otherwise it grows with the text.
       el.style.height = 'auto';
-      el.style.height = `${Math.min(180, el.scrollHeight)}px`;
+      if (!expanded) el.style.height = `${Math.min(180, el.scrollHeight)}px`;
+      else el.style.height = '';
+      const cs = getComputedStyle(el);
+      setTall(el.scrollHeight >= (parseFloat(cs.minHeight) || 42) + (parseFloat(cs.lineHeight) || 22) * 0.6);
     }
-  }, [text]);
+  }, [text, expanded, tall]);
+
+  const toggleExpanded = () => {
+    setExpanded(!expanded);
+    // Still in the tap, so the keyboard opens (or stays) on a phone.
+    ta.current?.focus({ preventScroll: true });
+  };
 
   // Desktop: focus the input when a session opens, like VS Code's chat (not on touch, where it pops the keyboard).
   useEffect(() => {
@@ -266,14 +291,9 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
       }
       setUploading((n) => n + 1);
       try {
-        const isImage = /^image\//.test(file.type);
-        const bytes = isImage ? (await downscaleImage(file)) || new Uint8Array(await file.arrayBuffer()) : new Uint8Array(await file.arrayBuffer());
-        const name = isImage && !/\.jpe?g$/i.test(file.name) ? `${file.name.replace(/\.[^.]+$/, '') || 'photo'}.jpg` : file.name || 'upload';
-        const data = b64(bytes);
-        const saved = await conn.upload({ session: sessionUri, name, mime: isImage ? 'image/jpeg' : file.type, data });
-        const items = [{ type: 'simple', label: name, modelRepresentation: `The user sent a file from their ${fine() ? 'other computer' : 'phone'} (Pocket Pilot). It is saved on this machine at: ${saved.path}` }];
-        if (isImage && bytes.length < 3 * 1024 * 1024) items.push({ type: 'embeddedResource', label: name, data, contentType: 'image/jpeg' });
-        setAttachments((a) => [...a, { name, items }]);
+        const f = await prepareFile(file);
+        const items = await uploadFile(conn, sessionUri, f);
+        setAttachments((a) => [...a, { name: f.name, items, picture: f.picture }]);
       } catch (err) {
         toast(`Upload failed: ${err.message}`, 'err');
       } finally {
@@ -284,8 +304,8 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
 
   /** how: 'send' (idle), 'steer' (default while working), 'queue' or 'stop'. */
   function send(how) {
-    const t = text.trim();
-    if (!t && !attachments.length) return;
+    if (!text.trim() && !attachments.length) return;
+    const t = text.trim() || filesOnlyText(attachments.map((a) => !!a.picture));
     const atts = attachments.flatMap((a) => a.items);
     const mode = how || (active ? 'steer' : 'send');
     dictation.cancel();
@@ -307,6 +327,7 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
       setText('');
       setAttachments([]);
       setMenu(false);
+      setExpanded(false);
     } catch (err) {
       toast(err.message, 'err');
     }
@@ -322,16 +343,10 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
 
   // Ctrl+V / ⌘V of a screenshot or copied files attaches them; pasted text stays text.
   const onPaste = (e) => {
-    const cd = e.clipboardData;
-    const files = [...(cd?.items || [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
-    if (!files.length || (cd.getData('text/plain') || '').trim()) return;
+    const files = pastedFiles(e.clipboardData, attachments.filter((a) => a.name.startsWith('Pasted image')).length);
+    if (!files) return;
     e.preventDefault();
-    let n = attachments.filter((a) => a.name.startsWith('Pasted image')).length;
-    addFiles(files.map((f) => {
-      if (!/^image\//.test(f.type) || (f.name && !/^image\.\w+$/i.test(f.name))) return f;
-      n++;
-      return new File([f], `Pasted image${n > 1 ? ` ${n}` : ''}.${f.type.split('/')[1] || 'png'}`, { type: f.type });
-    }));
+    addFiles(files);
   };
 
   // Files dropped anywhere on the input area are attached.
@@ -361,21 +376,16 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const chip = modelChip(models, currentModel);
   const opts = hasOptions(models, currentModel) ? optionsChip(models, currentModel) : '';
   const placeholder = dictation.listening ? 'Listening…' : active ? 'Steer the agent, or add to the queue…' : `Ask ${providerLabel(session?.provider)} or describe a task…`;
-  return html`<div class=${`composer-wrap ${dragging ? 'dropping' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
+  return html`<div class=${`composer-wrap ${dragging ? 'dropping' : ''} ${expanded ? 'expanded' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
     ${(queued.length > 0 || steering) && html`<div class="pending-list">
       ${steering && html`<${PendingItem} key=${steering.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="steering" item=${steering} />`}
       ${queued.map((q) => html`<${PendingItem} key=${q.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="queued" item=${q} />`)}
     </div>`}
-    <div class=${`composer ${dictation.listening ? 'listening' : ''}`}>
-      ${(attachments.length > 0 || uploading > 0) && html`<div class="att-row">
-        ${attachments.map((a, i) => {
-          const pic = a.items.find(isImageAttachment);
-          return html`<span class=${`chip ${pic ? 'pic' : ''}`} key=${i}>${pic ? html`<${Thumbs} images=${[pic]} read=${readImage} size="xs" />` : html`<${Icon} name="clip" />`}<span>${a.name}</span><button onClick=${() => setAttachments(attachments.filter((_, j) => j !== i))} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`;
-        })}
-        ${uploading > 0 && html`<span class="chip"><span class="spinner"></span>Uploading…</span>`}
-      </div>`}
+    <div class=${`composer ${dictation.listening ? 'listening' : ''} ${tall ? 'tall' : ''}`}>
+      <${GrowButton} expanded=${expanded} onToggle=${toggleExpanded} />
+      <${AttachmentChips} list=${attachments} read=${readImage} onRemove=${(i) => setAttachments(attachments.filter((_, j) => j !== i))} busy=${uploading} />
       <textarea ref=${ta} rows="1" placeholder=${placeholder} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} onPaste=${onPaste}></textarea>
-      <input ref=${fileInput} type="file" multiple class="hidden" accept="image/*,.pdf,.txt,.md,.json,.csv,.log,.zip,.png,.jpg,.jpeg,.gif,.webp" onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
+      <input ref=${fileInput} type="file" multiple class="hidden" accept=${ATTACH_ACCEPT} onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
       <div class="cbar">
         <div class="left">
           <button class="pick icon" onClick=${() => fileInput.current?.click()} aria-label="Attach photo or file"><${Icon} name="clip" /></button>

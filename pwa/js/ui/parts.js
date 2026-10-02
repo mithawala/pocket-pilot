@@ -202,25 +202,31 @@ function AuthCard({ tc, ctx }) {
   </div>`;
 }
 
-function QuestionField({ q, value, onChange }) {
+function QuestionField({ q, value, onChange, own, onOwn }) {
   if (q.kind === 'boolean') {
     return html`<div class="row"><span class="grow">${q.message}</span><${Switch} on=${!!value} label=${q.message} onChange=${onChange} /></div>`;
   }
   if (q.kind === 'single-select' || q.kind === 'multi-select') {
     const multi = q.kind === 'multi-select';
     const sel = multi ? value || [] : value;
+    // The agent takes an answer in your own words too: instead of a choice, or (several choices) with them.
+    const typed = !!q.allowFreeformInput && !multi && !!(own || '').trim();
     return html`<div>
       <div class="qt">${q.title || q.message}</div>
       ${q.title && html`<div class="muted small" style="margin:-2px 0 8px">${q.message}</div>`}
       <div class="options" role=${multi ? 'group' : 'radiogroup'}>
         ${q.options.map((o) => {
-          const on = multi ? sel.includes(o.id) : sel === o.id;
-          return html`<button key=${o.id} class=${`opt ${on ? 'on' : ''}`} role=${multi ? 'checkbox' : 'radio'} aria-checked=${on ? 'true' : 'false'} onClick=${() => onChange(multi ? (on ? sel.filter((x) => x !== o.id) : [...sel, o.id]) : o.id)}>
+          const on = multi ? sel.includes(o.id) : sel === o.id && !typed;
+          return html`<button key=${o.id} class=${`opt ${on ? 'on' : ''}`} role=${multi ? 'checkbox' : 'radio'} aria-checked=${on ? 'true' : 'false'} onClick=${() => {
+            onChange(multi ? (on ? sel.filter((x) => x !== o.id) : [...sel, o.id]) : o.id);
+            if (!multi) onOwn('');
+          }}>
             <span class=${`mark ${multi ? 'box' : ''}`}></span>
             <span class="grow">${o.label}${o.recommended && html`<span class="rec">Recommended</span>`}${o.description && html`<small>${o.description}</small>`}</span>
           </button>`;
         })}
       </div>
+      ${q.allowFreeformInput && html`<textarea class=${`input own ${typed ? 'on' : ''}`} rows="2" value=${own || ''} placeholder=${multi ? 'Add your own answer…' : 'Or type your own answer…'} aria-label=${multi ? 'Your own answer, with the choices' : 'Your own answer, instead of a choice'} onInput=${(e) => onOwn(e.target.value)}></textarea>`}
     </div>`;
   }
   const numeric = q.kind === 'number' || q.kind === 'integer';
@@ -231,7 +237,17 @@ function QuestionField({ q, value, onChange }) {
   </div>`;
 }
 
-function answerFor(q, v) {
+/**
+ * The answer to one question, as VS Code sends it: an answer typed instead of a choice is a text answer,
+ * and one typed along with several choices goes with them (`freeformValues`). Null when unanswered.
+ */
+export function answerFor(q, v, own) {
+  const typed = q.allowFreeformInput ? String(own || '').trim() : '';
+  if (typed && q.kind === 'single-select') return { state: 'submitted', value: { kind: 'text', value: typed } };
+  if (typed && q.kind === 'multi-select') {
+    const sel = Array.isArray(v) ? v : [];
+    return { state: 'submitted', value: sel.length ? { kind: 'selected-many', value: sel, freeformValues: [typed] } : { kind: 'text', value: typed } };
+  }
   if (v === undefined || v === '' || (Array.isArray(v) && !v.length)) return null;
   const kind = q.kind === 'boolean' ? 'boolean' : q.kind === 'single-select' ? 'selected' : q.kind === 'multi-select' ? 'selected-many' : q.kind === 'number' || q.kind === 'integer' ? 'number' : 'text';
   return { state: 'submitted', value: { kind, value: v } };
@@ -240,6 +256,7 @@ function answerFor(q, v) {
 function InputRequestCard({ request, ctx }) {
   const qs = request.questions || [];
   const [vals, setVals] = useState(() => Object.fromEntries(qs.map((q) => [q.id, q.defaultValue])));
+  const [own, setOwn] = useState({});
   const [busy, setBusy] = useState(false);
   const submit = (response) => {
     setBusy(true);
@@ -247,7 +264,7 @@ function InputRequestCard({ request, ctx }) {
     const answers = {};
     if (response === 'accept') {
       for (const q of qs) {
-        const a = answerFor(q, vals[q.id]);
+        const a = answerFor(q, vals[q.id], own[q.id]);
         if (a) answers[q.id] = a;
         else if (!q.required) answers[q.id] = { state: 'skipped' };
       }
@@ -259,12 +276,12 @@ function InputRequestCard({ request, ctx }) {
       toast(err.message, 'err');
     }
   };
-  const missing = qs.some((q) => q.required && !answerFor(q, vals[q.id]));
+  const missing = qs.some((q) => q.required && !answerFor(q, vals[q.id], own[q.id]));
   return html`<div class="confirm info">
     <div class="ch"><${Icon} name="chat" /><span>The agent has a question</span></div>
     ${request.message && html`<div class="cm"><${Markdown} text=${request.message} /></div>`}
     ${request.url && html`<div class="qbody"><a class="btn sm" href=${request.url} target="_blank" rel="noopener noreferrer">Open link</a></div>`}
-    ${qs.length > 0 && html`<div class="qbody">${qs.map((q) => html`<div class="question" key=${q.id}><${QuestionField} q=${q} value=${vals[q.id]} onChange=${(v) => setVals({ ...vals, [q.id]: v })} /></div>`)}</div>`}
+    ${qs.length > 0 && html`<div class="qbody">${qs.map((q) => html`<div class="question" key=${q.id}><${QuestionField} q=${q} value=${vals[q.id]} onChange=${(v) => setVals({ ...vals, [q.id]: v })} own=${own[q.id]} onOwn=${(t) => setOwn((o) => ({ ...o, [q.id]: t }))} /></div>`)}</div>`}
     <div class="actions">
       <button class="btn primary" disabled=${busy || missing} onClick=${() => submit('accept')}>${qs.length ? 'Submit' : 'Done'}</button>
       <button class="btn" disabled=${busy} onClick=${() => submit('decline')}>Skip</button>
@@ -299,7 +316,8 @@ function answerText(part) {
     if (!a || a.state !== 'submitted') continue;
     const v = a.value?.value;
     const label = (id) => q.options?.find((o) => o.id === id)?.label || String(id);
-    const text = Array.isArray(v) ? v.map(label).join(', ') : q.options ? label(v) : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
+    const own = (a.value?.freeformValues || []).filter((x) => typeof x === 'string' && x.trim());
+    const text = Array.isArray(v) ? [...v.map(label), ...own].join(', ') : q.options ? label(v) : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
     bits.push(`${q.title || mdPlain(q.message, 40)}: ${text}`);
   }
   return bits.length ? `Answered · ${bits.join(' · ')}` : `Answered: ${mdPlain(req.message, 90)}`;

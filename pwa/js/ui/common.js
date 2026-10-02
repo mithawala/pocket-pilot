@@ -58,6 +58,8 @@ const P = {
   mic: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3',
   share: 'M8 9H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2M12 2v13M8 6l4-4 4 4',
   'plus-square': 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 8v8M8 12h8',
+  maximize: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7',
+  minimize: 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7',
 };
 
 export function Icon({ name, size = 20, cls }) {
@@ -117,12 +119,10 @@ export function swipeCloses(dy, ms, height) {
 }
 
 /**
- * A bottom sheet (a centred dialog on wide screens). It always says how to leave it: the Done button in
- * its header (`doneLabel`, e.g. Cancel where closing backs out), a swipe down, a tap outside, or Escape.
+ * Puts an open layer (a sheet, a full-screen editor) on the Escape stack, so Escape closes only the
+ * newest one. Returns a ref that always holds the latest `onClose`.
  */
-export function Sheet({ open, onClose, title, children, wide = false, doneLabel = 'Done' }) {
-  const ref = useRef(null);
-  const drag = useRef(null);
+export function useEscape(open, onClose) {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -133,12 +133,25 @@ export function Sheet({ open, onClose, title, children, wide = false, doneLabel 
       if (i >= 0) openSheets.splice(i, 1);
     };
   }, [open]);
+  return close;
+}
+
+/**
+ * A bottom sheet (a centred dialog on wide screens). It always says how to leave it: the Done button in
+ * its header (`doneLabel`, e.g. Cancel where closing backs out), a swipe down, a tap outside, or Escape.
+ * `full` makes it fill the screen, for writing a long text in it.
+ */
+export function Sheet({ open, onClose, title, children, wide = false, full = false, doneLabel = 'Done' }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const close = useEscape(open, onClose);
   if (!open) return null;
   const el = () => ref.current;
   // Swipe down to close: from the handle or the header at any time, or from the content once it's
-  // scrolled to the top (an upward swipe, or any swipe further down the content, just scrolls).
+  // scrolled to the top (an upward swipe, or any swipe further down the content, just scrolls). Not
+  // full screen: there Done (or the button by the text) goes back, and the text needs its swipes.
   const start = (e) => {
-    if (e.touches.length !== 1 || !matchMedia('(max-width: 899px)').matches) return;
+    if (full || e.touches.length !== 1 || !matchMedia('(max-width: 899px)').matches) return;
     const fromHead = !!e.target.closest('.sheet-top');
     if (!fromHead && (el().scrollTop > 0 || e.target.closest('input, textarea, select, pre'))) return;
     const t = e.touches[0];
@@ -178,7 +191,7 @@ export function Sheet({ open, onClose, title, children, wide = false, doneLabel 
   };
   return html`<div>
     <div class="scrim" onClick=${onClose}></div>
-    <div ref=${ref} class=${`sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label=${title}
+    <div ref=${ref} class=${`sheet ${wide ? 'wide' : ''} ${full ? 'full' : ''}`} role="dialog" aria-modal="true" aria-label=${title}
       ontouchstart=${start} ontouchmove=${move} ontouchend=${end} ontouchcancel=${end}>
       <div class="sheet-top">
         <div class="grab" aria-hidden="true"></div>

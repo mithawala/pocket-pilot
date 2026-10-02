@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.9
+
+- **Photos and files when you start a session.** **New session** now has **Add photos or files**, and you can paste a screenshot or drop files on the text, as in a chat. They go to your PC as soon as the session exists, and its first message carries them. The model sees pictures directly. Other files are saved on your PC and the agent reads them from there, which can ask you first, like any file it reads. With the GitHub Copilot app they're saved in the project's `.pocket-pilot/uploads` folder; with VS Code in `~/Pocket Pilot/.pocket-pilot/uploads`, because VS Code only tells which folder a new session is in once its first message arrives. If a file doesn't reach your PC, the session opens with your message in its chat box, so you can attach the file again and send.
+- **Write full screen.** The button at the top right of New session's text box makes it fill the screen, to write and read back a long task. **Done** goes back to the rest of the form. In a chat, the same button appears once your message runs over a line: the chat box then takes the whole screen, with Send, attachments and the model at hand. Press it again (or Escape on a computer) to go back; sending also brings the chat back.
+- **Answer in your own words.** When the agent asks a question that also takes an answer of your own, the card has a box for it under the choices. Typing there replaces the choice, and the agent gets your words, as from VS Code.
+- **A photo on its own reaches the GitHub Copilot app.** A message with only photos or files, and no text, was turned away there (*Type a message first*). The phone now adds a few words, like *Take a look at this picture.*
+- A picture the browser can't convert (HEIC in some browsers, SVG) is sent as it is, under its own name and type, instead of as a JPEG it wasn't. It no longer goes to the model inline, where models can't read it; the agent reads the file instead.
+- Only the phone app changed, and it updates by itself. Nothing changed on the PC.
+
 ## 0.7.8
 
 - **Pocket Pilot is on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mithawala.pocket-pilot)**, and no longer marked as Preview. Install it there (or run `code --install-extension mithawala.pocket-pilot`) and VS Code keeps it up to date. If you installed the `.vsix` file, VS Code doesn't update it by itself: in the Extensions view, open Pocket Pilot's gear menu and check **Auto Update** once, and VS Code updates it from the Marketplace from then on.

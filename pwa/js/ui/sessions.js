@@ -1,8 +1,10 @@
-import { html, useState, useEffect, useChange } from '../lib/ui.js';
+import { html, useState, useEffect, useRef, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
 import { statusOf, ago, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
 import { ModelSheet, ModelOptionsSheet, modelChip, optionsChip, hasOptions } from './model-picker.js';
+import { AttachmentChips, GrowButton, ATTACH_ACCEPT } from './composer.js';
+import { MAX_UPLOAD, prepareFile, uploadFile, previewItems, pastedFiles, filesOnlyText } from '../lib/uploads.js';
 
 function StatusIcon({ st, unread }) {
   if (st.key === 'running') return html`<span class="spinner" aria-label="Working"></span>`;
@@ -128,7 +130,7 @@ function FolderBrowser({ store, start, onPick, onClose }) {
   </${Sheet}>`;
 }
 
-function NewSession({ store, open, onClose, onCreated, copilotHost = false }) {
+function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false }) {
   const agents = store.agents();
   const [provider, setProvider] = useState(agents[0]?.provider || 'copilotcli');
   // The GitHub Copilot app keeps a scratch folder per chat without a project: not a place for new work.
@@ -136,6 +138,11 @@ function NewSession({ store, open, onClose, onCreated, copilotHost = false }) {
   const [folder, setFolder] = useState(folders[0] || store.defaultDirectory || '');
   const [browse, setBrowse] = useState(false);
   const [text, setText] = useState('');
+  // Photos and files for the first message, ready to upload: they go to the PC once the session exists.
+  const [files, setFiles] = useState([]);
+  const [adding, setAdding] = useState(0);
+  const [dropping, setDropping] = useState(false);
+  const [writing, setWriting] = useState(false);
   const [mode, setMode] = useState('interactive');
   const [approve, setApprove] = useState('default');
   const [isolation, setIsolation] = useState('folder');
@@ -148,39 +155,126 @@ function NewSession({ store, open, onClose, onCreated, copilotHost = false }) {
   });
   const [modelOpen, setModelOpen] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState('');
+  const ta = useRef(null);
+  const fileInput = useRef(null);
   const models = store.models(provider).filter((m) => m.policyState !== 'disabled');
   const chosenModel = modelSel && models.some((m) => m.id === modelSel.id) ? modelSel : null;
   useEffect(() => {
     if (open) setFolder((f) => f || folders[0] || store.defaultDirectory || '');
+    else setWriting(false);
   }, [open]);
   const allFolders = folder && !folders.includes(folder) ? [folder, ...folders] : folders;
+
+  async function addFiles(list) {
+    for (const file of list) {
+      if (file.size > MAX_UPLOAD) {
+        toast(`${file.name} is larger than 20 MB`, 'err');
+        continue;
+      }
+      setAdding((n) => n + 1);
+      try {
+        const f = await prepareFile(file);
+        setFiles((a) => [...a, { name: f.name, file: f, items: previewItems(f) }]);
+      } catch (err) {
+        toast(`${file.name || 'That file'} could not be added: ${err.message}`, 'err');
+      } finally {
+        setAdding((n) => n - 1);
+      }
+    }
+  }
+  const onPaste = (e) => {
+    const pasted = pastedFiles(e.clipboardData, files.filter((a) => a.name.startsWith('Pasted image')).length);
+    if (!pasted) return;
+    e.preventDefault();
+    addFiles(pasted);
+  };
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  const onDragOver = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dropping) setDropping(true);
+  };
+  const onDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setDropping(false);
+  };
+  const onDrop = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDropping(false);
+    addFiles([...e.dataTransfer.files]);
+  };
+  const toggleWriting = () => {
+    setWriting(!writing);
+    // Still in the tap, so the keyboard opens (or stays) on a phone.
+    ta.current?.focus({ preventScroll: true });
+  };
+
   async function create() {
     setBusy(true);
+    setPhase('');
+    const message = text.trim();
+    const chosen = files;
     try {
       const uri = await store.createSession({
         provider,
         folder,
-        text: text.trim(),
+        text: message || (chosen.length ? filesOnlyText(chosen.map((f) => f.file.picture)) : ''),
         model: chosenModel || undefined,
         // The Copilot app plugin starts the session with the model right away (no switch in the chat).
         modelAtStart: copilotHost,
         config: copilotHost ? { mode, autoApprove: approve } : { mode, autoApprove: approve, isolation },
+        // Uploaded once the session exists, so the PC saves them in its folder; then the first message carries them.
+        prepare: chosen.length ? async (sessionUri) => {
+          setPhase(chosen.length === 1 ? 'Sending the file…' : `Sending ${chosen.length} files…`);
+          const items = [];
+          for (const f of chosen) {
+            try {
+              items.push(...(await uploadFile(conn, sessionUri, f.file)));
+            } catch (err) {
+              throw new Error(`${f.name} didn't reach your PC (${err.message})`);
+            }
+          }
+          return items;
+        } : undefined,
       });
       if (chosenModel) localStorage.setItem('pp:newSessionModel', JSON.stringify(chosenModel));
       setText('');
+      setFiles([]);
       onClose();
       onCreated(uri);
     } catch (err) {
-      toast(err.message, 'err');
+      if (err.sessionUri) {
+        // The session started but a file didn't make it: open it, with the message ready in its chat box.
+        if (message) sessionStorage.setItem(`draft:${err.sessionUri}`, message);
+        setText('');
+        setFiles([]);
+        onClose();
+        onCreated(err.sessionUri);
+        toast(`${err.message}. The session is open with your message in the chat box: attach the file again and send.`, 'err');
+      } else {
+        toast(err.message, 'err');
+      }
     } finally {
       setBusy(false);
+      setPhase('');
     }
   }
-  return html`<${Sheet} open=${open} onClose=${onClose} title="New session" doneLabel="Cancel">
+  // Writing full screen, the sheet shows just the text (and its files); Done brings the rest back.
+  return html`<${Sheet} open=${open} onClose=${writing ? () => setWriting(false) : onClose} title=${writing ? 'What should the agent do?' : 'New session'} doneLabel=${writing ? 'Done' : 'Cancel'} full=${writing}>
     <div class="stack">
       ${agents.length > 1 && html`<div class="seg">${agents.map((a) => html`<button class=${provider === a.provider ? 'on' : ''} onClick=${() => { setProvider(a.provider); setModelSel(null); }}>${a.displayName}</button>`)}</div>`}
-      <div class="field"><label>What should the agent do?</label>
-        <textarea class="input" rows="3" placeholder="e.g. Fix the failing tests and explain what was wrong" value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
+      <div class="field prompt-field"><label>What should the agent do?</label>
+        <div class=${`prompt-box ${dropping ? 'dropping' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
+          <textarea ref=${ta} class="input" rows="3" placeholder="e.g. Fix the failing tests and explain what was wrong" value=${text} onInput=${(e) => setText(e.target.value)} onPaste=${onPaste}></textarea>
+          <${GrowButton} expanded=${writing} onToggle=${toggleWriting} />
+        </div>
+        <${AttachmentChips} list=${files} read=${(u) => store.readImage(u)} onRemove=${(i) => setFiles(files.filter((_, j) => j !== i))} busy=${adding} busyLabel="Adding…" />
+        <div class="row attach-row">
+          <button type="button" class="btn sm" onClick=${() => fileInput.current?.click()}><${Icon} name="clip" size="16" /> Add photos or files</button>
+        </div>
+        <input ref=${fileInput} type="file" multiple class="hidden" accept=${ATTACH_ACCEPT} onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
       </div>
       <div class="field"><label>Folder on your PC</label>
         ${allFolders.slice(0, 5).map((f) => html`<button class=${`list-item ${f === folder ? 'on' : ''}`} key=${f} onClick=${() => setFolder(f)}>
@@ -201,7 +295,7 @@ function NewSession({ store, open, onClose, onCreated, copilotHost = false }) {
       ${!copilotHost && html`<div class="field"><label>Where changes go</label>
         <div class="seg">${[['folder', 'This folder'], ['worktree', 'New worktree']].map(([v, l]) => html`<button class=${isolation === v ? 'on' : ''} onClick=${() => setIsolation(v)}>${l}</button>`)}</div>
       </div>`}
-      <button class="btn primary block" disabled=${busy || !folder} onClick=${create}>${busy ? html`<${Spinner} /> Starting…` : 'Start session'}</button>
+      <button class="btn primary block" disabled=${busy || adding > 0 || !folder} onClick=${create}>${busy ? html`<${Spinner} /> ${phase || 'Starting…'}` : 'Start session'}</button>
       ${copilotHost && html`<p class="muted small new-note"><${Icon} name="info" size="15" /><span>Runs on your PC in the background, with your GitHub Copilot sign-in, models, tools and plugins, like a Copilot CLI session. It doesn't open in the app window: follow and control it here.</span></p>`}
     </div>
     ${browse && html`<${FolderBrowser} store=${store} start=${folder || store.defaultDirectory} onPick=${setFolder} onClose=${() => setBrowse(false)} />`}
@@ -292,7 +386,7 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
       : html`<div class="bottom-bar">
       <button class="newbar" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
     </div>`)}
-    ${store.online && canCreate && html`<${NewSession} store=${store} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} copilotHost=${copilotHost} />`}
+    ${store.online && canCreate && html`<${NewSession} store=${store} conn=${conn} open=${newOpen} onClose=${onNewClose} onCreated=${onOpen} copilotHost=${copilotHost} />`}
   </div>`;
 }
 

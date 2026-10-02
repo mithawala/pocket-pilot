@@ -43,7 +43,9 @@ function fail(m) {
 }
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-home-'));
-const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-ws-'));
+// In a folder of its own: the phone's folder browser lists at most 1000 folders, and a temp folder can have more.
+const ws = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-e2e-ws-')), 'workspace');
+fs.mkdirSync(ws);
 fs.writeFileSync(path.join(ws, 'README.md'), '# e2e workspace\n');
 process.env.POCKET_PILOT_HOME = home;
 process.env.POCKET_PILOT_DEBUG = '1';
@@ -72,6 +74,8 @@ const { CopilotClient, RuntimeConnection, approveAll } = await import(pathToFile
 const ipc = await import(pathToFileURL(path.join(root, 'copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib/ipc.mjs')).href);
 const { pairWithHost, HostConnection } = await import('../pwa/js/net/host-connection.js');
 const { HostStore } = await import('../pwa/js/model/host-store.js');
+const { prepareFile, uploadFile } = await import('../pwa/js/lib/uploads.js');
+const { answerFor } = await import('../pwa/js/ui/parts.js');
 
 async function until(fn, what, ms = 120000) {
   const end = Date.now() + ms;
@@ -108,7 +112,11 @@ const session = await client.createSession({
 });
 step(`session ${session.sessionId} created in ${ws}`);
 const seen = [];
-session.on((e) => seen.push(`${e.type}${e.data?.toolName ? `:${e.data.toolName}` : ''}${e.data?.permissionRequest ? `:${e.data.permissionRequest.kind}` : ''}`));
+const answersSeen = [];
+session.on((e) => {
+  seen.push(`${e.type}${e.data?.toolName ? `:${e.data.toolName}` : ''}${e.data?.permissionRequest ? `:${e.data.permissionRequest.kind}` : ''}`);
+  if (e.type === 'user_input.completed') answersSeen.push(e.data);
+});
 
 // Empty sessions (like the app's internal warm-up sessions) stay off the phone: talk to it first.
 if (fs.existsSync(path.join(home, 'hub.json'))) fail('an empty session must not host the hub');
@@ -198,38 +206,64 @@ fs.rmSync(shotDir, { recursive: true, force: true });
 
 // 2c. A new session started on the phone: the hub runs it in a Copilot runtime of its own (the app
 //     only opens chats from outside after a click on the PC), in a folder picked in the phone's browser.
+//     A photo and a file sent with the first message go into that folder first. The model sees the
+//     photo; it reads the file, which may ask the phone first (allowed once, like a person would).
 const folders = await store.listDirectory(pathToFileURL(path.dirname(ws)).href);
 if (!folders.includes(path.basename(ws))) fail(`the folder browser did not list ${path.basename(ws)}: ${folders.slice(0, 20)}`);
+const codeWord = `PERIWINKLE${Math.floor(1000 + Math.random() * 9000)}`;
+const notes = await prepareFile(new File([`The code word is ${codeWord}.\n`], 'notes.txt', { type: 'text/plain' }));
+const photo = await prepareFile(new File([fs.readFileSync(path.join(root, 'marketing', 'social', 'video-thumbnail.png'))], 'shot.png', { type: 'image/png' }));
 const newAt = Date.now();
-const phoneUri = await store.createSession({ provider: 'copilotcli', folder: pathToFileURL(ws).href, text: 'Reply with just the word fresh.', model: { id: model }, modelAtStart: true, config: { mode: 'interactive', autoApprove: 'default' } });
+const phoneUri = await store.createSession({
+  provider: 'copilotcli', folder: pathToFileURL(ws).href, model: { id: model }, modelAtStart: true, config: { mode: 'interactive', autoApprove: 'default' },
+  text: 'Reply with two things on one line: the code word from the attached notes.txt file, and the large headline text in the attached picture shot.png.',
+  prepare: async (sessionUri) => [...(await uploadFile(conn, sessionUri, photo)), ...(await uploadFile(conn, sessionUri, notes))],
+});
 const phoneRelease = store.watchSession(phoneUri);
 const phoneChat = await until(() => store.chatFor(phoneUri) && store.chatState.get(store.chatFor(phoneUri)) && store.chatFor(phoneUri), 'the new session\'s chat', 60000);
+const allowed = [];
 const fresh = await until(() => {
   const cs = store.chatState.get(phoneChat);
+  const ask = cs?.activeTurn?.responseParts.find((p) => p.kind === 'toolCall' && p.toolCall.status === 'pending-confirmation');
+  if (ask && !allowed.includes(ask.toolCall.toolCallId)) {
+    const input = ask.toolCall.toolInput;
+    const what = `${ask.toolCall.toolName} ${typeof input === 'string' ? input : JSON.stringify(input || '')} ${JSON.stringify(ask.toolCall.invocationMessage || '')}`;
+    if (!/^(view|read)/i.test(ask.toolCall.toolName) || !/notes\.txt/.test(what)) fail(`the new session asked for something other than reading the file it was sent: ${what.slice(0, 200)}`);
+    allowed.push(ask.toolCall.toolCallId);
+    store.confirmTool(phoneChat, cs.activeTurn.id, ask.toolCall.toolCallId, true, 'approve-once');
+  }
   const last = cs?.turns?.[cs.turns.length - 1];
-  return !cs?.activeTurn && last && /fresh/i.test(last.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ')) ? last : null;
-}, 'the reply in the session started on the phone', 180000);
+  const md = last ? last.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ') : '';
+  return !cs?.activeTurn && last && new RegExp(codeWord, 'i').test(md) ? last : null;
+}, 'the code word from the attached file in the session started on the phone', 180000);
+const freshReply = fresh.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ').replace(/\s+/g, ' ').trim();
+if (!/pocket/i.test(freshReply)) fail(`the reply does not have the picture's headline: ${freshReply.slice(0, 200)}`);
 const phoneSummary = store.sessions.get(phoneUri);
 const sameDir = (a, b) => (process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b));
 if (!sameDir(fileURLToPath(phoneSummary.workingDirectories[0]), ws)) fail(`the new session runs in ${phoneSummary.workingDirectories[0]}, not ${ws}`);
-step(`session started on the phone: ${phoneUri.slice(12, 20)} in ${path.basename(ws)} answered "${fresh.message.text}" -> ${fresh.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ').trim().slice(0, 40)} (${((Date.now() - newAt) / 1000).toFixed(1)}s)`);
+const uploaded = fs.readdirSync(path.join(ws, '.pocket-pilot', 'uploads')).filter((f) => /-(notes\.txt|shot\.png)$/.test(f));
+if (uploaded.length !== 2) fail(`the files sent with the new session are not in ${path.join(ws, '.pocket-pilot', 'uploads')}: ${uploaded}`);
+step(`session started on the phone with a photo and a file: ${phoneUri.slice(12, 20)} in ${path.basename(ws)}, both saved in .pocket-pilot/uploads; ${allowed.length ? `reading notes.txt was allowed on the phone, ` : ''}reply: ${freshReply.slice(0, 80)} (${((Date.now() - newAt) / 1000).toFixed(1)}s)`);
 phoneRelease();
 
-// 3. The agent asks a question; the phone answers it.
-store.sendMessage(uri, { text: 'Use the ask_user tool to ask me whether I prefer tabs or spaces, with the two choices "Tabs" and "Spaces". After I answer, reply with one sentence that repeats my choice.' });
+// 3. The agent asks a question; the phone answers it in its own words (what the question card sends).
+store.sendMessage(uri, { text: 'Use the ask_user tool to ask me whether I prefer tabs or spaces, with the two choices "Tabs" and "Spaces". After I answer, reply with one sentence that repeats my answer word for word.' });
 const ask = await until(() => store.chatState.get(chat).activeTurn?.responseParts.find((p) => p.kind === 'inputRequest' && !p.response), 'the question on the phone', 180000);
 const q = ask.request.questions[0];
-step(`phone shows question: "${q.message}" ${JSON.stringify((q.options || []).map((o) => o.label))}`);
-const pick = (q.options || []).find((o) => /spaces/i.test(o.label));
-store.answerInput(chat, ask.request.id, 'accept', { [q.id]: pick ? { state: 'submitted', value: { kind: 'selected', value: pick.id } } : { state: 'submitted', value: { kind: 'text', value: 'Spaces' } } });
+step(`phone shows question: "${q.message}" ${JSON.stringify((q.options || []).map((o) => o.label))}${q.allowFreeformInput ? ' + your own answer' : ''}`);
+if (!q.allowFreeformInput) fail('the question does not take an answer in your own words');
+const own = 'Spaces, exactly 3 wide';
+store.answerInput(chat, ask.request.id, 'accept', { [q.id]: answerFor(q, undefined, own) });
 const answered = await until(() => {
   const cs = store.chatState.get(chat);
   const last = cs.turns[cs.turns.length - 1];
   return !cs.activeTurn && /tabs or spaces/i.test(last?.message.text || '') ? last : null;
 }, 'the answered turn', 180000);
 const reply = answered.responseParts.filter((p) => p.kind === 'markdown').map((p) => p.content).join(' ');
-if (!/spaces/i.test(reply)) fail(`the reply does not repeat the phone's answer: ${reply.slice(0, 160)}`);
-step(`answer reached the agent: ${reply.replace(/\s+/g, ' ').slice(0, 100)}`);
+const got = answersSeen[answersSeen.length - 1];
+if (got?.answer !== own || got?.wasFreeform !== true) fail(`the runtime did not get the typed answer: ${JSON.stringify(got)}`);
+if (!/spaces/i.test(reply)) fail(`the reply does not repeat the phone's answer ("${own}"): ${reply.slice(0, 160)}`);
+step(`typed answer reached the agent as the user's own words ("${got.answer}"): ${reply.replace(/\s+/g, ' ').slice(0, 100)}`);
 
 // 4. Switching the agent mode from the phone changes the runtime's mode.
 store.setConfig(uri, { mode: 'plan' });

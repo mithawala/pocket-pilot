@@ -136,7 +136,7 @@ function sessionsData() {
           request: {
             id: 'demo-question', message: 'The project has no date library yet. Which one should I add?',
             questions: [{
-              id: 'lib', kind: 'single-select', title: 'Date library', message: 'All three are tree-shakeable and handle time zones.', required: true,
+              id: 'lib', kind: 'single-select', title: 'Date library', message: 'All three are tree-shakeable and handle time zones.', required: true, allowFreeformInput: true,
               options: [
                 { id: 'date-fns', label: 'date-fns', description: 'Plain functions, about 6 KB for what the form needs', recommended: true },
                 { id: 'dayjs', label: 'Day.js', description: 'Moment-style API, 2 KB core plus plugins' },
@@ -329,9 +329,12 @@ class DemoStore extends HostStore {
       await this._stream(chat, 'All **42 tests pass** and coverage went up to **94%**. ✅ The auth module now uses `TokenService` everywhere — want me to open a pull request?');
       this._finish(chat, sessionUri);
     } else if (action.type === 'chat/inputCompleted') {
-      const picked = action.answers?.lib?.value?.value;
-      const name = { 'date-fns': 'date-fns', dayjs: 'Day.js', temporal: 'the Temporal polyfill' }[picked] || 'date-fns';
-      const pkg = { 'date-fns': 'date-fns', dayjs: 'dayjs', temporal: '@js-temporal/polyfill' }[picked] || 'date-fns';
+      const answer = action.answers?.lib?.value;
+      const picked = answer?.value;
+      // An answer in the user's own words: that library, if it looks like a package name.
+      const own = answer?.kind === 'text' ? String(picked).trim() : '';
+      const name = own || { 'date-fns': 'date-fns', dayjs: 'Day.js', temporal: 'the Temporal polyfill' }[picked] || 'date-fns';
+      const pkg = own ? (/^@?[a-z0-9][\w.-]*(\/[\w.-]+)?$/i.test(own) ? own.toLowerCase() : 'date-fns') : { 'date-fns': 'date-fns', dayjs: 'dayjs', temporal: '@js-temporal/polyfill' }[picked] || 'date-fns';
       this._setSummary(sessionUri, { status: S.InProgress | S.IsRead, activity: `Installing ${pkg}` });
       await wait(900);
       this._parts(chat, (p) => [...p, tool(uuid(), 'powershell', 'Run Shell Command', 'terminal', `Run \`npm install ${pkg}\``, `Ran \`npm install ${pkg}\``, { command: `npm install ${pkg}` }, `added 1 package in 2s`)]);
@@ -376,7 +379,7 @@ class DemoStore extends HostStore {
     return { data: btoa(settingsScreenshot()), encoding: 'base64', contentType: 'image/svg+xml' };
   }
 
-  async createSession({ provider, folder: dir, config, text, model }) {
+  async createSession({ provider, folder: dir, config, text, model, attachments, prepare }) {
     const id = uuid().slice(0, 8);
     const resource = `${provider}:/demo-${id}`;
     const chatUri = `ahp-chat://default/demo-${id}`;
@@ -389,7 +392,8 @@ class DemoStore extends HostStore {
     this.snapshotSeq.set(chatUri, 0);
     this.kinds.set(chatUri, 'chat');
     this._emit('sessions');
-    if (text) this.sendMessage(resource, { text, model });
+    const all = [...(attachments || []), ...((prepare && (await prepare(resource))) || [])];
+    if (text || all.length) this.sendMessage(resource, { text: text || '', model, attachments: all });
     return resource;
   }
 

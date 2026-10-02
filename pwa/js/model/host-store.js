@@ -531,8 +531,11 @@ export class HostStore extends EventTarget {
   /**
    * Creates a session, waits until it is ready and sends the first message. `modelAtStart` also sends
    * the model with the request, for hosts that start the session with it (the Copilot app plugin).
+   * `prepare(uri)` runs once the session exists and before the first message, and returns more
+   * attachments for it: files sent from the device go into the new session's folder on the PC. If it
+   * fails, no message is sent and the error carries the new session's address (`sessionUri`).
    */
-  async createSession({ provider, folder, config, text, model, attachments, modelAtStart = false }) {
+  async createSession({ provider, folder, config, text, model, attachments, prepare, modelAtStart = false }) {
     if (!this.client) throw new Error('Not connected to your PC');
     const uri = `${provider}:/${uuid()}`;
     await this.client.request('createSession', { channel: uri, provider, workingDirectories: [folder], ...(config ? { config } : {}), ...(modelAtStart && model ? { model } : {}) });
@@ -563,8 +566,17 @@ export class HostStore extends EventTarget {
         this.addEventListener('change', check);
         check();
       });
-      if (text) this.sendMessage(uri, { text, model, attachments });
       void chat;
+      let all = attachments || [];
+      if (prepare) {
+        try {
+          all = [...all, ...((await prepare(uri)) || [])];
+        } catch (err) {
+          err.sessionUri = uri;
+          throw err;
+        }
+      }
+      if (text || all.length) this.sendMessage(uri, { text: text || '', model, attachments: all });
       return uri;
     } finally {
       setTimeout(stop, 1000);
