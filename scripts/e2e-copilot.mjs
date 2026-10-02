@@ -389,6 +389,6 @@ await client.stop().catch(() => {});
 await hubRpc.request('stop').catch(() => {});
 ch.close();
 clearTimeout(watchdog);
-for (const dir of [home, ws, copilotHome, path.dirname(pluginDir)]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+for (const dir of [home, path.dirname(ws), copilotHome, path.dirname(pluginDir)]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 step('E2E OK');
 process.exit(0);

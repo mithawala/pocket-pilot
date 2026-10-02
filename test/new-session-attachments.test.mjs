@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,7 +6,17 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-process.env.POCKET_PILOT_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-new-attach-'));
+const temp = [];
+const tempDir = (prefix) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  temp.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of temp) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+process.env.POCKET_PILOT_HOME = tempDir('pp-new-attach-');
 const lib = '../copilot-plugin/com.github.copilot/extensions/pocket-pilot/lib';
 const { CopilotAgentHost } = await import(`${lib}/agent-host.mjs`);
 const { rootReducer, sessionReducer, chatReducer, SUPPORTED_PROTOCOL_VERSIONS } = await import('../pwa/vendor/ahp/types/index.js');
@@ -130,7 +140,7 @@ async function phoneAndHost() {
 
 test('new session with a photo: it goes to the new session\'s folder first, then the first message carries it', async () => {
   const { bridge, host, store, close } = await phoneAndHost();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-new-attach-cwd-'));
+  const dir = tempDir('pp-new-attach-cwd-');
   try {
     const saved = [];
     // The hub saves an upload in the folder of the session it names (hub.mjs saveUpload).
@@ -179,7 +189,7 @@ test('a message of just files gets words, in the chat box and in New session', (
 
 test('new session with a photo that does not arrive: no message goes out, and the error names the session to open', async () => {
   const { bridge, store, close } = await phoneAndHost();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-new-attach-fail-'));
+  const dir = tempDir('pp-new-attach-fail-');
   try {
     const conn = { upload: async () => { throw new Error('The PC could not save the file'); } };
     const photo = await prepareFile(file('a.png', 'image/png'), { convert: toJpeg });
