@@ -62,7 +62,7 @@ function SessionMenu({ open, onClose, store, uri, session, onDeleted }) {
       <div class="kv">${(session?.workingDirectories || []).map(filePath).join('\n')}</div>
       <button class="btn block" onClick=${() => { store.archive(uri, true); onClose(); onDeleted(); }}><${Icon} name="folder" /> Archive</button>
       <button class="btn block danger" onClick=${async () => {
-        if (!confirm('Delete this session on your PC? This cannot be undone.')) return;
+        if (!confirm('Delete this session on your computer? This cannot be undone.')) return;
         try {
           await store.disposeSession(uri);
           onClose();
@@ -216,7 +216,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
           ${empty && html`<div class="chat-empty">
             <div class="big"><${Icon} name="sparkle" /></div>
             <h2>${providerLabel(provider)} is ready</h2>
-            <p>${folder ? html`Ask anything about <b>${folder}</b>. ` : ''}The agent works on your PC, and you can follow along here or in ${hostApp(conn?.record)}.</p>
+            <p>${folder ? html`Ask anything about <b>${folder}</b>. ` : ''}The agent works on your computer, and you can follow along here or in ${hostApp(conn?.record)}.</p>
           </div>`}
         </div>
       </div>

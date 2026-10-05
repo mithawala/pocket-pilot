@@ -114,8 +114,8 @@ export function AuthenticatorSetup({ storageKey, hostName, deviceName, onReady, 
   };
   return html`<div class="card stack authn">
     <div class="authn-head"><${Icon} name="key" /><b>Set up your authenticator app</b></div>
-    <p class="muted small">${note || 'Your PC will ask for a 6-digit code from it now and then (every 12 hours by default), instead of Face ID.'}</p>
-    ${live && html`<div class="authn-warn">Your PC is waiting. If switching apps disconnects the pairing, click <b>New code</b> on your PC and scan it again: this setup is kept.</div>`}
+    <p class="muted small">${note || 'Your computer will ask for a 6-digit code from it now and then (every 12 hours by default), instead of Face ID.'}</p>
+    ${live && html`<div class="authn-warn">Your computer is waiting. If switching apps disconnects the pairing, click <b>New code</b> on your computer and scan it again: this setup is kept.</div>`}
     <ol class="authn-steps">
       ${phone ? html`<li>
         <div><b>Copy the setup key</b></div>
@@ -164,7 +164,7 @@ export function passkeyTrouble(err, use = false) {
   if (use) {
     return {
       title: "Face ID or your passkey didn't go through",
-      text: "If you cancelled, tap Try again. If this device can't find the passkey anymore (it was saved in an app you've since turned off or removed, such as Microsoft Authenticator or 1Password), tap Set up this device again: your PC asks you to allow it, then you save a new passkey or use an authenticator app.",
+      text: "If you cancelled, tap Try again. If this device can't find the passkey anymore (it was saved in an app you've since turned off or removed, such as Microsoft Authenticator or 1Password), tap Set up this device again: your computer asks you to allow it, then you save a new passkey or use an authenticator app.",
     };
   }
   if (name === 'NotAllowedError' || /not allowed|denied|cancel/i.test(err?.message || '')) {
@@ -174,7 +174,7 @@ export function passkeyTrouble(err, use = false) {
       totpFirst: true,
     };
   }
-  if (name === 'InvalidStateError') return { title: 'This device already has a passkey for your PC', text: 'Tap Try again to make a new one, or use an authenticator app.' };
+  if (name === 'InvalidStateError') return { title: 'This device already has a passkey for your computer', text: 'Tap Try again to make a new one, or use an authenticator app.' };
   if (/No Face ID|no passkey|not supported/i.test(err?.message || '') || name === 'NotSupportedError') {
     return { title: "This device can't save passkeys", text: 'It has no Face ID, fingerprint or screen lock set up, or the browser has no passkey support. Use an authenticator app instead, or set up a screen lock and try again.', totpFirst: true };
   }
@@ -199,7 +199,7 @@ export function FactorChooser({ error: firstError, register, allowTotp, canPassk
   };
   if (mode === 'totp') {
     return html`<${AuthenticatorSetup} storageKey=${storageKey} hostName=${hostName} deviceName=${deviceName} live=${live}
-      note=${canPasskey ? null : "This device can't save passkeys, so your PC will ask for a 6-digit code from your authenticator app now and then."}
+      note=${canPasskey ? null : "This device can't save passkeys, so your computer will ask for a 6-digit code from your authenticator app now and then."}
       onReady=${async (s) => onDone({ totp: { secret: s.secret, code: await codeAt(s.secret, stepAt()) } })}
       onPasskey=${canPasskey ? () => setMode('choose') : null} onCancel=${onCancel} />`;
   }
@@ -229,7 +229,7 @@ function PasskeyBody({ request }) {
   const t = error ? passkeyTrouble(error, true) : null;
   return html`<div class="stack">
     ${t && html`<div class="authn-head warn"><${Icon} name="alert-circle" /><b>${t.title}</b></div>`}
-    <p class="muted" style="margin:0">${t ? t.text : `Use Face ID, Touch ID or your fingerprint to reconnect to ${request.hostName || 'your PC'}.`}</p>
+    <p class="muted" style="margin:0">${t ? t.text : `Use Face ID, Touch ID or your fingerprint to reconnect to ${request.hostName || 'your computer'}.`}</p>
     <button class="btn primary block" disabled=${busy} onClick=${use}><${Icon} name=${error ? 'refresh' : 'lock'} /> ${error ? 'Try again' : 'Use Face ID or fingerprint'}</button>
     ${error && html`<button class="btn block" onClick=${() => request.resolve({ reset: true })}><${Icon} name="key" /> Set up this device again</button>`}
   </div>`;
@@ -247,7 +247,7 @@ export function FactorSheet({ request, onCancel }) {
   return html`<${Sheet} open=${true} onClose=${onCancel} title="Set up this device again" doneLabel="Cancel">
     <${FactorChooser} register=${request.register} allowTotp=${request.allowTotp} canPasskey=${request.canPasskey}
       storageKey=${request.storageKey} hostName=${request.hostName} deviceName=${request.deviceName}
-      intro="Your PC allowed it. Save a new passkey, or use codes from an authenticator app from now on."
+      intro="Your computer allowed it. Save a new passkey, or use codes from an authenticator app from now on."
       onDone=${request.resolve} onCancel=${onCancel} />
   </${Sheet}>`;
 }

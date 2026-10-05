@@ -9,10 +9,11 @@ import { PictureViewer } from './viewer.js';
 import { SessionsScreen, DesktopHome } from './sessions.js';
 import { ChatScreen } from './chat.js';
 import { Welcome, PairScreen } from './pair.js';
-import { SettingsScreen, NotificationSetup, pushPromptWanted } from './settings.js';
+import { SettingsScreen, NotificationSetup, RenameHost, pushPromptWanted } from './settings.js';
 import { QrScanner } from './scanner.js';
 import { CodeSheet, PasskeySheet, FactorSheet, clearSetup } from './authenticator.js';
 import { isPairingFragment } from '../core/secure-channel.js';
+import { hostLabel, defaultHostLabel, cleanHostLabel } from '../lib/format.js';
 
 function parseRoute() {
   const h = location.hash.replace(/^#/, '');
@@ -111,14 +112,14 @@ export class AppController extends EventTarget {
         error = err;
       }
     }
-    return this._ask('passkey', { hostName: req.hostName, error, assert: () => webauthn.assert(req) });
+    return this._ask('passkey', { hostName: this.current ? hostLabel(this.current) : req.hostName, error, assert: () => webauthn.assert(req) });
   }
 
   /** After a yes on the PC, this device sets up a new passkey or an authenticator app. */
   async _enrollFactor(req) {
     const canPasskey = await passkeysAvailable();
     const allowTotp = req.alternatives.includes('totp');
-    if (!canPasskey && !allowTotp) throw new Error('This device has no Face ID, fingerprint or screen lock, and your PC only accepts passkeys.');
+    if (!canPasskey && !allowTotp) throw new Error('This device has no Face ID, fingerprint or screen lock, and your computer only accepts passkeys.');
     const storageKey = `again-${req.hostId}`;
     const r = await this._ask('factor', { hostName: req.hostName, deviceName: req.deviceName, storageKey, allowTotp, canPasskey, register: () => webauthn.register(req) });
     clearSetup(storageKey);
@@ -193,7 +194,7 @@ export class AppController extends EventTarget {
 
   _connectCurrent() {
     if (this.demo) return;
-    this.sheet?.reject(new Error('Switched PC'));
+    this.sheet?.reject(new Error('Switched computer'));
     if (this.active) {
       this.active.conn.stop();
       this.active.store.dispose();
@@ -231,9 +232,26 @@ export class AppController extends EventTarget {
   }
 
   async addHost(record) {
+    // Paired again: the name you gave it stays.
+    const before = this.hosts.find((h) => h.hostId === record.hostId);
+    if (before?.customName && !record.customName) record.customName = before.customName;
     this.hosts = [...this.hosts.filter((h) => h.hostId !== record.hostId), record];
     await db.putHost(record);
     await this.selectHost(record.hostId);
+  }
+
+  /**
+   * Gives a paired computer a name of your own, on this device ('' or its default name: the default).
+   * The record is the one the connection holds, so its own updates keep the name.
+   */
+  async renameHost(host, name) {
+    const h = this.hosts.find((x) => x.hostId === host.hostId);
+    if (!h) return;
+    const clean = cleanHostLabel(name);
+    if (!clean || clean === defaultHostLabel(h)) delete h.customName;
+    else h.customName = clean;
+    if (!this.demo) await db.putHost(h);
+    this._emit();
   }
 
   async forgetHost(host) {
@@ -254,7 +272,7 @@ export class AppController extends EventTarget {
   }
 
   async repair(host) {
-    if (!confirm(`${host.hostName} no longer recognises this device. Forget it and pair again?`)) return;
+    if (!confirm(`${hostLabel(host)} no longer recognises this device. Forget it and pair again?`)) return;
     await db.deleteHost(host.hostId);
     this.hosts = this.hosts.filter((h) => h.hostId !== host.hostId);
     this.currentId = this.hosts[0]?.hostId || null;
@@ -269,12 +287,12 @@ export class AppController extends EventTarget {
   }
 
   async enablePush(host) {
-    if (this.demo) throw new Error('Notifications work once you pair your own PC');
-    if (!this.active || this.active.host.hostId !== host.hostId || this.active.conn.state !== 'online') throw new Error('Connect to the PC first');
-    if (!host.vapidPublicKey) throw new Error('This PC did not provide a push key');
+    if (this.demo) throw new Error('Notifications work once you pair your own computer');
+    if (!this.active || this.active.host.hostId !== host.hostId || this.active.conn.state !== 'online') throw new Error('Connect to the computer first');
+    if (!host.vapidPublicKey) throw new Error('This computer did not provide a push key');
     const sub = await pushSubscribe(host.vapidPublicKey);
     const r = await this.active.conn.subscribePush(sub);
-    if (!r.ok) throw new Error(r.error || 'The PC rejected the subscription');
+    if (!r.ok) throw new Error(r.error || 'The computer rejected the subscription');
     for (const h of this.hosts) {
       if (h.pushEnabled && h.hostId !== host.hostId) {
         h.pushEnabled = false;
@@ -331,12 +349,15 @@ export class AppController extends EventTarget {
   }
 }
 
-function HostSwitcher({ app, open, onClose }) {
-  return html`<${Sheet} open=${open} onClose=${onClose} title="Your PCs">
-    ${app.hosts.map((h) => html`<button class=${`list-item ${h.hostId === app.currentId ? 'on' : ''}`} onClick=${() => { app.selectHost(h.hostId); onClose(); }}>
-      <${Icon} name="monitor" /><span class="grow">${h.hostName}</span>${h.hostId === app.currentId && html`<span class="check"><${Icon} name="check" /></span>`}
-    </button>`)}
-    <button class="list-item" onClick=${() => { onClose(); location.hash = '#/settings'; }}><${Icon} name="gear" /><span class="grow">Manage PCs</span></button>
+function HostSwitcher({ app, open, onClose, onRename }) {
+  return html`<${Sheet} open=${open} onClose=${onClose} title="Your computers">
+    ${app.hosts.map((h) => html`<div class="host-pick" key=${h.hostId}>
+      <button class=${`list-item ${h.hostId === app.currentId ? 'on' : ''}`} onClick=${() => { app.selectHost(h.hostId); onClose(); }}>
+        <${Icon} name="monitor" /><div class="grow"><div>${hostLabel(h)}</div>${h.customName && html`<div class="muted tiny">${defaultHostLabel(h)}</div>`}</div>${h.hostId === app.currentId && html`<span class="check"><${Icon} name="check" /></span>`}
+      </button>
+      <button class="icon-btn" onClick=${() => { onClose(); onRename(h); }} aria-label=${`Rename ${hostLabel(h)}`} title="Rename"><${Icon} name="edit" /></button>
+    </div>`)}
+    <button class="list-item" onClick=${() => { onClose(); location.hash = '#/settings'; }}><${Icon} name="gear" /><span class="grow">Manage computers</span></button>
   </${Sheet}>`;
 }
 
@@ -344,6 +365,7 @@ export function App({ app }) {
   useChange(app);
   const [route, setRoute] = useState(parseRoute());
   const [switcher, setSwitcher] = useState(false);
+  const [renaming, setRenaming] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const wide = useWide();
@@ -382,7 +404,7 @@ export function App({ app }) {
       onPaired=${async (record) => {
         app.pendingFragment = null;
         await app.addHost(record);
-        toast(`Paired with ${record.hostName} 🎉`);
+        toast(`Paired with ${hostLabel(app.hosts.find((h) => h.hostId === record.hostId) || record)} 🎉`);
       }}
       onRescan=${() => setScanning(true)}
       onCancel=${() => { app.pendingFragment = null; location.hash = '#/'; }} />`);
@@ -418,11 +440,12 @@ export function App({ app }) {
       onSwitchHost=${() => setSwitcher(true)} />`;
   }
   return html`<div class=${`shell ${app.demo ? 'has-banner' : ''}`}>
-    ${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my PC →</b></a>`}
+    ${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my computer →</b></a>`}
     ${screen}
     <${Toasts} />
     <${PictureViewer} />
-    <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} />
+    <${HostSwitcher} app=${app} open=${switcher} onClose=${() => setSwitcher(false)} onRename=${setRenaming} />
+    ${renaming && html`<${RenameHost} app=${app} host=${renaming} onClose=${() => setRenaming(null)} />`}
     <${CodeSheet} request=${app.sheet?.kind === 'code' ? app.sheet : null} onSubmit=${(code) => app.sheet?.resolve(code)} onReset=${() => app.sheet?.resolve({ reset: true })} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
     <${PasskeySheet} request=${app.sheet?.kind === 'passkey' ? app.sheet : null} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />
     <${FactorSheet} request=${app.sheet?.kind === 'factor' ? app.sheet : null} onCancel=${() => app.sheet?.reject(new Error('cancelled'))} />

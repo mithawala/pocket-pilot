@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.10';
+export const APP_VERSION = '0.7.11';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 
@@ -22,11 +22,11 @@ export class PairingError extends Error {
 
 // Local wording for rejections the PC can only send in plaintext (before any keys exist).
 const PLAINTEXT_REASONS = {
-  'pairing-expired': 'This pairing code has expired or was already used. Show a new QR code on your PC.',
+  'pairing-expired': 'This pairing code has expired or was already used. Show a new QR code on your computer.',
 };
 
 function untrustedError(peerCode) {
-  return new PairingError('peer-rejected', PLAINTEXT_REASONS[peerCode] || 'Your PC refused the connection.', { untrusted: true, peerCode });
+  return new PairingError('peer-rejected', PLAINTEXT_REASONS[peerCode] || 'Your computer refused the connection.', { untrusted: true, peerCode });
 }
 
 function wsUrl(httpUrl) {
@@ -57,7 +57,7 @@ function createMessenger(sock, cipher, compress) {
     recv,
     async recvControl(timeoutMs) {
       const text = await recv(timeoutMs);
-      if (text[0] !== 'C') throw new PairingError('protocol', 'Unexpected message from PC');
+      if (text[0] !== 'C') throw new PairingError('protocol', 'Unexpected message from your computer');
       return JSON.parse(text.slice(1));
     },
     sendControl(obj) {
@@ -77,7 +77,7 @@ function createMessenger(sock, cipher, compress) {
  */
 export async function pairWithHost({ fragment, deviceName, platform, webauthn, factor, WebSocketImpl, onStatus = () => {} }) {
   const p = sc.decodePairingFragment(fragment);
-  if (!p) throw new PairingError('bad-link', 'This pairing link is invalid. Scan the QR code on your PC again.');
+  if (!p) throw new PairingError('bad-link', 'This pairing link is invalid. Scan the QR code on your computer again.');
   const answer = factor || (async (req) => ({ credential: await webauthn.register(req) }));
   const deviceKeys = await sc.generateKeyPair(false);
   onStatus('connecting');
@@ -103,19 +103,19 @@ export async function pairWithHost({ fragment, deviceName, platform, webauthn, f
         onStatus('passkey');
         let reply;
         try {
-          const r = await answer({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'PC'} · Pocket Pilot`, displayName: deviceName, hostName: p.name || 'your PC', alternatives: Array.isArray(m.alternatives) ? m.alternatives : [], hostKnowsTotp: Array.isArray(m.alternatives) });
+          const r = await answer({ challenge: m.challenge, userId: m.userId, userName: `${p.name || 'Computer'} · Pocket Pilot`, displayName: deviceName, hostName: p.name || 'your computer', alternatives: Array.isArray(m.alternatives) ? m.alternatives : [], hostKnowsTotp: Array.isArray(m.alternatives) });
           reply = r.totp ? { t: 'totp.enroll', secret: r.totp.secret, code: r.totp.code } : { t: 'passkey.registered', credential: r.credential };
           factorKind = r.totp ? 'totp' : 'passkey';
         } catch (err) {
           reply = { t: 'passkey.unavailable', reason: String(err?.message || err).slice(0, 200) };
         }
-        if (sock.closed) throw new PairingError('connection-lost', 'The connection to your PC was lost while this device was being set up.');
+        if (sock.closed) throw new PairingError('connection-lost', 'The connection to your computer was lost while this device was being set up.');
         await ch.sendControl(reply);
         onStatus('finishing');
       } else if (m.t === 'welcome') {
         return {
           hostId: m.host.id,
-          hostName: m.host.name || p.name || 'My PC',
+          hostName: m.host.name || p.name || 'My computer',
           url: p.url,
           hostPublicKey: b64u(done.hostPublicKey),
           deviceId: m.deviceId,
@@ -299,18 +299,18 @@ export class HostConnection extends EventTarget {
           this._setState('setup');
           let reply;
           try {
-            const r = await this.enrollFactor({ challenge: m.challenge, userId: m.userId, userName: `${this.record.hostName || 'PC'} · Pocket Pilot`, displayName: this.record.deviceName, hostName: this.record.hostName, deviceName: this.record.deviceName, hostId: this.record.hostId, alternatives: Array.isArray(m.alternatives) ? m.alternatives : [] });
+            const r = await this.enrollFactor({ challenge: m.challenge, userId: m.userId, userName: `${this.record.hostName || 'Computer'} · Pocket Pilot`, displayName: this.record.deviceName, hostName: this.record.hostName, deviceName: this.record.deviceName, hostId: this.record.hostId, alternatives: Array.isArray(m.alternatives) ? m.alternatives : [] });
             reply = r.totp ? { t: 'totp.enroll', secret: r.totp.secret, code: r.totp.code } : { t: 'passkey.registered', credential: r.credential };
           } catch (err) {
             reply = { t: 'passkey.unavailable', reason: String(err?.message || err).slice(0, 200) };
           }
-          if (sock.closed) throw new Error('The connection to your PC was lost while this device was being set up. Try again.');
+          if (sock.closed) throw new Error('The connection to your computer was lost while this device was being set up. Try again.');
           await ch.sendControl(reply);
           this._setState('authenticating');
         } else if (m.t === 'welcome') {
           welcome = m;
           break;
-        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This device was removed on your PC.');
+        } else if (m.t === 'revoked') throw new PairingError('revoked', 'This device was removed on your computer.');
         else if (m.t === 'error') throw new PairingError(m.code, m.message);
       }
       this.welcome = welcome;
@@ -345,7 +345,7 @@ export class HostConnection extends EventTarget {
         return;
       }
       this.failures++;
-      const reason = err && err.untrusted ? 'The PC refused the connection' : err && err.code === 'host-mismatch' ? 'Another machine answered at your PC’s address' : err.message;
+      const reason = err && err.untrusted ? 'The computer refused the connection' : err && err.code === 'host-mismatch' ? 'Another machine answered at your computer’s address' : err.message;
       await this._retry(reason);
     }
   }
@@ -366,7 +366,7 @@ export class HostConnection extends EventTarget {
   _onControl(m) {
     if (m.t === 'revoked') {
       this.stopped = true;
-      this._setState('unpaired', 'This device was removed on your PC.');
+      this._setState('unpaired', 'This device was removed on your computer.');
     }
     if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong') {
       const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t;

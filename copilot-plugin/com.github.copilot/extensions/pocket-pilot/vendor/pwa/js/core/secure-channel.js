@@ -258,7 +258,7 @@ function parseJson(text, expectedType) {
     if (obj && obj.t === 'error') {
       // Plaintext rejections are unauthenticated (anyone on the path could send one):
       // callers must never act on them beyond a retry, and must not show the peer's text.
-      const e = new HandshakeError('peer-rejected', 'The PC refused the connection');
+      const e = new HandshakeError('peer-rejected', 'The computer refused the connection');
       e.untrusted = true;
       e.peerCode = typeof obj.code === 'string' ? obj.code.slice(0, 40) : '';
       throw e;
@@ -306,7 +306,7 @@ export async function createClientHello({ mode, deviceKeys, pairingToken }) {
       }
       const hk = unb64u(ch.hk);
       if (hostPublicKey && !equalBytes(hk, toBytes(hostPublicKey))) {
-        throw new HandshakeError('host-mismatch', 'Host identity does not match the paired PC');
+        throw new HandshakeError('host-mismatch', 'Host identity does not match the paired computer');
       }
       if (hostFingerprint && !equalBytes(await fingerprint(hk), toBytes(hostFingerprint))) {
         throw new HandshakeError('host-mismatch', 'Host identity does not match the QR code');

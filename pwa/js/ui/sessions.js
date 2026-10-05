@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useRef, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
-import { statusOf, ago, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
+import { statusOf, ago, folderName, providerLabel, filePath, hostApp, hostLabel, S, has } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
 import { ModelSheet, ModelOptionsSheet, modelChip, optionsChip, hasOptions } from './model-picker.js';
 import { AttachmentChips, GrowButton, ATTACH_ACCEPT } from './composer.js';
@@ -233,7 +233,7 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
             try {
               items.push(...(await uploadFile(conn, sessionUri, f.file)));
             } catch (err) {
-              throw new Error(`${f.name} didn't reach your PC (${err.message})`);
+              throw new Error(`${f.name} didn't reach your computer (${err.message})`);
             }
           }
           return items;
@@ -276,7 +276,7 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
         </div>
         <input ref=${fileInput} type="file" multiple class="hidden" accept=${ATTACH_ACCEPT} onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
       </div>
-      <div class="field"><label>Folder on your PC</label>
+      <div class="field"><label>Folder on your computer</label>
         ${allFolders.slice(0, 5).map((f) => html`<button class=${`list-item ${f === folder ? 'on' : ''}`} key=${f} onClick=${() => setFolder(f)}>
           <${Icon} name="folder" /><div class="grow"><div>${folderName(f)}</div><div class="muted tiny">${filePath(f)}</div></div>${f === folder && html`<span class="check"><${Icon} name="check" /></span>`}
         </button>`)}
@@ -296,7 +296,7 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
         <div class="seg">${[['folder', 'This folder'], ['worktree', 'New worktree']].map(([v, l]) => html`<button class=${isolation === v ? 'on' : ''} onClick=${() => setIsolation(v)}>${l}</button>`)}</div>
       </div>`}
       <button class="btn primary block" disabled=${busy || adding > 0 || !folder} onClick=${create}>${busy ? html`<${Spinner} /> ${phase || 'Starting…'}` : 'Start session'}</button>
-      ${copilotHost && html`<p class="muted small new-note"><${Icon} name="info" size="15" /><span>Runs on your PC in the background, with your GitHub Copilot sign-in, models, tools and plugins, like a Copilot CLI session. It doesn't open in the app window: follow and control it here.</span></p>`}
+      ${copilotHost && html`<p class="muted small new-note"><${Icon} name="info" size="15" /><span>Runs on your computer in the background, with your GitHub Copilot sign-in, models, tools and plugins, like a Copilot CLI session. It doesn't open in the app window: follow and control it here.</span></p>`}
     </div>
     ${browse && html`<${FolderBrowser} store=${store} start=${folder || store.defaultDirectory} onPick=${setFolder} onClose=${() => setBrowse(false)} />`}
     <${ModelSheet} open=${modelOpen === 'model'} onClose=${() => setModelOpen(null)} models=${models} value=${chosenModel} onChange=${setModelSel} />
@@ -307,15 +307,15 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
 export function ConnectionBanner({ conn, store, onRepair }) {
   const st = conn.state;
   if (st === 'online' && store.ahpConnected) return null;
-  if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your PC.' : 'VS Code agent host is not available on your PC.')}</div>`;
-  if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your PC…</div>`;
+  if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your computer.' : 'VS Code agent host is not available on your computer.')}</div>`;
+  if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your computer…</div>`;
   if (st === 'passkey') return html`<div class="banner"><${Icon} name="lock" size="18" />Confirm it's you (Face ID / fingerprint)…</div>`;
   if (st === 'code') return html`<div class="banner"><${Icon} name="lock" size="18" />Enter the code from your authenticator app…</div>`;
-  if (st === 'approval') return html`<div class="banner"><${Spinner} />Click Allow on your PC to set up this device again…</div>`;
+  if (st === 'approval') return html`<div class="banner"><${Spinner} />Click Allow on your computer to set up this device again…</div>`;
   if (st === 'setup') return html`<div class="banner"><${Icon} name="key" size="18" />Setting up this device again…</div>`;
   if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This device is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
   if (st === 'locked') return html`<div class="banner err"><${Icon} name="lock" size="18" /><span>${conn.detail || 'Verification failed.'}</span><button onClick=${() => { conn.stopped = false; conn.poke(); }}>Retry</button></div>`;
-  return html`<div class="banner warn"><${Spinner} /><span>PC offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
+  return html`<div class="banner warn"><${Spinner} /><span>Computer offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
 }
 
 export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
@@ -355,9 +355,9 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
   return html`<div class="screen">
     <div class="topbar">
       <img class="brand" src="./icons/icon.svg" alt="" />
-      <button class="titles" onClick=${onSwitchHost} aria-label="Switch PC">
-        <h1 class="host"><span>${host.hostName}</span><${Icon} name="down" /></h1>
-        <div class="sub"><span class=${`dot ${online ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`}></span>${online ? `${list.length} session${list.length === 1 ? '' : 's'}` : { passkey: 'confirm it’s you', code: 'waiting for your code', approval: 'waiting for your PC', setup: 'setting up', authenticating: 'connecting', unpaired: 'not paired', locked: 'locked' }[conn.state] || conn.state}</div>
+      <button class="titles" onClick=${onSwitchHost} aria-label="Switch computer">
+        <h1 class="host"><span>${hostLabel(host)}</span><${Icon} name="down" /></h1>
+        <div class="sub"><span class=${`dot ${online ? 'ok' : conn.state === 'offline' ? 'err' : 'busy'}`}></span>${online ? `${list.length} session${list.length === 1 ? '' : 's'}` : { passkey: 'confirm it’s you', code: 'waiting for your code', approval: 'waiting for your computer', setup: 'setting up', authenticating: 'connecting', unpaired: 'not paired', locked: 'locked' }[conn.state] || conn.state}</div>
       </button>
       <button class="icon-btn" onClick=${onSettings} aria-label="Settings"><${Icon} name="gear" /></button>
     </div>
@@ -377,12 +377,12 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
             ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}
           </div>`)}
           ${folders.map((g) => html`<${FolderGroup} key=${g.key} g=${g} closed=${!q && collapsed.has(g.key)} onToggle=${() => toggleFolder(g.key)} onOpen=${onOpen} selected=${selected} />`)}
-          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? `No open chats yet. Chats you use in the GitHub Copilot app or CLI on this PC show up here${canCreate ? ', or start one below.' : '.'}` : 'No sessions yet. Start one below.'}</div>`}
+          ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? `No open chats yet. Chats you use in the GitHub Copilot app or CLI on this computer show up here${canCreate ? ', or start one below.' : '.'}` : 'No sessions yet. Start one below.'}</div>`}
         </div>
       </div>
     </div>
     ${store.online && (!canCreate
-      ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your PC — they appear here after the first message. Update Pocket Pilot on your PC to start them from here.</span></div></div>`
+      ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your computer — they appear here after the first message. Update Pocket Pilot on your computer to start them from here.</span></div></div>`
       : html`<div class="bottom-bar">
       <button class="newbar" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>
     </div>`)}
@@ -402,7 +402,7 @@ export function DesktopHome({ store, host, onNew }) {
     <div class="scroll-wrap"><div class="scroll"><div class="chat"><div class="chat-empty">
       <div class="big"><${Icon} name="sparkle" /></div>
       <h2>${canCreate ? 'Open a session, or start a new one' : 'Open a chat'}</h2>
-      <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${host.hostName}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in ${hostApp(host)} on your PC.</p>
+      <p>${list.length} session${list.length === 1 ? '' : 's'} on <b>${hostLabel(host)}</b>${waiting ? html` · <span class="st-input">${waiting} need${waiting === 1 ? 's' : ''} input</span>` : ''}${running ? html` · <span class="st-running">${running} working</span>` : ''}. Everything you do here happens in ${hostApp(host)} on your computer.</p>
       ${store.online && canCreate && html`<button class="newbar home-new" onClick=${onNew}><${Icon} name="plus" /><span>New session — describe a task…</span><span class="go"><${Icon} name="send" /></span></button>`}
     </div></div></div></div>
   </div>`;

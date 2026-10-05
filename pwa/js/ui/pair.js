@@ -28,7 +28,7 @@ function HomeScreenFirst({ pairing }) {
     <ol>
       <li>Tap <b>Share</b> <span class="hf-ic"><${Icon} name="share" /></span> in the toolbar (under <b>⋯</b> if you don't see it).</li>
       <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
-      <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.${pairing ? ' Scan the same code on your PC again: it works for 10 minutes, and New code on your PC makes a fresh one.' : ''}</li>
+      <li>Open Pocket Pilot from your Home Screen and tap <b>Scan the QR code</b>.${pairing ? ' Scan the same code on your computer again: it works for 10 minutes, and New code on your computer makes a fresh one.' : ''}</li>
     </ol>
   </div>`;
 }
@@ -52,15 +52,15 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     </div>
     ${inBrowser && html`<${HomeScreenFirst} />`}
     <button class=${`btn block ${inBrowser ? '' : 'primary'}`} style="margin-top:14px" onClick=${onScan}><${Icon} name="phone" /> ${inBrowser ? 'Scan the QR code here instead' : 'Scan the QR code'}</button>
-    ${inApp && html`<div class="ios-tip">Paired in the browser before (Safari, Chrome or Edge)? This Home Screen app doesn't share the browser's pairing, so pair it once more: tap <b>Scan the QR code</b> and scan a code from your PC. You can remove the browser's entry from <b>Paired devices</b> on your PC.</div>`}
+    ${inApp && html`<div class="ios-tip">Paired in the browser before (Safari, Chrome or Edge)? This Home Screen app doesn't share the browser's pairing, so pair it once more: tap <b>Scan the QR code</b> and scan a code from your computer. You can remove the browser's entry from <b>Paired devices</b> on your computer.</div>`}
     <ol class="steps">
-      <li><div><b>Install Pocket Pilot on your PC</b><div class="muted small">The VS Code extension or the GitHub Copilot app plugin — see <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
+      <li><div><b>Install Pocket Pilot on your computer</b><div class="muted small">The VS Code extension or the GitHub Copilot app plugin — see <a href=${PRODUCT_URL} target="_blank" rel="noopener">${PRODUCT_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>.</div></div></li>
       <li><div><b>Turn on remote access</b><div class="muted small">VS Code: “Start remote access” in the Pocket Pilot panel. Copilot app or CLI: type <b>/pocket-pilot</b> in a chat.</div></div></li>
       <li><div><b>Scan the QR code</b><div class="muted small">${inBrowser ? 'In the app on your Home Screen (see above).' : inApp ? 'With the button above. The Camera app would open the code in your browser, which pairs separately.' : 'With the button above or your camera — on a computer, paste the pairing link below.'}</div></div></li>
     </ol>
     <div class="trust">
       <div><${Icon} name="lock" size="18" /> End-to-end encrypted — even the tunnel can’t read it</div>
-      <div><${Icon} name="shield" size="18" /> Only devices you approve on your PC, with Face ID / fingerprint</div>
+      <div><${Icon} name="shield" size="18" /> Only devices you approve on your computer, with Face ID / fingerprint</div>
       <div><${Icon} name="bolt" size="18" /> Free: no accounts, no servers, no tracking</div>
     </div>
     ${installPrompt}
@@ -68,7 +68,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
     <details class="card" style="margin-top:14px">
       <summary class="muted">I have a pairing link</summary>
       <div class="stack" style="margin-top:12px">
-        <input class="input" placeholder="Paste the pairing link from your PC" value=${link} onInput=${(e) => { setLink(e.target.value); setError(''); }} />
+        <input class="input" placeholder="Paste the pairing link from your computer" value=${link} onInput=${(e) => { setLink(e.target.value); setError(''); }} />
         ${error && html`<div class="errpart">${error}</div>`}
         <button class="btn primary" onClick=${submit} disabled=${!link}>Continue</button>
       </div>
@@ -79,7 +79,7 @@ export function Welcome({ onLink, onScan, installPrompt }) {
 
 const STEPS = [
   ['connecting', 'Connecting securely'],
-  ['approval', 'Approve on your PC'],
+  ['approval', 'Approve on your computer'],
   ['passkey', 'Protect this device'],
   ['finishing', 'Finishing'],
 ];
@@ -130,8 +130,8 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     const ready = live.current.setup;
     if (wantsTotp && allowTotp && ready?.verified) return { totp: { secret: ready.secret, code: await codeAt(ready.secret, stepAt()) } };
     const onlyPasskeys = oldPc
-      ? 'Pocket Pilot on your PC is older than 0.6 and only accepts passkeys. Update it there to use an authenticator app.'
-      : 'Your PC only accepts passkeys.';
+      ? 'Pocket Pilot on your computer is older than 0.6 and only accepts passkeys. Update it there to use an authenticator app.'
+      : 'Your computer only accepts passkeys.';
     if (!canPasskey && !allowTotp) throw new Error(`${onlyPasskeys} This device has no Face ID, fingerprint or screen lock.`);
     let error = null;
     if (canPasskey && !wantsTotp) {
@@ -167,7 +167,7 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     return html`<div class="page safe">
       <div class="hero" style="padding-top:12px">
         <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
-        <h2 style="font-size:23px">Pair with ${info.name || 'your PC'}</h2>
+        <h2 style="font-size:23px">Pair with ${info.name || 'your computer'}</h2>
         <p>One step first, so this ${appleDevice()} stays paired and can notify you.</p>
       </div>
       <${HomeScreenFirst} pairing=${true} />
@@ -176,7 +176,7 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
       <button class="btn block ghost" style="margin-top:6px" onClick=${onCancel}>Cancel</button>
     </div>`;
   }
-  const totpSetup = (props) => html`<${AuthenticatorSetup} storageKey=${setupKey} hostName=${info.name || 'PC'} deviceName=${name.trim() || dev.name} ...${props} />`;
+  const totpSetup = (props) => html`<${AuthenticatorSetup} storageKey=${setupKey} hostName=${info.name || 'Computer'} deviceName=${name.trim() || dev.name} ...${props} />`;
   const factorNote = method === 'totp' ? 'Using the code from your authenticator app.' : passkeyHint();
   const needsSetup = method === 'totp' && !setup?.verified;
   const choice = (value, icon, title, sub) => html`<button type="button" role="radio" aria-checked=${method === value} class=${`choice-opt ${method === value ? 'on' : ''}`} onClick=${() => setMethod(value)}>
@@ -185,8 +185,8 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
   return html`<div class="page safe">
     <div class="hero" style="padding-top:12px">
       <img class="logo" src="./icons/icon.svg" alt="" style="width:64px;height:64px" />
-      <h2 style="font-size:23px">Pair with ${info.name || 'your PC'}</h2>
-      <p>Check that this fingerprint matches the one under the QR code on your PC:</p>
+      <h2 style="font-size:23px">Pair with ${info.name || 'your computer'}</h2>
+      <p>Check that this fingerprint matches the one under the QR code on your computer:</p>
       <p style="margin-top:10px"><span class="fingerprint">${fingerprintText(info.hostFingerprint)}</span></p>
     </div>
     ${!phase && html`<div class="card stack">
@@ -204,7 +204,7 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     </div>`}
     ${!phase && needsSetup && totpSetup({ note: null, onReady: (s) => setSetup(s) })}
     ${!phase && html`<div class="stack pair-actions">
-      ${error && html`<div class="errpart">${error}${spent ? ' To pair, click New code on your PC and scan the new QR code.' : ''}</div>`}
+      ${error && html`<div class="errpart">${error}${spent ? ' To pair, click New code on your computer and scan the new QR code.' : ''}</div>`}
       ${spent
         ? html`${onRescan && html`<button class="btn primary block" onClick=${onRescan}><${Icon} name="phone" /> Scan a new QR code</button>`}`
         : html`<button class="btn primary block" disabled=${needsSetup} onClick=${start}><${Icon} name="lock" /> ${needsSetup ? 'Set up the app above to pair' : 'Pair securely'}</button>`}
@@ -214,11 +214,11 @@ export function PairScreen({ fragment, onPaired, onCancel, onRescan }) {
     ${phase && html`<div class="progress-steps">
       ${STEPS.map(([k, label], i) => html`<div class=${`ps ${i === idx ? 'active' : i < idx || phase === 'done' ? 'done' : ''}`}>
         ${i === idx && phase !== 'done' ? html`<${Spinner} />` : i < idx || phase === 'done' ? html`<${Icon} name="check" size="18" />` : html`<span class="dot"></span>`}
-        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your PC — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && !ask && html`<div class="muted small">${factorNote}</div>`}</div>
+        <div><div>${label}</div>${i === idx && k === 'approval' && html`<div class="muted small">Click “Allow” on your computer — in VS Code, or on the Pocket Pilot page the Copilot app opened.</div>`}${i === idx && k === 'passkey' && !ask && html`<div class="muted small">${factorNote}</div>`}</div>
       </div>`)}
     </div>`}
     ${ask?.kind === 'factor' && html`<${FactorChooser} error=${ask.error} register=${() => webauthn.register(ask.req)} allowTotp=${ask.allowTotp} canPasskey=${ask.canPasskey} startWithTotp=${ask.startWithTotp}
-      storageKey=${setupKey} hostName=${info.name || 'PC'} deviceName=${name.trim() || dev.name} intro=${ask.intro}
+      storageKey=${setupKey} hostName=${info.name || 'Computer'} deviceName=${name.trim() || dev.name} intro=${ask.intro}
       onDone=${(r) => ask.resolve(r)} onCancel=${() => ask.reject(new Error('Pairing cancelled'))} />`}
   </div>`;
 }

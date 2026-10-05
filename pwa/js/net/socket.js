@@ -32,7 +32,7 @@ class FrameQueue {
       if (timeoutMs > 0) {
         const t = setTimeout(() => {
           this.waiters = this.waiters.filter((x) => x !== w);
-          reject(new Error('Timed out waiting for your PC'));
+          reject(new Error('Timed out waiting for your computer'));
         }, timeoutMs);
         w.resolve = (v) => { clearTimeout(t); resolve(v); };
         w.reject = (e) => { clearTimeout(t); reject(e); };
@@ -80,7 +80,7 @@ export function openSocket(url, { WebSocketImpl = globalThis.WebSocket, timeoutM
     const timer = setTimeout(() => {
       if (!opened) {
         sock.close();
-        reject(new Error('Timed out connecting to your PC'));
+        reject(new Error('Timed out connecting to your computer'));
       }
     }, timeoutMs);
     ws.onopen = () => {
@@ -91,7 +91,7 @@ export function openSocket(url, { WebSocketImpl = globalThis.WebSocket, timeoutM
     ws.onerror = () => {
       if (!opened) {
         clearTimeout(timer);
-        reject(new Error('Could not reach your PC'));
+        reject(new Error('Could not reach your computer'));
       }
     };
     ws.onmessage = (ev) => {
@@ -101,7 +101,7 @@ export function openSocket(url, { WebSocketImpl = globalThis.WebSocket, timeoutM
       clearTimeout(timer);
       const err = new SocketClosedError(ev.code, ev.reason);
       q.fail(err);
-      if (!opened) reject(new Error('Could not reach your PC'));
+      if (!opened) reject(new Error('Could not reach your computer'));
       else sock.onclose?.(err);
     };
   });

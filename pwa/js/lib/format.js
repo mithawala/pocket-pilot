@@ -73,6 +73,33 @@ export function hostApp(host) {
   return host?.hostKind === 'copilot' ? 'the GitHub Copilot app' : 'VS Code';
 }
 
+/**
+ * The computer a host runs on, by its name: without the " · Copilot" the Copilot app plugin adds to it,
+ * or the ".local" of a Mac's name.
+ */
+export function hostComputer(host) {
+  return String(host?.hostName || '').replace(/\s*·\s*Copilot$/i, '').replace(/\.local$/i, '').trim() || 'Computer';
+}
+
+/** A paired computer's name before you give it your own: the computer, and the app it serves. */
+export function defaultHostLabel(host) {
+  return `${hostComputer(host)} · ${host?.hostKind === 'copilot' ? 'Copilot app' : 'VS Code'}`;
+}
+
+/**
+ * What the app calls a paired computer: the name you gave it on this device, or its default name. One
+ * computer paired from VS Code and from the GitHub Copilot app shows up twice, so the default tells
+ * them apart.
+ */
+export function hostLabel(host) {
+  return host?.customName || defaultHostLabel(host);
+}
+
+/** A name typed for a computer, tidied: one line, at most 60 characters ('' for the default name). */
+export function cleanHostLabel(name) {
+  return String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+}
+
 export function deviceDescription() {
   const ua = navigator.userAgent;
   const os = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /mac os/i.test(ua) ? 'Mac' : /windows/i.test(ua) ? 'Windows' : /linux/i.test(ua) ? 'Linux' : 'Device';

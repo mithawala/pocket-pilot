@@ -86,10 +86,10 @@ export function base64ToBytes(data) {
 /** What the viewer says when a picture can't be loaded. */
 export function pictureError(err) {
   const msg = String(err?.message || err || '');
-  if (/outside your session folders|not (allowed|supported)|MethodNotFound|-32601/i.test(msg)) return 'Update Pocket Pilot on your PC to see the pictures sent in chats.';
+  if (/outside your session folders|not (allowed|supported)|MethodNotFound|-32601/i.test(msg)) return 'Update Pocket Pilot on your computer to see the pictures sent in chats.';
   if (/too large/i.test(msg)) return 'This picture is too large to show here.';
   if (/not a picture/i.test(msg)) return 'This file isn\'t a picture the app can show.';
-  if (/not found|ENOENT|-32008/i.test(msg)) return 'This picture is no longer on your PC.';
+  if (/not found|ENOENT|-32008/i.test(msg)) return 'This picture is no longer on your computer.';
   return msg || 'The picture could not be loaded.';
 }
 

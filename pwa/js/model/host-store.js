@@ -181,7 +181,7 @@ export class HostStore extends EventTarget {
     if (env.serverSeq > this.lastSeq) this.lastSeq = env.serverSeq;
     if (env.action?.type === 'chat/draftChanged' && this.draftModels.delete(env.channel)) this._emit('chat', env.channel);
     if (env.rejectionReason) {
-      if (env.origin?.clientId === this.clientId) this._error(`The PC rejected that action: ${env.rejectionReason}`);
+      if (env.origin?.clientId === this.clientId) this._error(`Your computer rejected that action: ${env.rejectionReason}`);
       return;
     }
     const uri = env.channel;
@@ -341,7 +341,7 @@ export class HostStore extends EventTarget {
   // ------------------------------------------------------------------ actions
 
   _dispatch(channel, action) {
-    if (!this.client) throw new Error('Not connected to your PC');
+    if (!this.client) throw new Error('Not connected to your computer');
     this.client.dispatch(channel, action);
   }
 
@@ -524,7 +524,7 @@ export class HostStore extends EventTarget {
 
   /** A picture from the PC, always as base64 (a text read would mangle the bytes). */
   async readImage(uri) {
-    if (!this.client) throw new Error('Not connected to your PC');
+    if (!this.client) throw new Error('Not connected to your computer');
     return this.client.request('resourceRead', { channel: ROOT, uri, encoding: 'base64' });
   }
 
@@ -536,7 +536,7 @@ export class HostStore extends EventTarget {
    * fails, no message is sent and the error carries the new session's address (`sessionUri`).
    */
   async createSession({ provider, folder, config, text, model, attachments, prepare, modelAtStart = false }) {
-    if (!this.client) throw new Error('Not connected to your PC');
+    if (!this.client) throw new Error('Not connected to your computer');
     const uri = `${provider}:/${uuid()}`;
     await this.client.request('createSession', { channel: uri, provider, workingDirectories: [folder], ...(config ? { config } : {}), ...(modelAtStart && model ? { model } : {}) });
     const stop = this.watchSession(uri);
@@ -551,7 +551,7 @@ export class HostStore extends EventTarget {
           if (st?.lifecycle === 'creationFailed') {
             clearTimeout(timer);
             this.removeEventListener('change', check);
-            reject(new Error(st.creationError?.message || 'The PC could not create the session'));
+            reject(new Error(st.creationError?.message || 'Your computer could not create the session'));
             return;
           }
           const c = this.chatFor(uri);

@@ -311,7 +311,7 @@ class DemoStore extends HostStore {
       await wait(700);
       this._parts(chat, (p) => [...p, { kind: 'reasoning', id: uuid(), content: 'The user is trying the Pocket Pilot demo.' }]);
       await wait(500);
-      await this._stream(chat, '👋 This is the **Pocket Pilot demo**. On your phone, this message would go straight to the agent session on your PC — the very same session you see in VS Code — and you would watch it work live, just like this.\n\n- Approve or skip tool calls\n- Answer the agent\'s questions\n- Get a push notification when it\'s done');
+      await this._stream(chat, '👋 This is the **Pocket Pilot demo**. On your phone, this message would go straight to the agent session on your computer — the very same session you see in VS Code — and you would watch it work live, just like this.\n\n- Approve or skip tool calls\n- Answer the agent\'s questions\n- Get a push notification when it\'s done');
       this._finish(chat, sessionUri);
     } else if (action.type === 'chat/toolCallConfirmed') {
       this._setSummary(sessionUri, { status: S.InProgress | S.IsRead, activity: action.approved ? 'Running tests' : 'Skipping tests' });
@@ -371,11 +371,11 @@ class DemoStore extends HostStore {
   }
 
   async readFile(uri) {
-    return { data: `// ${decodeURIComponent(uri.split('/').pop())}\n// (demo) The real app shows the file from your PC here.\nexport function example() {\n  return 42;\n}\n`, encoding: 'utf-8' };
+    return { data: `// ${decodeURIComponent(uri.split('/').pop())}\n// (demo) The real app shows the file from your computer here.\nexport function example() {\n  return 42;\n}\n`, encoding: 'utf-8' };
   }
 
   async readImage(uri) {
-    if (uri !== DEMO_PICTURE) throw new Error('This picture is only on the PC (demo)');
+    if (uri !== DEMO_PICTURE) throw new Error('This picture is only on the computer (demo)');
     return { data: btoa(settingsScreenshot()), encoding: 'base64', contentType: 'image/svg+xml' };
   }
 
@@ -411,7 +411,8 @@ class DemoStore extends HostStore {
 
 export const DEMO_HOST = {
   hostId: 'demo',
-  hostName: 'Studio PC (demo)',
+  hostName: 'Studio Mac',
+  hostKind: 'vscode',
   hostPublicKey: 'BHjhgDkJkMQ3fW9kl8pHfK3m2QmWc8m8Xy4n6oV0Yp2uQw1rT5zL7sA9dE3fG5hJ7kL9mN1pQ3rS5tU7vW9xY1Q',
   passkey: true,
   rendezvous: null,

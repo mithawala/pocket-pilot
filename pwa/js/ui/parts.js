@@ -197,7 +197,7 @@ function AuthCard({ tc, ctx }) {
   const server = tc._meta?.mcpServerName || (mcpServer(tc) ? String(mcpServer(tc)).split(':').pop() : '') || tc.displayName || tc.toolName;
   const tool = tc._meta?.mcpToolName;
   return html`<div class="confirm info">
-    <div class="ch"><${Icon} name="key" /><span>Sign in to ${server} on your PC</span></div>
+    <div class="ch"><${Icon} name="key" /><span>Sign in to ${server} on your computer</span></div>
     <div class="cm muted small">The agent is paused until you do${tool ? `, so it can use ${tool}` : ''}. Sign in from this chat in ${ctx.host || 'VS Code'}, or stop the agent to go on without it.</div>
   </div>`;
 }

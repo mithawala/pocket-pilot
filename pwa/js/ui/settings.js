@@ -1,10 +1,11 @@
-import { html, useState, useEffect } from '../lib/ui.js';
-import { Icon, toast } from './common.js';
+import { html, useState, useEffect, useRef } from '../lib/ui.js';
+import { Icon, Sheet, toast } from './common.js';
 import { pushBlockedReason, appleDevice } from '../lib/push.js';
 import { unb64u } from '../core/bytes.js';
 import { fingerprint } from '../core/secure-channel.js';
 import { fingerprintText } from './pair.js';
 import { APP_VERSION } from '../net/host-connection.js';
+import { hostLabel, defaultHostLabel } from '../lib/format.js';
 
 function HostFingerprint({ host }) {
   const [fp, setFp] = useState('');
@@ -20,6 +21,48 @@ export function pushPromptWanted(host) {
   if (reason === 'ios-install') return true;
   if (reason) return false;
   return !(host?.pushEnabled && Notification.permission === 'granted');
+}
+
+/** Gives a paired computer a name of your own on this device, or its default name back. */
+export function RenameHost({ app, host, onClose }) {
+  const [name, setName] = useState(() => hostLabel(host));
+  const [busy, setBusy] = useState(false);
+  const input = useRef(null);
+  const fallback = defaultHostLabel(host);
+  useEffect(() => {
+    // With a mouse, ready to type over the name (on a phone, a tap on the field opens the keyboard).
+    const el = input.current;
+    if (el && matchMedia('(pointer: fine)').matches) {
+      el.focus();
+      el.select();
+    }
+  }, []);
+  const save = async (value) => {
+    setBusy(true);
+    try {
+      await app.renameHost(host, value);
+      onClose();
+    } catch (err) {
+      toast(err.message, 'err');
+      setBusy(false);
+    }
+  };
+  return html`<${Sheet} open=${true} onClose=${onClose} title="Rename computer" doneLabel="Cancel">
+    <div class="stack">
+      <div class="field"><label for="host-name">Name</label>
+        <input id="host-name" ref=${input} class="input" value=${name} maxlength="60" placeholder=${fallback} autocomplete="off" enterkeyhint="done"
+          onInput=${(e) => setName(e.target.value)} onKeyDown=${(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              save(name);
+            }
+          }} />
+        <div class="muted small">Only this device uses the name. Leave it empty for the default, <b>${fallback}</b>.</div>
+      </div>
+      <button class="btn primary block" disabled=${busy} onClick=${() => save(name)}>Save</button>
+      ${host.customName && html`<button class="btn block" disabled=${busy} onClick=${() => save('')}>Use the default name</button>`}
+    </div>
+  </${Sheet}>`;
 }
 
 export function NotificationSetup({ app, host, compact, onDismiss }) {
@@ -50,7 +93,7 @@ export function NotificationSetup({ app, host, compact, onDismiss }) {
     }
   };
   if (enabled) {
-    return html`<div class="row"><span class="grow">Notifications are on for ${host.hostName}.</span><button class="btn sm" onClick=${() => app.testPush(host)}>Send test</button></div>`;
+    return html`<div class="row"><span class="grow">Notifications are on for ${hostLabel(host)}.</span><button class="btn sm" onClick=${() => app.testPush(host)}>Send test</button></div>`;
   }
   return html`<div class=${`card ${close ? 'closable' : ''}`} style="margin-bottom:12px">
     ${close}
@@ -62,12 +105,13 @@ export function NotificationSetup({ app, host, compact, onDismiss }) {
 
 export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
   const [theme, setTheme] = useState(app.theme);
+  const [renaming, setRenaming] = useState(null);
   const setT = (t) => {
     setTheme(t);
     app.setTheme(t);
   };
   const forget = async (h) => {
-    if (!confirm(`Forget ${h.hostName}? You will need to scan a new QR code to pair again.`)) return;
+    if (!confirm(`Forget ${hostLabel(h)}? You will need to scan a new QR code to pair again.`)) return;
     await app.forgetHost(h);
   };
   return html`<div class="screen">
@@ -76,34 +120,36 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
       <div class="titles"><h1>Settings</h1></div>
     </div>
     <div class="scroll-wrap"><div class="scroll"><div class="page">
-      <div class="section-title">Your PCs</div>
+      <div class="section-title">Your computers</div>
       <div class="set-group">
         ${hosts.map((h) => html`<div class="set-row" key=${h.hostId}>
           <div class="ic"><${Icon} name="monitor" /></div>
           <div class="grow">
-            <div><b>${h.hostName}</b>${current?.hostId === h.hostId ? html` <span class="muted small">· current</span>` : ''}</div>
+            <div><b>${hostLabel(h)}</b>${current?.hostId === h.hostId ? html` <span class="muted small">· current</span>` : ''}</div>
+            ${h.customName && html`<div class="host-sub">${defaultHostLabel(h)}</div>`}
             <div class="kv">Fingerprint <${HostFingerprint} host=${h} /></div>
             <div class="kv">${h.passkey || h.factor === 'passkey' ? 'Passkey protected' : h.factor === 'totp' ? 'Authenticator app codes' : 'No passkey'} · ${h.rendezvous ? 'Auto-reconnect' : 'Manual reconnect'}</div>
           </div>
           <div class="stack" style="gap:6px">
             ${current?.hostId !== h.hostId && html`<button class="btn sm" onClick=${() => app.selectHost(h.hostId)}>Use</button>`}
+            <button class="btn sm" onClick=${() => setRenaming(h)}>Rename</button>
             <button class="btn sm danger" onClick=${() => forget(h)}>Forget</button>
           </div>
         </div>`)}
-        <button class="set-row" onClick=${onPairNew}><div class="ic"><${Icon} name="plus" /></div><div class="grow">Pair another PC</div><${Icon} name="right" /></button>
+        <button class="set-row" onClick=${onPairNew}><div class="ic"><${Icon} name="plus" /></div><div class="grow">Pair another computer</div><${Icon} name="right" /></button>
       </div>
 
       <div class="section-title">Notifications</div>
-      <div class="card">${current ? html`<${NotificationSetup} app=${app} host=${current} />` : html`<span class="muted">Pair a PC first.</span>`}</div>
+      <div class="card">${current ? html`<${NotificationSetup} app=${app} host=${current} />` : html`<span class="muted">Pair a computer first.</span>`}</div>
 
       <div class="section-title">Theme</div>
       <div class="seg">${[['dark', 'One Dark'], ['light', 'One Light'], ['system', 'System']].map(([v, l]) => html`<button class=${theme === v ? 'on' : ''} onClick=${() => setT(v)}>${l}</button>`)}</div>
 
       <div class="section-title">Security</div>
       <div class="card stack small sec-list">
-        <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this device and your PC (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
-        <div class="row"><${Icon} name="key" /><span>This device’s private key never leaves it and cannot be exported. Your GitHub token never leaves your PC.</span></div>
-        <div class="row"><${Icon} name="shield" /><span>${current?.hostKind === 'copilot' ? 'Remove this device anytime in the Pocket Pilot panel on your PC (run /pocket-pilot in the GitHub Copilot app)' : 'Remove this device anytime in the Pocket Pilot panel in VS Code'} — it is disconnected immediately.</span></div>
+        <div class="row"><${Icon} name="lock" /><span>Every message is end-to-end encrypted between this device and your computer (ECDH P-256 + AES-256-GCM). The Cloudflare tunnel only relays ciphertext.</span></div>
+        <div class="row"><${Icon} name="key" /><span>This device’s private key never leaves it and cannot be exported. Your GitHub token never leaves your computer.</span></div>
+        <div class="row"><${Icon} name="shield" /><span>${current?.hostKind === 'copilot' ? 'Remove this device anytime in the Pocket Pilot panel on your computer (run /pocket-pilot in the GitHub Copilot app)' : 'Remove this device anytime in the Pocket Pilot panel in VS Code'} — it is disconnected immediately.</span></div>
       </div>
 
       <div class="section-title">About</div>
@@ -115,5 +161,6 @@ export function SettingsScreen({ app, hosts, current, onBack, onPairNew }) {
       </div>
       <p class="made-by">Developed by <a href="https://mithawala.com" target="_blank" rel="noopener">Asif Mithawala</a></p>
     </div></div></div>
+    ${renaming && html`<${RenameHost} app=${app} host=${renaming} onClose=${() => setRenaming(null)} />`}
   </div>`;
 }

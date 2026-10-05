@@ -69,7 +69,7 @@ test('attachments: pictures load once as blob: URLs, with base64 from the PC', a
   // A host that answers as text (the default encoding) or refuses: a clear message instead of a broken image.
   await assert.rejects(loadPicture(pasted('Other.png', 'image', 'image/png'), async () => ({ data: '\uFFFDPNG', encoding: 'utf-8' })), /Not a picture/);
   const old = loadPicture(pasted('Third.png', 'image', 'image/png'), async () => { throw new Error('RPC error -32602: Reading files outside your session folders is not allowed'); });
-  await assert.rejects(old, (err) => pictureError(err) === 'Update Pocket Pilot on your PC to see the pictures sent in chats.');
-  assert.equal(pictureError(new Error('ENOENT: no such file')), 'This picture is no longer on your PC.');
+  await assert.rejects(old, (err) => pictureError(err) === 'Update Pocket Pilot on your computer to see the pictures sent in chats.');
+  assert.equal(pictureError(new Error('ENOENT: no such file')), 'This picture is no longer on your computer.');
   clearPictures();
 });

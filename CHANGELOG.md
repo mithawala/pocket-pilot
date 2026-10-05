@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.11
+
+- **Rename your computers in the phone app.** Tap the computer's name at the top, then the pencil next to it, or go to **Settings → Your computers → Rename**. The name is kept on this device only. Leave it empty, or tap **Use the default name**, to go back. If you pair the same computer again, it keeps its name.
+- **VS Code and the GitHub Copilot app tell apart.** A computer paired from both used to show up twice under the same name. Its default name now says which app it is, like *CPC-amith-XGHZ8 · VS Code* and *CPC-amith-XGHZ8 · Copilot app*, and a Mac's name loses its *.local*. Under a name you gave it, the switcher and Settings still show which computer and app it is.
+- **The phone app says "computer" instead of "PC"**, because Pocket Pilot runs on Macs too: *Your computers*, *Manage computers*, *Connecting securely to your computer…*, and so on.
+- Only the phone app changed, and it updates by itself. Nothing changed on the computer.
+
 ## 0.7.10
 
 - **Remote access comes back by itself after the PC was offline or asleep.** A Cloudflare quick tunnel can lose its connection when your PC drops off Wi-Fi or goes to sleep, and not get it back. cloudflared then keeps running and reporting its address, but nothing reaches the PC there. Pocket Pilot only checked that cloudflared was running, so your devices kept retrying an address that no longer worked, and restarting the app reused the same tunnel. Pocket Pilot now also checks that the tunnel is connected to Cloudflare:

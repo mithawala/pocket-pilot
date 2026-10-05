@@ -525,6 +525,10 @@ a.btn { text-decoration: none; }
 .list-item > svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .list-item .check { margin-left: auto; color: var(--accent); display: grid; place-items: center; }
 .list-item .check svg { width: 18px; height: 18px; }
+/* A paired computer in the switcher: pick it, or rename it with the button next to it. */
+.host-pick { display: flex; align-items: center; gap: 2px; }
+.host-pick > .list-item { flex: 1; min-width: 0; }
+.host-pick > .list-item .grow { min-width: 0; overflow-wrap: anywhere; }
 .errpart .retry { margin-top: 8px; }
 
 /* ---------- notifications */
@@ -540,6 +544,10 @@ button.set-row:active, a.set-row:active { background: var(--surface); }
 .set-row .ic { width: 30px; height: 30px; display: grid; place-items: center; flex: none; color: var(--muted); background: var(--surface); border-radius: 6px; }
 .set-row .ic svg { width: 16px; height: 16px; }
 .set-row b { color: var(--strong); font-weight: 600; }
+/* A computer's name wraps between words (a long one without spaces anywhere), and under it, once
+   renamed, the computer and app it is. */
+.set-row b, .set-row .host-sub { overflow-wrap: anywhere; }
+.set-row .host-sub { font-size: 12.5px; color: var(--muted); }
 .set-row > svg { width: 16px; height: 16px; color: var(--dim); flex: none; }
 .sec-list .row { align-items: flex-start; }
 .sec-list .row svg { width: 16px; height: 16px; margin-top: 3px; flex: none; color: var(--muted); }
