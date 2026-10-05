@@ -120,17 +120,19 @@ function render(s) {
   }
   const local = s.tunnel.mode === 'none';
   const online = local || (s.tunnel.url && s.tunnel.reachable);
-  setState(busy === 'off' ? 'busy' : online ? 'on' : 'busy', busy === 'off' ? 'Turning off…' : online ? 'Remote access on' : s.tunnel.error ? 'Tunnel error' : 'Remote access starting…');
+  // The tunnel lost its connection (the PC was offline or asleep): it reconnects, or a new one opens.
+  const reconnecting = !online && !!(s.tunnel.url && s.tunnel.error);
+  setState(busy === 'off' ? 'busy' : online ? 'on' : 'busy', busy === 'off' ? 'Turning off…' : online ? 'Remote access on' : reconnecting ? 'Reconnecting…' : s.tunnel.error ? 'Tunnel error' : 'Remote access starting…');
   $('toggle').textContent = busy === 'off' ? 'Turning off…' : 'Turn off remote access';
   $('toggleNote').textContent = 'Keeps running when you close or delete the chat it was started from. With no chat open for 30 minutes it pauses, and comes back with your next chat.';
   const qr = $('qr');
   if (s.pairing) { qr.className = 'qr'; qr.innerHTML = s.pairing.svg; link = s.pairing.link; }
-  else { qr.className = 'qr wait'; qr.textContent = s.tunnel.error ? 'Tunnel error: ' + s.tunnel.error : s.tunnel.url ? 'Waiting for Cloudflare to publish the tunnel…' : 'Starting the secure tunnel…'; link = null; }
+  else { qr.className = 'qr wait'; qr.textContent = reconnecting ? s.tunnel.error : s.tunnel.error ? 'Tunnel error: ' + s.tunnel.error : s.tunnel.url ? 'Waiting for Cloudflare to publish the tunnel…' : 'Starting the secure tunnel…'; link = null; }
   $('copy').disabled = !link; $('renew').disabled = !s.tunnel.url;
   const left = s.pairing ? Math.max(0, Math.round((s.pairing.expiresAt - Date.now()) / 60000)) : 0;
   $('exp').textContent = s.pairing ? 'Expires in about ' + left + ' min · single use' : '';
   $('status').innerHTML = [
-    pill(online ? 'ok' : s.tunnel.error ? 'err' : 'busy', local ? 'Local network only' : online ? 'Tunnel online' : s.tunnel.error ? 'Tunnel error' : s.tunnel.url ? 'Tunnel connecting' : 'Tunnel starting'),
+    pill(online ? 'ok' : s.tunnel.error && !reconnecting ? 'err' : 'busy', local ? 'Local network only' : online ? 'Tunnel online' : reconnecting ? 'Tunnel reconnecting' : s.tunnel.error ? 'Tunnel error' : s.tunnel.url ? 'Tunnel connecting' : 'Tunnel starting'),
     pill(s.sessions ? 'ok' : '', s.sessions + ' open session' + (s.sessions === 1 ? '' : 's')),
     pill(s.rendezvous ? 'ok' : '', s.rendezvous ? 'Auto-reconnect on' : 'Auto-reconnect off'),
   ].join(' ');

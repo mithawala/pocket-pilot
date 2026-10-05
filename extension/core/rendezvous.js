@@ -138,6 +138,20 @@ class GistRendezvous {
     }
   }
 
+  /**
+   * publish(), tried again a few times when it fails (a network that just came back, GitHub busy), as
+   * long as `url` is still the address to publish. Without a GitHub sign-in it doesn't retry.
+   */
+  async publishWithRetry(url, { waits = [15000, 60000, 180000, 600000] } = {}) {
+    this.retryingFor = url;
+    for (let i = 0; ; i++) {
+      if (this.retryingFor !== url) return false;
+      if (await this.publish(url)) return true;
+      if (this.status === 'signin-required' || i >= waits.length) return false;
+      await new Promise((r) => setTimeout(r, waits[i]));
+    }
+  }
+
   async _writeShared(token, content) {
     const body = { files: { [this.file]: { content } } };
     const done = (r) => ({ id: r.json.id, owner: r.json.owner?.login });

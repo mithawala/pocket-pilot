@@ -228,7 +228,7 @@ const fresh = await until(() => {
   if (ask && !allowed.includes(ask.toolCall.toolCallId)) {
     const input = ask.toolCall.toolInput;
     const what = `${ask.toolCall.toolName} ${typeof input === 'string' ? input : JSON.stringify(input || '')} ${JSON.stringify(ask.toolCall.invocationMessage || '')}`;
-    if (!/^(view|read)/i.test(ask.toolCall.toolName) || !/notes\.txt/.test(what)) fail(`the new session asked for something other than reading the file it was sent: ${what.slice(0, 200)}`);
+    if (!/^(view|read)/i.test(ask.toolCall.toolName) || !/\.pocket-pilot[\\/]+uploads[\\/]+[^"\\/]*-(notes\.txt|shot\.(png|jpg))/.test(what)) fail(`the new session asked for something other than reading a file it was sent: ${what.slice(0, 200)}`);
     allowed.push(ask.toolCall.toolCallId);
     store.confirmTool(phoneChat, cs.activeTurn.id, ask.toolCall.toolCallId, true, 'approve-once');
   }
@@ -243,7 +243,7 @@ const sameDir = (a, b) => (process.platform === 'win32' ? path.resolve(a).toLowe
 if (!sameDir(fileURLToPath(phoneSummary.workingDirectories[0]), ws)) fail(`the new session runs in ${phoneSummary.workingDirectories[0]}, not ${ws}`);
 const uploaded = fs.readdirSync(path.join(ws, '.pocket-pilot', 'uploads')).filter((f) => /-(notes\.txt|shot\.png)$/.test(f));
 if (uploaded.length !== 2) fail(`the files sent with the new session are not in ${path.join(ws, '.pocket-pilot', 'uploads')}: ${uploaded}`);
-step(`session started on the phone with a photo and a file: ${phoneUri.slice(12, 20)} in ${path.basename(ws)}, both saved in .pocket-pilot/uploads; ${allowed.length ? `reading notes.txt was allowed on the phone, ` : ''}reply: ${freshReply.slice(0, 80)} (${((Date.now() - newAt) / 1000).toFixed(1)}s)`);
+step(`session started on the phone with a photo and a file: ${phoneUri.slice(12, 20)} in ${path.basename(ws)}, both saved in .pocket-pilot/uploads; ${allowed.length ? `${allowed.length} read(s) of the sent files allowed on the phone, ` : ''}reply: ${freshReply.slice(0, 80)} (${((Date.now() - newAt) / 1000).toFixed(1)}s)`);
 phoneRelease();
 
 // 3. The agent asks a question; the phone answers it in its own words (what the question card sends).

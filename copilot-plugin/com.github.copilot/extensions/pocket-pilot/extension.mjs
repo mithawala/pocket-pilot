@@ -486,7 +486,7 @@ async function confirm(title, message) {
 function statusText(s) {
   const lines = [
     `Pocket Pilot ${s.version} — ${s.hostName} (${s.fingerprint})`,
-    `Tunnel: ${s.tunnel.mode === 'none' ? 'off (local network only)' : s.tunnel.url ? `online${s.tunnel.reachable ? '' : ' (checking reachability)'}` : s.tunnel.error ? `error: ${s.tunnel.error}` : 'starting…'}`,
+    `Tunnel: ${s.tunnel.mode === 'none' ? 'off (local network only)' : s.tunnel.error ? `${s.tunnel.url ? 'reconnecting' : 'error'}: ${s.tunnel.error}` : s.tunnel.url ? `online${s.tunnel.reachable ? '' : ' (checking reachability)'}` : 'starting…'}`,
     `Open sessions on your devices: ${s.sessions}`,
     `Auto-reconnect after restarts: ${s.rendezvous ? 'on (encrypted GitHub gist)' : 'off (sign in with the GitHub CLI: gh auth login)'}`,
     `Paired devices: ${s.devices.length ? s.devices.map((d) => `${d.name}${d.online ? ' (connected)' : ''}`).join(', ') : 'none yet'}`,

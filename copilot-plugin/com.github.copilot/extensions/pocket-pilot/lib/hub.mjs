@@ -427,12 +427,27 @@ async function boot(log, cleanups) {
     state.lastPublicUrl = url;
     state.reachable = false;
     state.tunnelError = null;
-    if (!same && rendezvousOn()) rendezvous.publish(url).then((ok) => ok && log('info', 'Auto-reconnect address updated')).catch(() => {});
+    if (!same && rendezvousOn()) rendezvous.publishWithRetry(url).catch(() => {});
     newPairingCode().catch((err) => log('warn', `Pairing code failed: ${err.message}`));
-    tunnel.waitReachable().then(() => {
-      state.reachable = true;
-    }).catch((err) => log('warn', err.message));
+    checkReachable(url);
   }
+
+  /** Until the relay answers through the tunnel: checked again until it does, or the address changes. */
+  function checkReachable(url) {
+    if (settings().tunnel !== 'quick') {
+      state.reachable = true;
+      return;
+    }
+    tunnel.waitReachable().then(() => {
+      if (state.publicUrl === url) state.reachable = true;
+    }).catch((err) => {
+      if (state.stopped || state.publicUrl !== url) return;
+      log('warn', `${err.message}; checking again in 30s`);
+      setTimeout(() => checkReachable(url), 30000).unref?.();
+    });
+  }
+  /** The tunnel answers, and has its connection to Cloudflare (it loses it while the PC is offline). */
+  const tunnelUp = () => state.reachable && tunnel.state !== 'error';
 
   async function startTunnel() {
     const s = settings();
@@ -469,7 +484,7 @@ async function boot(log, cleanups) {
       hostName,
       hostPid: process.pid,
       fingerprint: identityLib.fingerprintText(identity.fingerprint),
-      tunnel: { url: state.publicUrl, reachable: state.reachable, state: tunnel.state, mode: settings().tunnel, error: state.tunnelError || tunnel.error || null },
+      tunnel: { url: state.publicUrl, reachable: tunnelUp(), state: tunnel.state, mode: settings().tunnel, error: tunnel.error || state.tunnelError || null },
       rendezvous: rendezvousOn() && !!rendezvous.info(),
       sessions: host.sessionCount,
       pairing: state.pairing ? { link: state.pairing.link, expiresAt: state.pairing.expiresAt } : null,
@@ -479,7 +494,7 @@ async function boot(log, cleanups) {
   }
 
   /** A QR code is only useful once Cloudflare answers for the new host name (early DNS misses get cached). */
-  const pairingReady = () => !!state.pairing && (state.reachable || settings().tunnel !== 'quick');
+  const pairingReady = () => !!state.pairing && (tunnelUp() || settings().tunnel !== 'quick');
 
   async function waitForPairing(ms = 150000) {
     const end = Date.now() + ms;
@@ -622,6 +637,7 @@ async function boot(log, cleanups) {
   async function stop(why = 'stopped', { keepTunnel = false } = {}) {
     if (stopped) return;
     stopped = true;
+    state.stopped = true;
     tunnelEnd.keep = keepTunnel;
     log('info', `Hub stopping (${why})`);
     for (const a of approvals.values()) a.done(false);

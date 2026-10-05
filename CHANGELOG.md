@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.10
+
+- **Remote access comes back by itself after the PC was offline or asleep.** A Cloudflare quick tunnel can lose its connection when your PC drops off Wi-Fi or goes to sleep, and not get it back. cloudflared then keeps running and reporting its address, but nothing reaches the PC there. Pocket Pilot only checked that cloudflared was running, so your devices kept retrying an address that no longer worked, and restarting the app reused the same tunnel. Pocket Pilot now also checks that the tunnel is connected to Cloudflare:
+  - A tunnel that loses its connection gets about two minutes to come back with its address.
+  - If it doesn't, Pocket Pilot opens a new tunnel once the PC is online again and ends the old one. The auto-reconnect gist gets the new address, so your devices find it by themselves.
+  - A tunnel that stops while the PC is offline, or that can't open when remote access starts, keeps being tried until the PC is back online.
+
+  This works the same in VS Code and the GitHub Copilot app.
+- **The Pocket Pilot panel no longer stays on "Remote access starting…".** After a new address, the panel waited until the PC could reach itself through Cloudflare, and gave up after 90 seconds. Some PCs can't reach their own address while your devices can, because of a DNS answer cached too early, a VPN or a network filter. The panel then never showed a QR code, even with a device connected. It now keeps checking, and a tunnel that has been connected to Cloudflare for 30 seconds counts as reachable.
+- While the tunnel has no connection, the panel, the VS Code sidebar and `/pocket-pilot status` say it's reconnecting instead of showing it online.
+- A failed update of the auto-reconnect gist (right after the network came back, say) is tried again.
+- **Docs:** in the GitHub Copilot app everything is in the Pocket Pilot panel (`/pocket-pilot` in any chat), and **Customize → Extensions** only has its on/off switch. Auto-reconnect there uses the GitHub CLI's sign-in without asking. The FAQ explains what to do when your phone keeps retrying.
+- `node scripts/tunnel-recovery-check.mjs` checks the recovery against Cloudflare: a cloudflared without a connection is replaced and the hub comes back online at a new address.
+- **Update Pocket Pilot on your PC:** the VS Code extension from the Marketplace, and the Copilot app plugin with **Update** on the app's Plugins page. The phone app needs nothing.
+
 ## 0.7.9
 
 - **Photos and files when you start a session.** **New session** now has **Add photos or files**, and you can paste a screenshot or drop files on the text, as in a chat. They go to your PC as soon as the session exists, and its first message carries them. The model sees pictures directly. Other files are saved on your PC and the agent reads them from there, which can ask you first, like any file it reads. With the GitHub Copilot app they're saved in the project's `.pocket-pilot/uploads` folder; with VS Code in `~/Pocket Pilot/.pocket-pilot/uploads`, because VS Code only tells which folder a new session is in once its first message arrives. If a file doesn't reach your PC, the session opens with your message in its chat box, so you can attach the file again and send.

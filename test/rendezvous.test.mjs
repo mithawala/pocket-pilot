@@ -144,3 +144,39 @@ test('publish reports sign-in required without a token and surfaces API errors',
   assert.equal(await denied.publish('https://x.trycloudflare.com'), false);
   assert.match(denied.lastError, /personal GitHub account/);
 });
+
+test('publishWithRetry: tries again after a failure (a network just back), not without a sign-in or for an old address', async () => {
+  const gh = fakeGitHub();
+  let down = 2;
+  const flaky = async (url, init) => {
+    if (down > 0 && url.startsWith('https://api.github.com/')) {
+      down--;
+      throw new Error('getaddrinfo ENOTFOUND api.github.com');
+    }
+    return gh.fetchImpl(url, init);
+  };
+  const r = pc({ fetchImpl: flaky }, 'h-retry');
+  assert.equal(await r.publishWithRetry('https://after-sleep.trycloudflare.com', { waits: [1, 1, 1] }), true);
+  assert.equal(down, 0, 'two failed tries before it worked');
+  const [gist] = gh.gists.values();
+  assert.ok(gist && Object.keys(gist.files).length === 1, 'published once it could');
+
+  // Gives up after the last wait.
+  const never = pc({ fetchImpl: async () => { throw new Error('offline'); } }, 'h-never');
+  assert.equal(await never.publishWithRetry('https://x.trycloudflare.com', { waits: [1, 1] }), false);
+  assert.equal(never.status, 'error');
+
+  // No GitHub sign-in: nothing to retry.
+  let asked = 0;
+  const nobody = new GistRendezvous({ getToken: async () => (asked++, null), stateFile: tmpState(), hostId: 'h', key: crypto.randomBytes(32), fetchImpl: gh.fetchImpl });
+  assert.equal(await nobody.publishWithRetry('https://x.trycloudflare.com', { waits: [1, 1, 1] }), false);
+  assert.equal(asked, 1);
+
+  // A newer address replaces the one still being retried.
+  let calls = 0;
+  const slow = pc({ fetchImpl: async () => { calls++; throw new Error('offline'); } }, 'h-slow');
+  const old = slow.publishWithRetry('https://old.trycloudflare.com', { waits: [30] });
+  slow.retryingFor = 'https://new.trycloudflare.com';
+  assert.equal(await old, false);
+  assert.equal(calls, 1, 'the old address is not tried again');
+});

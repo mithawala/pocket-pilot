@@ -487,10 +487,6 @@ class PocketPilotService {
       bin = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Pocket Pilot' }, (p) => this.tunnel.download((m) => p.report({ message: m })));
     }
     await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Pocket Pilot: opening tunnel…' }, () => this.tunnel.start(this.relay.port, bin));
-    this.tunnel.waitReachable().then(() => {
-      this.tunnelReachable = true;
-      this.changed();
-    }).catch((err) => this.logLine('warn', err.message));
   }
 
   async restartTunnel() {
@@ -507,9 +503,27 @@ class PocketPilotService {
   _onPublicUrl(url) {
     this.publicUrl = url;
     this.tunnelReachable = false;
-    if (settings().rendezvous) this.rendezvous.publish(url).then(() => this.changed());
+    if (settings().rendezvous) this.rendezvous.publishWithRetry(url).then(() => this.changed());
     if (this.state === 'running') this.newPairingCode();
+    this._checkReachable(url);
     this.changed();
+  }
+
+  /** Until the relay answers through the tunnel: checked again until it does, or the address changes. */
+  _checkReachable(url) {
+    if (settings().tunnelMode !== 'quick') {
+      this.tunnelReachable = true;
+      return;
+    }
+    this.tunnel.waitReachable().then(() => {
+      if (this.publicUrl !== url) return;
+      this.tunnelReachable = true;
+      this.changed();
+    }).catch((err) => {
+      if (this.publicUrl !== url) return;
+      this.logLine('warn', `${err.message}; checking again in 30s`);
+      setTimeout(() => this._checkReachable(url), 30000).unref?.();
+    });
   }
 
   async _onConfigChanged(e) {
@@ -887,7 +901,7 @@ class PocketPilotService {
       hostName: this.identity?.name,
       fingerprint: this.identity ? identityLib.fingerprintText(this.identity.fingerprint) : '',
       localUrl: this.relay ? `http://127.0.0.1:${this.relay.port}/` : null,
-      tunnel: { mode: s.tunnelMode, state: this.tunnel?.state, url: this.publicUrl, reachable: this.tunnelReachable, error: this.tunnel?.error },
+      tunnel: { mode: s.tunnelMode, state: this.tunnel?.state, url: this.publicUrl, reachable: this.tunnelReachable && this.tunnel?.state !== 'error', error: this.tunnel?.error },
       agentHost: { connected: !!this.monitor?.connected, found: !!this.endpoint(), counts: this.monitor ? this.monitor.counts() : null },
       rendezvous: { enabled: s.rendezvous, status: this.rendezvous?.status, error: this.rendezvous?.lastError },
       pairing: this.pairing ? { link: this.pairing.link, svg: this.pairing.svg, expiresAt: this.pairing.expiresAt } : null,
