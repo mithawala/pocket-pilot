@@ -519,11 +519,30 @@ class PocketPilotService {
       if (this.publicUrl !== url) return;
       this.tunnelReachable = true;
       this.changed();
+      this._announceAddress(url).catch((err) => this.logLine('warn', `Telling devices the new address failed: ${err.message}`));
     }).catch((err) => {
       if (this.publicUrl !== url) return;
       this.logLine('warn', `${err.message}; checking again in 30s`);
       setTimeout(() => this._checkReachable(url), 30000).unref?.();
     });
+  }
+
+  /**
+   * A newly opened tunnel has a new address, which devices find through the auto-reconnect gist. Without
+   * it, the devices this PC sends notifications to get the address in one (end-to-end encrypted) and
+   * connect there (rememberAddress in the app's sw.js). A tunnel kept from before keeps its address.
+   */
+  async _announceAddress(url) {
+    const rdv = this.rendezvous;
+    if (this.tunnel.kept || this._announced === url || (settings().rendezvous && rdv?.status === 'ready' && rdv.lastUrl === url)) return;
+    this._announced = url;
+    const devices = this.store.list().filter((d) => d.push);
+    if (!devices.length) return;
+    this.logLine('info', `New address, and no auto-reconnect gist: telling ${devices.length} device(s) by notification`);
+    await this._pushTo(devices, {
+      v: 1, kind: 'address', url, title: '🔄 Pocket Pilot', body: `${this.identity.name} has a new address. This device connects there now.`,
+      hostId: this.identity.hostId, tag: `${this.identity.hostId}:address`, ts: Date.now(),
+    }, { urgency: 'normal', ttl: 86400 });
   }
 
   async _onConfigChanged(e) {

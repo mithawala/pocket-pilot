@@ -79,6 +79,9 @@ const stamp = (rel, marker, value) => {
   fs.writeFileSync(p, src.replace(marker, value));
 };
 stamp('sw.js', "const VERSION = 'pp-v1';", `const VERSION = '${cacheVersion}';`);
+// The service worker installs every file of the release before it serves any (see installRelease in sw.js).
+const releaseFiles = listFiles(appDir).filter((rel) => rel !== 'sw.js').sort().map((rel) => `./${rel.split(path.sep).join('/')}`);
+stamp('sw.js', 'const FILES = [];', `const FILES = ${JSON.stringify(releaseFiles)};`);
 stamp('js/boot.js', "const BUILD = 'pp-v1';", `const BUILD = '${cacheVersion}';`);
 stamp('index.html', 'src="./js/boot.js"', `src="./js/boot.js?v=${cacheVersion}"`);
 fs.writeFileSync(path.join(out, '.nojekyll'), '');

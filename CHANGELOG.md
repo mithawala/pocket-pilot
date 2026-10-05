@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.12
+
+- **Phone app updates no longer mix two versions.** After 0.7.11, Rename could fail on a phone with *app.renameHost is not a function*. The phone had loaded part of the new release and part of the previous one: each app file was fetched separately, and right after a release a cache (the browser's, or a CDN edge's) could still serve an old one. The app now downloads a release in full before switching to it, and asks for every file under the release's own name, so no cache can hand it an old one. It then runs only that release's files. If any file fails to download, it keeps the previous release until the next try.
+- **Scan the QR code again to reconnect, without pairing again.** If a computer gets a new address and your phone can't find it, scan the computer's QR code (in the app, **Scan the QR code**). A code from a computer the phone is paired with now only updates its address: no approval on the computer, no new passkey, no second device in the list. After a few failed tries, the *Computer offline* banner offers **Scan** when the computer has no auto-reconnect. A device removed on the computer pairs again as before.
+- **Auto-reconnect without GitHub, for devices with notifications on.** When a computer opens a tunnel at a new address and can't keep it in the auto-reconnect gist, it sends the address in a notification to the devices that take its notifications. The notification is end-to-end encrypted and sent the same way as the others. The phone stores the address and connects there, even if the app is closed. It only accepts an address from the computer it takes notifications from, and the connection still checks the computer's key.
+- **The GitHub Copilot app gives a new address when it restarts.** On Windows the app ends the tunnel when it quits, so a restart opens a new tunnel. Closing or deleting the chat that runs remote access still keeps the address (tested against the real Copilot runtime). Your devices follow through auto-reconnect, a notification or a scan, as above.
+- **The Copilot app's Pocket Pilot panel**:
+  - The fingerprint now shows under the QR code. Pairing asked you to compare it, but it wasn't there.
+  - With auto-reconnect off, the panel says why and how to turn it on (sign in to the GitHub CLI with a personal account), with a **Check again** button.
+  - Pocket Pilot also checks again every few minutes, so signing in later turns auto-reconnect on without a restart.
+- `scripts/tunnel-recovery-check.mjs` also checks that a device with notifications on is sent the new address.
+- **Update Pocket Pilot on your computer** to send addresses in notifications and get the panel changes: the VS Code extension from the Marketplace, and the Copilot app plugin with **Update** on the app's Plugins page. The phone app updates itself.
+
 ## 0.7.11
 
 - **Rename your computers in the phone app.** Tap the computer's name at the top, then the pencil next to it, or go to **Settings → Your computers → Rename**. The name is kept on this device only. Leave it empty, or tap **Use the default name**, to go back. If you pair the same computer again, it keeps its name.

@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.11';
+export const APP_VERSION = '0.7.12';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 
@@ -231,6 +231,20 @@ export class HostConnection extends EventTarget {
     if (['online', 'connecting', 'authenticating', 'passkey', 'code', 'approval', 'setup'].includes(this.state)) return;
     this.attempt = 0;
     this._schedule(0);
+  }
+
+  /**
+   * The computer is at a new address (its QR code scanned again, or a notification from it): connect there
+   * from now on, and right away if this connection is waiting to retry. An attempt under way at the old
+   * address retries at the new one when it fails.
+   */
+  moveTo(url) {
+    if (!url || url === this.record.url) return false;
+    this._updateRecord({ url });
+    this.failures = 0;
+    this.attempt = 0;
+    if (!this.stopped && this.state === 'offline') this._schedule(0);
+    return true;
   }
 
   _schedule(ms) {

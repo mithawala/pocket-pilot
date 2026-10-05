@@ -439,12 +439,31 @@ async function boot(log, cleanups) {
       return;
     }
     tunnel.waitReachable().then(() => {
-      if (state.publicUrl === url) state.reachable = true;
+      if (state.publicUrl !== url) return;
+      state.reachable = true;
+      announceAddress(url).catch((err) => log('warn', `Telling devices the new address failed: ${err.message}`));
     }).catch((err) => {
       if (state.stopped || state.publicUrl !== url) return;
       log('warn', `${err.message}; checking again in 30s`);
       setTimeout(() => checkReachable(url), 30000).unref?.();
     });
+  }
+
+  /**
+   * A newly opened tunnel has a new address, which devices find through the auto-reconnect gist. Without
+   * it, the devices this computer sends notifications to get the address in one (end-to-end encrypted)
+   * and connect there (rememberAddress in the app's sw.js). A tunnel kept from before keeps its address.
+   */
+  async function announceAddress(url) {
+    if (tunnel.kept || state.announced === url || (rendezvousOn() && rendezvous.status === 'ready' && rendezvous.lastUrl === url)) return;
+    state.announced = url;
+    const devices = store.list().filter((d) => d.push);
+    if (!devices.length) return;
+    log('info', `New address, and no auto-reconnect gist: telling ${devices.length} device(s) by notification`);
+    await pushTo(devices, {
+      v: 1, kind: 'address', url, title: '🔄 Pocket Pilot', body: `${hostName} has a new address. This device connects there now.`,
+      hostId: identity.hostId, tag: `${identity.hostId}:address`, ts: Date.now(),
+    }, { urgency: 'normal', ttl: 86400 });
   }
   /** The tunnel answers, and has its connection to Cloudflare (it loses it while the PC is offline). */
   const tunnelUp = () => state.reachable && tunnel.state !== 'error';
@@ -486,6 +505,9 @@ async function boot(log, cleanups) {
       fingerprint: identityLib.fingerprintText(identity.fingerprint),
       tunnel: { url: state.publicUrl, reachable: tunnelUp(), state: tunnel.state, mode: settings().tunnel, error: tunnel.error || state.tunnelError || null },
       rendezvous: rendezvousOn() && !!rendezvous.info(),
+      // Why auto-reconnect is off: 'off' (turned off), 'signin-required' (no GitHub CLI sign-in) or 'error'.
+      rendezvousState: rendezvousOn() ? rendezvous.status || 'signin-required' : 'off',
+      rendezvousError: rendezvous.status === 'error' ? rendezvous.lastError || null : null,
       sessions: host.sessionCount,
       pairing: state.pairing ? { link: state.pairing.link, expiresAt: state.pairing.expiresAt } : null,
       devices: store.list().map((d) => ({ id: d.id, name: d.name, platform: d.platform, online: online.has(d.id), passkey: !!d.passkey, totp: !!d.totp, push: !!d.push, lastSeenAt: d.lastSeenAt })),
@@ -577,6 +599,10 @@ async function boot(log, cleanups) {
       case 'POST /pair/renew':
         await newPairingCode().catch(() => {});
         return { ok: true };
+      case 'POST /pair/rendezvous':
+        // "Check again": the GitHub CLI may be signed in by now.
+        if (state.publicUrl && rendezvousOn()) await rendezvous.publish(state.publicUrl).catch(() => false);
+        return { ok: true };
       case 'POST /pair/remove': {
         const b = await body();
         const d = store.get(String(b.id || ''));
@@ -607,6 +633,12 @@ async function boot(log, cleanups) {
   writeJson(FILES.hub, { pid: process.pid, port: ipcServer.address().port, token: ipcToken, version: VERSION, relayPort: relay.port, startedAt: new Date().toISOString() });
   log('info', `Hub ready: relay 127.0.0.1:${relay.port}, sessions port ${ipcServer.address().port}`);
   startTunnel();
+  // The GitHub CLI may be signed in while remote access runs: auto-reconnect then starts by itself.
+  const rdvTimer = setInterval(() => {
+    if (rendezvousOn() && state.publicUrl && settings().tunnel === 'quick' && rendezvous.status !== 'ready') rendezvous.publish(state.publicUrl).catch(() => {});
+  }, 5 * 60 * 1000);
+  rdvTimer.unref?.();
+  cleanups.push(() => clearInterval(rdvTimer));
   // Sessions begun on a device recently are on the phone again after the hub moved or restarted.
   phone.resumeRecent().catch((err) => log('warn', `Resuming sessions begun on a device: ${err.message}`));
 

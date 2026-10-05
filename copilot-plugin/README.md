@@ -23,7 +23,9 @@ paired devices; `/pocket-pilot off` or **Turn off remote access** in the panel c
 the panel.
 
 Remote access isn't tied to that chat: close or delete it and another open chat takes over within
-seconds, at the same address.
+seconds, at the same address. When the app restarts, the tunnel gets a new address: your devices
+follow it through auto-reconnect (the GitHub CLI's sign-in) or a notification, or you scan the QR
+code again, and they stay paired.
 
 **New sessions from your phone.** Tap **New session**, pick a folder on your PC, the model, mode and
 approvals, and say what to do, with photos and files if you like. The session runs on your PC in the background, in a Copilot runtime

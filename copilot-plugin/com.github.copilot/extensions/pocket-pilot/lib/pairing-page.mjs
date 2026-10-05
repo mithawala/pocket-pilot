@@ -52,6 +52,7 @@ button:disabled{opacity:.55;cursor:default;filter:none}.hide{display:none!import
     <div id="pairsec">
       <div id="qr" class="qr wait">Starting the secure tunnel…</div>
       <p class="small muted" id="exp"></p>
+      <p class="small muted" id="fp"></p>
       <div class="row"><button id="copy" disabled>Copy link</button><button id="renew" disabled>New code</button></div>
     </div>
   </section>
@@ -67,6 +68,7 @@ button:disabled{opacity:.55;cursor:default;filter:none}.hide{display:none!import
       <p class="small muted">The code works once and expires after 10 minutes. Everything between your device and this PC is end-to-end encrypted; Cloudflare only relays ciphertext.</p>
       <h2>Status</h2>
       <div class="row" id="status"></div>
+      <div id="rdv" class="hide"><p class="small muted" id="rdvText"></p><button id="rdvCheck">Check again</button></div>
     </div>
     <h2>Paired devices</h2>
     <div id="devices" class="small muted">None yet.</div>
@@ -131,6 +133,16 @@ function render(s) {
   $('copy').disabled = !link; $('renew').disabled = !s.tunnel.url;
   const left = s.pairing ? Math.max(0, Math.round((s.pairing.expiresAt - Date.now()) / 60000)) : 0;
   $('exp').textContent = s.pairing ? 'Expires in about ' + left + ' min · single use' : '';
+  // Pairing shows this fingerprint on the device too: the same one means it reached this PC, and only it.
+  $('fp').innerHTML = s.pairing && s.fingerprint ? 'Fingerprint <code>' + esc(s.fingerprint) + '</code>' : '';
+  const rdv = !local && !s.rendezvous;
+  $('rdv').classList.toggle('hide', !rdv);
+  if (rdv) {
+    const why = s.rendezvousState === 'off' ? 'Auto-reconnect is turned off in the settings.'
+      : s.rendezvousState === 'error' && s.rendezvousError ? 'Auto-reconnect is off: ' + esc(s.rendezvousError)
+      : 'Auto-reconnect is off. To turn it on, sign in to the GitHub CLI with a personal GitHub account: run <code>gh auth login</code> in a terminal. Pocket Pilot checks again every few minutes.';
+    $('rdvText').innerHTML = why + ' Until then, when this PC gets a new address (after the app restarts, say), devices with notifications on follow it by themselves, and the others scan this QR code again: they stay paired.';
+  }
   $('status').innerHTML = [
     pill(online ? 'ok' : s.tunnel.error && !reconnecting ? 'err' : 'busy', local ? 'Local network only' : online ? 'Tunnel online' : reconnecting ? 'Tunnel reconnecting' : s.tunnel.error ? 'Tunnel error' : s.tunnel.url ? 'Tunnel connecting' : 'Tunnel starting'),
     pill(s.sessions ? 'ok' : '', s.sessions + ' open session' + (s.sessions === 1 ? '' : 's')),
@@ -150,6 +162,14 @@ document.addEventListener('click', async (e) => {
 });
 $('copy').onclick = async () => { if (link) { await navigator.clipboard.writeText(link); $('copy').textContent = 'Copied'; setTimeout(() => ($('copy').textContent = 'Copy link'), 1500); } };
 $('renew').onclick = async () => { await api('/pair/renew', {}).catch(() => {}); tick(); };
+$('rdvCheck').onclick = async () => {
+  $('rdvCheck').disabled = true;
+  $('rdvCheck').textContent = 'Checking…';
+  await api('/pair/rendezvous', {}).catch(() => {});
+  $('rdvCheck').disabled = false;
+  $('rdvCheck').textContent = 'Check again';
+  tick();
+};
 async function turnOn() {
   busy = 'on';
   setState('busy', 'Turning on…');

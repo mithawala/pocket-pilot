@@ -75,7 +75,7 @@ function SessionMenu({ open, onClose, store, uri, session, onDeleted }) {
   </${Sheet}>`;
 }
 
-export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = false }) {
+export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedded = false }) {
   useChange(store, (d) => !d.uri || d.uri === uri || d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || store.chatFor(uri) === d.uri);
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
@@ -203,7 +203,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, embedded = fals
     ${waiting > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
       <${Icon} name="alert-circle" /><span>${waiting === 1 ? 'The agent is waiting for you' : `${waiting} requests are waiting for you`}</span><span class="go">Review</span>
     </button>`}
-    <${ConnectionBanner} conn=${conn} store=${store} onRepair=${onRepair} />
+    <${ConnectionBanner} conn=${conn} store=${store} onRepair=${onRepair} onScan=${onScan} />
     <div class="scroll-wrap">
       <div class="scroll" ref=${scrollRef} onScroll=${onScroll}>
         <div class="chat" ref=${contentRef}>

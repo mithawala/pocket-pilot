@@ -304,7 +304,7 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
   </${Sheet}>`;
 }
 
-export function ConnectionBanner({ conn, store, onRepair }) {
+export function ConnectionBanner({ conn, store, onRepair, onScan }) {
   const st = conn.state;
   if (st === 'online' && store.ahpConnected) return null;
   if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your computer.' : 'VS Code agent host is not available on your computer.')}</div>`;
@@ -315,10 +315,12 @@ export function ConnectionBanner({ conn, store, onRepair }) {
   if (st === 'setup') return html`<div class="banner"><${Icon} name="key" size="18" />Setting up this device again…</div>`;
   if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This device is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
   if (st === 'locked') return html`<div class="banner err"><${Icon} name="lock" size="18" /><span>${conn.detail || 'Verification failed.'}</span><button onClick=${() => { conn.stopped = false; conn.poke(); }}>Retry</button></div>`;
-  return html`<div class="banner warn"><${Spinner} /><span>Computer offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}</span><button onClick=${() => conn.poke()}>Retry</button></div>`;
+  // Without auto-reconnect, a computer at a new address (a new tunnel) is only found again through its QR code.
+  const rescan = onScan && !conn.record?.rendezvous && conn.failures >= 2;
+  return html`<div class="banner warn"><${Spinner} /><span>Computer offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}${rescan ? ' New address? Scan its QR code again: you stay paired.' : ''}</span>${rescan && html`<button onClick=${onScan}>Scan</button>`}<button onClick=${() => conn.poke()}>Retry</button></div>`;
 }
 
-export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, pushPrompt, selected, newOpen, onNew, onNewClose }) {
+export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, onScan, pushPrompt, selected, newOpen, onNew, onNewClose }) {
   // Session and chat state can correct a session's status (see HostStore.statusFor).
   const correctable = (s) => !!s && ((s.status & 31) === S.Error || has(s.status, S.Input));
   useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root'
@@ -361,7 +363,7 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
       </button>
       <button class="icon-btn" onClick=${onSettings} aria-label="Settings"><${Icon} name="gear" /></button>
     </div>
-    <${ConnectionBanner} conn=${conn} store=${store} onRepair=${() => app.repair(host)} />
+    <${ConnectionBanner} conn=${conn} store=${store} onRepair=${() => app.repair(host)} onScan=${onScan} />
     <div class="scroll-wrap">
       <div class="scroll">
         <div class="list">

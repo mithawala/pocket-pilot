@@ -124,6 +124,7 @@ a { color: var(--accent); }
 .banner.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--bg-2)); }
 .banner.err { color: var(--err); background: color-mix(in srgb, var(--err) 10%, var(--bg-2)); }
 .banner > button, .banner .go { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.banner > button + button { margin-left: 0; }
 .demo-banner { flex: none; display: block; padding: calc(var(--safe-top) + 5px) 12px 5px; text-align: center; font-size: 12.5px; color: #fff; background: var(--btn); text-decoration: none; }
 
 /* ---------- controls */

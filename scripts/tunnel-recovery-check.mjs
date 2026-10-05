@@ -7,6 +7,7 @@
 // online at the new address. Uses a throwaway POCKET_PILOT_HOME; takes about four minutes.
 //   node scripts/tunnel-recovery-check.mjs
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -35,6 +36,14 @@ const bin = probe.findBinary() || (await new PersistentTunnel({ storageDir: tunn
 fs.mkdirSync(path.join(tunnelDir, 'bin'), { recursive: true });
 if (path.dirname(bin) !== path.join(tunnelDir, 'bin')) fs.copyFileSync(bin, path.join(tunnelDir, 'bin', path.basename(bin)));
 fs.writeFileSync(path.join(home, 'state.json'), JSON.stringify({ enabled: true, settings: { tunnel: 'quick', passkey: 'off', requireApproval: false, rendezvous: false } }));
+// A paired phone that takes notifications: it gets the new address in one (its push service refuses the
+// made-up subscription, which is fine here).
+const ecdh = crypto.createECDH('prime256v1');
+ecdh.generateKeys();
+fs.writeFileSync(path.join(home, 'devices.json'), JSON.stringify({ version: 1, devices: [{
+  id: 'test-phone', name: 'Test phone', platform: 'iPhone', publicKey: crypto.randomBytes(65).toString('base64url'), pairedAt: Date.now(),
+  push: { endpoint: 'https://fcm.googleapis.com/fcm/send/pocket-pilot-recovery-check', keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url') } },
+}] }));
 
 const free = () => new Promise((r) => {
   const s = net.createServer();
@@ -110,6 +119,15 @@ const saved = ipc.readJson(path.join(tunnelDir, 'tunnel.json'));
 if (!saved || saved.pid === dead.pid || saved.next) fail(`tunnel.json was not updated: ${JSON.stringify(saved)}`);
 const health = await get(`${back.s.tunnel.url}/health`, 15000);
 log(`the dead cloudflared is ended; ${back.s.tunnel.url}/health answers ${health.status || health.error} from this PC`);
+const told = await (async () => {
+  for (let i = 0; i < 20; i++) {
+    if (/New address, and no auto-reconnect gist: telling 1 device\(s\) by notification/.test(fs.readFileSync(path.join(home, 'hub.log'), 'utf8'))) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+})();
+if (!told) fail('the paired phone was not told the new address');
+log('the phone that takes notifications was sent the new address');
 
 const info = ipc.readJson(path.join(home, 'hub.json'));
 const ch = await ipc.connect(info.port, info.token, { pid: process.pid });
@@ -119,7 +137,7 @@ await new Promise((r) => setTimeout(r, 3000));
 if (ipc.isAlive(saved.pid) || fs.existsSync(path.join(tunnelDir, 'tunnel.json'))) fail('stop did not end the new tunnel');
 hub.kill();
 await new Promise((r) => setTimeout(r, 500));
-const hubLog = fs.readFileSync(path.join(home, 'hub.log'), 'utf8').split('\n').filter((l) => /tunnel|Tunnel/.test(l)).map((l) => `    ${l.slice(25)}`);
+const hubLog = fs.readFileSync(path.join(home, 'hub.log'), 'utf8').split('\n').filter((l) => /tunnel|Tunnel|address|Push/.test(l)).map((l) => `    ${l.slice(25)}`);
 console.log(hubLog.join('\n'));
 fs.rmSync(home, { recursive: true, force: true, maxRetries: 5 });
 log('RECOVERY CHECK OK');

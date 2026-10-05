@@ -12,7 +12,8 @@ import { Welcome, PairScreen } from './pair.js';
 import { SettingsScreen, NotificationSetup, RenameHost, pushPromptWanted } from './settings.js';
 import { QrScanner } from './scanner.js';
 import { CodeSheet, PasskeySheet, FactorSheet, clearSetup } from './authenticator.js';
-import { isPairingFragment } from '../core/secure-channel.js';
+import { isPairingFragment, decodePairingFragment, fingerprint } from '../core/secure-channel.js';
+import { unb64u } from '../core/bytes.js';
 import { hostLabel, defaultHostLabel, cleanHostLabel } from '../lib/format.js';
 
 function parseRoute() {
@@ -172,6 +173,15 @@ export class AppController extends EventTarget {
     this.hosts = await db.hosts().catch(() => []);
     const saved = await db.get('currentHost').catch(() => null);
     this.currentId = this.hosts.find((h) => h.hostId === saved)?.hostId || this.hosts[0]?.hostId || null;
+    // Opened with the QR code of a computer this device is paired with: it only tells its address.
+    const known = this.pendingFragment ? await this.pairedHostFor(this.pendingFragment).catch(() => null) : null;
+    if (known) {
+      this.pendingFragment = null;
+      history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+      this.currentId = known.host.hostId;
+      await db.set('currentHost', this.currentId).catch(() => {});
+      await this.moveHost(known.host.hostId, known.url);
+    }
     this._connectCurrent();
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -183,9 +193,11 @@ export class AppController extends EventTarget {
     window.addEventListener('focus', () => this.active?.conn.poke());
     navigator.serviceWorker?.addEventListener('message', (e) => {
       if (e.data?.type === 'open-session') this.openFromNotification(e.data.hostId, e.data.session);
+      if (e.data?.type === 'host-address') this.moveHost(e.data.hostId, e.data.url, { fromPush: true });
     });
     this.ready = true;
     this._emit();
+    if (known) toast(`Connecting to ${hostLabel(known.host)}. You're still paired.`);
   }
 
   get current() {
@@ -252,6 +264,54 @@ export class AppController extends EventTarget {
     else h.customName = clean;
     if (!this.demo) await db.putHost(h);
     this._emit();
+  }
+
+  /** The paired computer a pairing link (a QR code) is from, by its key's fingerprint, with the address it gives. */
+  async pairedHostFor(fragment) {
+    const p = decodePairingFragment(fragment);
+    if (!p) return null;
+    for (const host of this.hosts) {
+      if (!host.hostPublicKey) continue;
+      const fp = await fingerprint(unb64u(host.hostPublicKey));
+      if (fp.length === p.hostFingerprint.length && fp.every((b, i) => b === p.hostFingerprint[i])) return { host, url: p.url };
+    }
+    return null;
+  }
+
+  /**
+   * A paired computer is at a new address: from its QR code scanned again, or from a notification it sent
+   * (`fromPush`: only the computer this device takes notifications from). Its connection moves there.
+   */
+  async moveHost(hostId, url, { fromPush = false } = {}) {
+    const h = this.hosts.find((x) => x.hostId === hostId);
+    // An address like the ones pairing links carry; one from a notification is always a public https one.
+    const valid = fromPush ? /^https:\/\/[^/\s?#]+$/.test(url || '') : /^(https:\/\/[^/\s?#]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/.test(url || '');
+    if (!h || !valid || h.url === url || (fromPush && !h.pushEnabled)) return false;
+    if (this.active?.host === h) {
+      this.active.conn.moveTo(url);
+    } else {
+      h.url = url;
+      if (!this.demo) await db.putHost(h).catch(() => {});
+    }
+    this._emit();
+    return true;
+  }
+
+  /**
+   * A QR code (or pairing link) from a computer this device is paired with already: there's no need to
+   * pair again, it only tells the computer's current address. Returns that computer, or null to pair.
+   * A device removed on the computer pairs again instead.
+   */
+  async reconnectWithLink(fragment) {
+    if (this.demo) return null;
+    const known = await this.pairedHostFor(fragment).catch(() => null);
+    if (!known) return null;
+    const { host, url } = known;
+    if (this.active?.host === host && this.active.conn.state === 'unpaired') return null;
+    await this.moveHost(host.hostId, url);
+    if (this.currentId !== host.hostId) await this.selectHost(host.hostId);
+    else this.active?.conn.poke();
+    return host;
   }
 
   async forgetHost(host) {
@@ -369,8 +429,15 @@ export function App({ app }) {
   const [scanning, setScanning] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const wide = useWide();
-  const startPairing = (frag) => {
+  // A scanned QR code or an opened pairing link: from a computer this device is paired with already, it
+  // only tells the computer's address (connect there, no new pairing); otherwise pair.
+  const startPairing = async (frag) => {
     setScanning(false);
+    const known = await app.reconnectWithLink(frag);
+    if (known) {
+      toast(`Connecting to ${hostLabel(known)}. You're still paired.`);
+      return;
+    }
     app.pendingFragment = frag;
     location.hash = '#/pair';
     setRoute({ name: 'pair' });
@@ -378,9 +445,10 @@ export function App({ app }) {
   useEffect(() => {
     const onHash = () => {
       if (isPairingFragment(location.hash)) {
-        app.pendingFragment = location.hash;
-        history.replaceState(null, '', `${location.pathname}${location.search}#/pair`);
-        setRoute({ name: 'pair' });
+        const frag = location.hash;
+        // The token leaves the address bar (and history) right away.
+        history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+        startPairing(frag);
         return;
       }
       setRoute(parseRoute());
@@ -417,10 +485,10 @@ export function App({ app }) {
       selected=${route.name === 'chat' ? route.uri : null} newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}
-      onSwitchHost=${() => setSwitcher(true)} />`;
+      onSwitchHost=${() => setSwitcher(true)} onScan=${() => setScanning(true)} />`;
     let main;
     if (route.name === 'chat') {
-      main = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} embedded=${true} onRepair=${() => app.repair(app.current)} onBack=${() => { location.hash = '#/'; }} />`;
+      main = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} embedded=${true} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => { location.hash = '#/'; }} />`;
     } else if (route.name === 'settings') {
       main = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => { location.hash = '#/'; }} onPairNew=${() => setScanning(true)} />`;
     } else {
@@ -430,14 +498,14 @@ export function App({ app }) {
   } else if (route.name === 'settings') {
     screen = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => history.length > 1 ? history.back() : (location.hash = '#/')} onPairNew=${() => setScanning(true)} />`;
   } else if (route.name === 'chat' && app.active) {
-    screen = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} onRepair=${() => app.repair(app.current)} onBack=${() => (history.length > 1 ? history.back() : (location.hash = '#/'))} />`;
+    screen = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => (history.length > 1 ? history.back() : (location.hash = '#/'))} />`;
   } else if (app.active) {
     screen = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
       pushPrompt=${app.pushPrompt()}
       newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
       onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
       onSettings=${() => { location.hash = '#/settings'; }}
-      onSwitchHost=${() => setSwitcher(true)} />`;
+      onSwitchHost=${() => setSwitcher(true)} onScan=${() => setScanning(true)} />`;
   }
   return html`<div class=${`shell ${app.demo ? 'has-banner' : ''}`}>
     ${app.demo && html`<a class="demo-banner" href="./" target="_top">Demo with sample data · <b>Use it with my computer →</b></a>`}
