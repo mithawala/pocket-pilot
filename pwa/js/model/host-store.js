@@ -2,7 +2,8 @@
 // user actions the phone can take. State is reduced with the official AHP reducers, so the
 // phone renders exactly what VS Code renders.
 import { AhpClient } from '../../vendor/ahp/client/index.js';
-import { rootReducer, sessionReducer, chatReducer, SUPPORTED_PROTOCOL_VERSIONS } from '../../vendor/ahp/types/index.js';
+import { rootReducer, sessionReducer, chatReducer } from '../../vendor/ahp/types/index.js';
+import { PROTOCOL_VERSIONS } from '../core/protocol.js';
 import { S, has, uuid, effectiveStatus } from '../lib/format.js';
 import { waitingOn } from '../lib/asks.js';
 
@@ -108,7 +109,7 @@ export class HostStore extends EventTarget {
     if (!done) {
       const init = await client.initialize({
         clientId: this.clientId,
-        protocolVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
+        protocolVersions: [...PROTOCOL_VERSIONS],
         initialSubscriptions: subs,
         locale: navigator.language,
       });

@@ -154,6 +154,25 @@ export function sessionReducer(state, action, log) {
             updated[idx] = { ...list[idx], ...changes };
             return { ...state, chats: updated };
         }
+        case ActionType.SessionChatsReordered: {
+            const list = state.chats;
+            if (action.chats.length !== list.length || new Set(action.chats).size !== list.length) {
+                return state;
+            }
+            const summaries = new Map(list.map(summary => [summary.resource, summary]));
+            const reordered = [];
+            for (const resource of action.chats) {
+                const summary = summaries.get(resource);
+                if (!summary) {
+                    return state;
+                }
+                reordered.push(summary);
+            }
+            if (reordered.every((summary, index) => summary === list[index])) {
+                return state;
+            }
+            return { ...state, chats: reordered };
+        }
         case ActionType.SessionDefaultChatChanged:
             return { ...state, defaultChat: action.defaultChat };
         // ── Metadata ──────────────────────────────────────────────────────────
@@ -378,6 +397,11 @@ export function sessionReducer(state, action, log) {
                 state: { kind: McpServerStatus.Starting },
                 channel: undefined,
             }));
+        }
+        case ActionType.SessionMcpServerBackgroundRequested: {
+            return updateMcpServerCustomization(state, action.id, entry => entry.state.kind === McpServerStatus.Starting && entry.state.blocking
+                ? { ...entry, state: { ...entry.state, blocking: false } }
+                : entry);
         }
         case ActionType.SessionMcpServerStopRequested: {
             return updateMcpServerCustomization(state, action.id, entry => ({

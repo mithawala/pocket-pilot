@@ -8,6 +8,7 @@ const agentHost = require('./agentHost');
 
 const BIT = { Idle: 1, Error: 2, InProgress: 8, Input: 16, IsRead: 32, IsArchived: 64 };
 const VENDOR = path.join(__dirname, '..', '..', 'pwa', 'vendor', 'ahp');
+const PROTOCOL = path.join(__dirname, '..', '..', 'pwa', 'js', 'core', 'protocol.js');
 
 let ahpPromise;
 function loadAhp() {
@@ -15,7 +16,8 @@ function loadAhp() {
     ahpPromise = Promise.all([
       import(pathToFileURL(path.join(VENDOR, 'client', 'index.js')).href),
       import(pathToFileURL(path.join(VENDOR, 'types', 'index.js')).href),
-    ]).then(([c, t]) => ({ AhpClient: c.AhpClient, SUPPORTED: t.SUPPORTED_PROTOCOL_VERSIONS, sessionReducer: t.sessionReducer }));
+      import(pathToFileURL(PROTOCOL).href),
+    ]).then(([c, t, p]) => ({ AhpClient: c.AhpClient, SUPPORTED: p.PROTOCOL_VERSIONS, sessionReducer: t.sessionReducer }));
   }
   return ahpPromise;
 }

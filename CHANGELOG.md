@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.13
+
+- **Works with VS Code 1.141.** VS Code 1.141 speaks a newer version of the Agent Host Protocol (0.10.0) and accepts no other, so the phone app couldn't load your sessions (*Could not load sessions: RPC error -32005 … server accepts ^0.10.0*). Pocket Pilot's notifications from VS Code stopped too. Pocket Pilot now uses version 1.0.0 of the protocol library, which understands everything 0.10.0 adds (such as per-chat read state). It offers 0.10.0 together with 1.0.0 and the versions earlier VS Code releases speak, so it works with VS Code 1.141, the releases before it and the next ones (tested against VS Code 1.141 itself: it negotiates 0.10.0).
+- The versions Pocket Pilot offers are kept in one place for the phone app and the VS Code extension's notifications (`pwa/js/core/protocol.js`).
+- **Updating:** the phone app updates itself, and that's what brings your sessions back. Update the VS Code extension too (from the Marketplace, or **Update** when VS Code offers it) to get its notifications back. The Copilot app plugin works with the new phone app as it is, and gets the new library with **Update**.
+
 ## 0.7.12
 
 - **Phone app updates no longer mix two versions.** After 0.7.11, Rename could fail on a phone with *app.renameHost is not a function*. The phone had loaded part of the new release and part of the previous one: each app file was fetched separately, and right after a release a cache (the browser's, or a CDN edge's) could still serve an old one. The app now downloads a release in full before switching to it, and asks for every file under the release's own name, so no cache can hand it an old one. It then runs only that release's files. If any file fails to download, it keeps the previous release until the next try.

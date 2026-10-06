@@ -14,7 +14,7 @@ const lockPath = path.join(root, 'scripts', 'vendor-lock.json');
 const update = process.argv.includes('--update');
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
-const AHP = '@microsoft/agent-host-protocol@0.9.0';
+const AHP = '@microsoft/agent-host-protocol@1.0.0';
 const HLJS = '@highlightjs/cdn-assets@11.12.0';
 // The qrcode-generator npm package ships no LICENSE file: take it from the matching release tag.
 const QRCODE_LICENSE = 'https://raw.githubusercontent.com/kazuhikoarase/qrcode-generator/js2.0.4/LICENSE';

@@ -50,3 +50,16 @@ export var AutomationTriggerKind;
     /** A host-defined external event discovered from trigger definitions. */
     AutomationTriggerKind["Event"] = "event";
 })(AutomationTriggerKind || (AutomationTriggerKind = {}));
+/**
+ * Discriminant for an {@link AutomationDisableCondition}.
+ *
+ * @category Automation State
+ * @exhaustive
+ */
+export var AutomationDisableConditionKind;
+(function (AutomationDisableConditionKind) {
+    /** Stop scheduling after a fixed number of scheduled runs. */
+    AutomationDisableConditionKind["AfterRuns"] = "afterRuns";
+    /** Stop scheduling once a wall-clock date passes. */
+    AutomationDisableConditionKind["AfterDate"] = "afterDate";
+})(AutomationDisableConditionKind || (AutomationDisableConditionKind = {}));

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { pairWithHost, HostConnection } from '../pwa/js/net/host-connection.js';
 import { encodePairingFragment } from '../pwa/js/core/secure-channel.js';
 import { AhpClient } from '../pwa/vendor/ahp/client/index.js';
-import { SUPPORTED_PROTOCOL_VERSIONS } from '../pwa/vendor/ahp/types/index.js';
+import { PROTOCOL_VERSIONS } from '../pwa/js/core/protocol.js';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,7 +56,7 @@ conn.start();
 const { transport } = await ready;
 const client = new AhpClient(transport, { requestTimeoutMs: 45000 });
 client.connect();
-const init = await client.initialize({ clientId: `pocket-pilot-live-${Date.now()}`, protocolVersions: [...SUPPORTED_PROTOCOL_VERSIONS], initialSubscriptions: ['ahp-root://'] });
+const init = await client.initialize({ clientId: `pocket-pilot-live-${Date.now()}`, protocolVersions: [...PROTOCOL_VERSIONS], initialSubscriptions: ['ahp-root://'] });
 const rootState = init.snapshots.find((s) => s.resource === 'ahp-root://')?.state;
 console.log('negotiated protocol', init.protocolVersion, '| agents:', (rootState?.agents || []).map((a) => `${a.displayName} (${a.models.length} models)`).join(', '));
 const { items } = await client.request('listSessions', { channel: 'ahp-root://' });

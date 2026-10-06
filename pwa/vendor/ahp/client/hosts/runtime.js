@@ -776,5 +776,7 @@ function applySummaryChange(cache, params) {
         merged.workingDirectories = changes.workingDirectories;
     if (changes._meta !== undefined)
         merged._meta = changes._meta;
+    if (changes.chats !== undefined)
+        merged.chats = changes.chats;
     cache.set(params.session, merged);
 }

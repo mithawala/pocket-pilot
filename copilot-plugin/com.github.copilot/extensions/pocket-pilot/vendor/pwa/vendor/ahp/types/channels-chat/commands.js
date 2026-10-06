@@ -12,3 +12,17 @@ export var ChatSourceKind;
     /** Supply source context without copying it into the new chat's visible history. */
     ChatSourceKind["SideChat"] = "sideChat";
 })(ChatSourceKind || (ChatSourceKind = {}));
+// ─── moveChat ────────────────────────────────────────────────────────────────
+/**
+ * Destination kind for an atomic chat move.
+ *
+ * @category Commands
+ * @nonexhaustive
+ */
+export var ChatMoveDestinationKind;
+(function (ChatMoveDestinationKind) {
+    /** Move the source chat subtree into an existing session. */
+    ChatMoveDestinationKind["Session"] = "session";
+    /** Move the source chat subtree into a newly allocated session. */
+    ChatMoveDestinationKind["NewSession"] = "newSession";
+})(ChatMoveDestinationKind || (ChatMoveDestinationKind = {}));

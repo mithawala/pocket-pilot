@@ -1,6 +1,22 @@
 // Generated from types/*.ts — do not edit.
 // Regenerate with: npm run generate:typescript
 /**
+ * Kind of {@link BackgroundWork}.
+ *
+ * This is a general/typological union (not a lifecycle), so the discriminant is
+ * a `*Kind`.
+ *
+ * @category Background Work
+ * @nonexhaustive
+ */
+export var BackgroundWorkKind;
+(function (BackgroundWorkKind) {
+    /** A shell command that continues after its initiating tool call returns. */
+    BackgroundWorkKind["Shell"] = "shell";
+    /** A subagent running in the background. */
+    BackgroundWorkKind["Subagent"] = "subagent";
+})(BackgroundWorkKind || (BackgroundWorkKind = {}));
+/**
  * Discriminant for {@link ChatOrigin} — how a chat came into existence.
  *
  * @category Chat State

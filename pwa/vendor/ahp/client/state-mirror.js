@@ -2,7 +2,7 @@
  * Convenience reducer-driven state store, mirroring the Swift
  * `AHPStateMirror` and the Rust reducers example.
  *
- * Tracks root, session, terminal, changeset, automation catalogue, and
+ * Tracks root, session, canvas, terminal, changeset, automation catalogue, and
  * automation-run state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
  * the mirror keeps those resources up to date via the generated reducers.
  *
@@ -11,12 +11,15 @@
  *
  * @module client/state-mirror
  */
+import { ActionType } from '../types/common/actions.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
+import { canvasReducer } from '../types/channels-canvas/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
 import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
 import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
+import { isCanvasState } from './canvas-state.js';
 const ROOT_URI = 'ahp-root://';
 const AUTOMATIONS_URI = 'ahp-automations://';
 const INITIAL_ROOT = { agents: [] };
@@ -25,6 +28,7 @@ const INITIAL_AUTOMATION_CATALOG = { entries: [] };
 export class AhpStateMirror {
     rootState = INITIAL_ROOT;
     sessionsMap = new Map();
+    canvasesMap = new Map();
     terminalsMap = new Map();
     changesetsMap = new Map();
     automationCatalogState = INITIAL_AUTOMATION_CATALOG;
@@ -37,6 +41,10 @@ export class AhpStateMirror {
     /** All known sessions keyed by URI. */
     get sessions() {
         return this.sessionsMap;
+    }
+    /** All known live canvases keyed by their channel URI. */
+    get canvases() {
+        return this.canvasesMap;
     }
     /** All known terminals keyed by URI. */
     get terminals() {
@@ -61,6 +69,9 @@ export class AhpStateMirror {
     getSession(uri) {
         return this.sessionsMap.get(uri);
     }
+    getCanvas(uri) {
+        return this.canvasesMap.get(uri);
+    }
     /** Look up a terminal by URI. */
     getTerminal(uri) {
         return this.terminalsMap.get(uri);
@@ -81,6 +92,13 @@ export class AhpStateMirror {
         }
         if (resource.startsWith('ahp-session:')) {
             this.sessionsMap.set(resource, snapshot.state);
+            return;
+        }
+        if (resource.startsWith('ahp-canvas:')) {
+            if (!isCanvasState(snapshot.state)) {
+                throw new Error('Invalid canvas snapshot state');
+            }
+            this.canvasesMap.set(resource, snapshot.state);
             return;
         }
         if (resource.startsWith('ahp-terminal:')) {
@@ -121,6 +139,13 @@ export class AhpStateMirror {
             if (!current)
                 return;
             this.sessionsMap.set(channel, sessionReducer(current, action));
+            return;
+        }
+        if (channel.startsWith('ahp-canvas:')) {
+            const current = this.canvasesMap.get(channel);
+            if (current === undefined || action.type !== ActionType.CanvasStateChanged)
+                return;
+            this.canvasesMap.set(channel, canvasReducer(current, action));
             return;
         }
         if (channel.startsWith('ahp-terminal:')) {

@@ -30,7 +30,7 @@ function walk(dir) {
 const want = new Map();
 const add = (src, dest) => want.set(path.join(vendor, dest), fs.readFileSync(path.join(root, src)));
 for (const f of fs.readdirSync(path.join(root, 'extension', 'core'))) if (f.endsWith('.js')) add(`extension/core/${f}`, `extension/core/${f}`);
-for (const f of ['secure-channel.js', 'bytes.js', 'totp.js']) add(`pwa/js/core/${f}`, `pwa/js/core/${f}`);
+for (const f of ['secure-channel.js', 'bytes.js', 'totp.js', 'protocol.js']) add(`pwa/js/core/${f}`, `pwa/js/core/${f}`);
 add('pwa/package.json', 'pwa/package.json');
 for (const f of walk(path.join(root, 'pwa', 'vendor', 'ahp'))) {
   const rel = path.relative(root, f).split(path.sep).join('/');

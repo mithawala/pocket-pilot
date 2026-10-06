@@ -111,6 +111,7 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
   const mock = createVscodeMock(settings, { warning: (msg, items) => (/Allow "/.test(msg) ? 'Allow' : undefined) });
   const uninstall = installMock(mock.api);
   let service;
+  let stopConn;
   try {
     delete require.cache[require.resolve('../extension/extension.js')];
     const ext = require('../extension/extension.js');
@@ -142,14 +143,17 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
     assert.equal(service.store.list().length, 1);
 
     const conn = new HostConnection(record, { webauthn: {} });
+    stopConn = () => conn.stop();
     const ready = new Promise((r) => conn.addEventListener('ready', (e) => r(e.detail), { once: true }));
     conn.start();
     const { transport, welcome } = await ready;
     assert.ok(welcome.vapidPublicKey, 'welcome carries the VAPID key for push');
     const { AhpClient } = await import('../pwa/vendor/ahp/client/index.js');
+    const { PROTOCOL_VERSIONS } = await import('../pwa/js/core/protocol.js');
     const client = new AhpClient(transport, { requestTimeoutMs: 30000 });
     client.connect();
-    await client.initialize({ clientId: `smoke-${Date.now()}`, protocolVersions: ['0.9.0'], initialSubscriptions: ['ahp-root://'] });
+    // What the phone offers: VS Code accepts only its own protocol version (0.10.x for 1.141).
+    await client.initialize({ clientId: `smoke-${Date.now()}`, protocolVersions: [...PROTOCOL_VERSIONS], initialSubscriptions: ['ahp-root://'] });
     const { items } = await client.request('listSessions', { channel: 'ahp-root://' });
     assert.ok(Array.isArray(items) && items.length > 0, 'real sessions visible through the extension relay');
     await new Promise((r) => setTimeout(r, 300));
@@ -161,6 +165,8 @@ test('extension activates, starts, pairs a phone and relays AHP (live agent host
     await mock.api.commands.executeCommand('pocketPilot.stop');
     assert.equal(service.state, 'stopped');
   } finally {
+    // A connection left open would keep the test process running after a failure.
+    stopConn?.();
     if (service) await service.dispose();
     uninstall();
   }

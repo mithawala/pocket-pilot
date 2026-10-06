@@ -8,3 +8,4 @@ export { createResourceRequestHandler } from './client.js';
 export { AhpClientError, ClientClosedError, RpcError, RpcTimeoutError, TransportError, } from './error.js';
 export { InMemoryTransport } from './transport.js';
 export { AhpStateMirror } from './state-mirror.js';
+export { ManagedSubscriptionManager } from './managed-subscriptions.js';

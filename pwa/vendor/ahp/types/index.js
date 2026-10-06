@@ -17,4 +17,4 @@ export * from './messages.js';
 export * from './errors.js';
 export * from './version/registry.js';
 // Explicit: the shim also re-exports the internal `softAssertNever`.
-export { rootReducer, sessionReducer, chatReducer, terminalReducer, changesetReducer, annotationsReducer, resourceWatchReducer, automationReducer, automationRunReducer, isClientDispatchable, } from './reducers.js';
+export { rootReducer, sessionReducer, chatReducer, canvasReducer, terminalReducer, changesetReducer, annotationsReducer, resourceWatchReducer, automationReducer, automationRunReducer, isClientDispatchable, } from './reducers.js';

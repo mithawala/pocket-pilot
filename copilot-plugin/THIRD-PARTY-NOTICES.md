@@ -10,7 +10,7 @@ full license text is in the `LICENSE` file next to it.
 
 | Component | Version | License | Where |
 |---|---|---|---|
-| [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) | 0.9.0 | MIT, Copyright (c) Microsoft Corporation | `pwa/vendor/ahp/` (also in the Copilot plugin) |
+| [Agent Host Protocol client](https://github.com/microsoft/agent-host-protocol) | 1.0.0 | MIT, Copyright (c) Microsoft Corporation | `pwa/vendor/ahp/` (also in the Copilot plugin) |
 | [Preact](https://preactjs.com) | 10.29.8 | MIT, Copyright (c) 2015-present Jason Miller | `pwa/vendor/preact/` |
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | `pwa/vendor/htm/` |
 | [marked](https://marked.js.org) | 18.0.14 | MIT | `pwa/vendor/marked/` |
