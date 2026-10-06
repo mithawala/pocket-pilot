@@ -1,0 +1,420 @@
+import { html, useState, useRef, useEffect, useLayoutEffect } from '../lib/ui.js';
+import { Icon, Sheet, toast, useEscape } from './common.js';
+import { ModelSheet, ModelOptionsSheet, modelSummary, modelChip, optionsChip, hasOptions } from './model-picker.js';
+import { haptic, providerLabel } from '../lib/format.js';
+import { isImageAttachment, splitAttachments } from '../lib/attachments.js';
+import { MAX_UPLOAD, prepareFile, uploadFile, pastedFiles, filesOnlyText } from '../lib/uploads.js';
+import { Thumbs } from './viewer.js';
+
+const fine = () => window.matchMedia('(pointer: fine)').matches;
+
+/** What a file input offers: photos and the files an agent can read. */
+export const ATTACH_ACCEPT = 'image/*,.pdf,.txt,.md,.json,.csv,.log,.zip,.png,.jpg,.jpeg,.gif,.webp';
+
+/** Files waiting to be sent, above the text: a picture's thumbnail (or a clip), the name, and Remove. */
+export function AttachmentChips({ list, read, onRemove, busy = 0, busyLabel = 'Uploading…' }) {
+  if (!list.length && !busy) return null;
+  return html`<div class="att-row">
+    ${list.map((a, i) => {
+      const pic = a.items.find(isImageAttachment);
+      return html`<span class=${`chip ${pic ? 'pic' : ''}`} key=${i}>${pic ? html`<${Thumbs} images=${[pic]} read=${read} size="xs" />` : html`<${Icon} name="clip" />`}<span>${a.name}</span><button onClick=${() => onRemove(i)} aria-label="Remove attachment"><${Icon} name="x" size="14" /></button></span>`;
+    })}
+    ${busy > 0 && html`<span class="chip"><span class="spinner"></span>${busyLabel}</span>`}
+  </div>`;
+}
+
+/**
+ * The button that makes an input fill the screen, for writing a long text, and brings it back. It keeps
+ * the keyboard open: the input keeps its focus.
+ */
+export function GrowButton({ expanded, onToggle }) {
+  return html`<button type="button" class="grow-btn" onmousedown=${(e) => e.preventDefault()} onClick=${onToggle}
+    aria-pressed=${expanded ? 'true' : 'false'} aria-label=${expanded ? 'Exit full screen' : 'Write in full screen'} title=${expanded ? 'Exit full screen' : 'Write in full screen'}>
+    <${Icon} name=${expanded ? 'minimize' : 'maximize'} size="16" />
+  </button>`;
+}
+
+function OptionSheet({ open, title, options, value, icons, onPick, onClose }) {
+  return html`<${Sheet} open=${open} onClose=${onClose} title=${title}>
+    ${options.map((o) => html`<button class=${`list-item ${o.value === value ? 'on' : ''}`} onClick=${() => { onPick(o.value); onClose(); }}>
+      ${icons?.[o.value] && html`<${Icon} name=${icons[o.value]} />`}
+      <div class="grow"><div>${o.label}</div>${o.description && html`<div class="muted small">${o.description}</div>`}</div>
+      ${o.value === value && html`<span class="check"><${Icon} name="check" /></span>`}
+    </button>`)}
+  </${Sheet}>`;
+}
+
+function enumOptions(schema) {
+  if (!schema?.enum) return [];
+  return schema.enum.map((v, i) => ({ value: v, label: schema.enumLabels?.[i] || v, description: schema.enumDescriptions?.[i] }));
+}
+
+const MODE_ICONS = { interactive: 'chat', plan: 'checklist', autopilot: 'rocket' };
+const APPROVAL_ICONS = { default: 'shield', assisted: 'shield-check', autoApprove: 'shield-off' };
+
+/**
+ * A message waiting for the agent, like VS Code's queue above the chat input: the text, two lines of it
+ * until Show all, Edit (or tap the text), Send Immediately for queued messages, and Remove. A long
+ * message scrolls inside its box, and so does the list, so the chat above always stays in view.
+ */
+function PendingItem({ store, sessionUri, chat, kind, item }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const box = useRef(null);
+  const shown = useRef(null);
+  const text = item.message?.text || '';
+  const { images, others } = splitAttachments(item.message);
+  const read = (u) => store.readImage(u);
+  const label = kind === 'steering' ? 'Steering' : 'Queued';
+  const hint = kind === 'steering' ? 'Sent to the running agent after its next tool call' : 'Sent when the agent finishes its current turn';
+  const run = (fn) => {
+    try {
+      fn();
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  };
+  const startEdit = () => {
+    setDraft(text);
+    setEditing(true);
+  };
+  const save = () => run(() => {
+    store.editPending(chat, kind, item.id, draft);
+    setEditing(false);
+  });
+  // Keeps the message being edited, Save included, in view in the list (which scrolls, not the page).
+  const reveal = () => {
+    const el = box.current?.closest('.pending-item');
+    const list = el?.parentElement;
+    if (!list) return;
+    const ir = el.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    if (ir.height > lr.height || ir.bottom > lr.bottom) list.scrollTop += ir.bottom - lr.bottom;
+    else if (ir.top < lr.top) list.scrollTop -= lr.top - ir.top;
+  };
+  useEffect(() => {
+    const el = box.current;
+    if (!editing || !el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(240, el.scrollHeight)}px`;
+    reveal();
+  }, [editing, draft]);
+  useEffect(() => {
+    const el = box.current;
+    if (editing && el) {
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+    // The list gets shorter when the keyboard opens.
+    const list = el?.closest('.pending-list');
+    if (!editing || !list || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(reveal);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [editing]);
+  // Show all only when two lines don't hold the message: measured, so it follows the width of the screen.
+  useLayoutEffect(() => {
+    const el = shown.current;
+    if (!el || open) return undefined;
+    el.scrollTop = 0; // back to the start after reading an opened message
+    const measure = () => setLong(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open, editing]);
+  if (editing) {
+    return html`<div class="pending-item editing">
+      <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
+      <div class="pe">
+        <textarea ref=${box} value=${draft} aria-label=${`Edit the ${label.toLowerCase()} message`} onInput=${(e) => setDraft(e.target.value)}
+          onKeyDown=${(e) => {
+            if (e.key === 'Escape') setEditing(false);
+            else if (e.key === 'Enter' && !e.shiftKey && fine()) {
+              e.preventDefault();
+              save();
+            }
+          }}></textarea>
+        <div class="pe-bar">
+          <span class="muted small">${fine() ? 'Enter to save · Esc to cancel' : hint}</span>
+          <button class="btn sm" onClick=${() => setEditing(false)}>Cancel</button>
+          <button class="btn sm primary" onClick=${save}>Save</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  // The text is a div, not a <button>: Safari ignores line clamping on buttons, which showed the whole message.
+  return html`<div class="pending-item" title=${hint}>
+    <${Icon} name=${kind === 'steering' ? 'bolt' : 'list'} />
+    <div class="pb">
+      <div ref=${shown} class=${`pt ${open ? 'open' : ''}`} role="button" tabindex="0" onClick=${startEdit}
+        onKeyDown=${(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            startEdit();
+          }
+        }} aria-label=${`${label}: ${text}. Tap to edit`}><b>${label}</b> ${text}</div>
+      ${images.length > 0 && html`<${Thumbs} images=${images} read=${read} size="sm" />`}
+      ${others.length > 0 && html`<div class="att">${others.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="clip" /><span>${a.label}</span></span>`)}</div>`}
+    </div>
+    <div class="pa">
+      ${(long || open) && html`<button onClick=${() => setOpen(!open)} aria-expanded=${open ? 'true' : 'false'} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}
+      <button onClick=${startEdit} aria-label="Edit" title="Edit"><${Icon} name="edit" size="16" /></button>
+      ${kind === 'queued' && html`<button onClick=${() => run(() => store.sendPendingNow(sessionUri, chat, item.id))} aria-label="Send immediately" title="Send Immediately"><${Icon} name="send" size="16" /></button>`}
+      <button onClick=${() => run(() => store.removePending(chat, kind, item.id))} aria-label=${kind === 'steering' ? 'Remove' : 'Remove from queue'} title=${kind === 'steering' ? 'Remove' : 'Remove from Queue'}><${Icon} name="x" size="16" /></button>
+    </div>
+  </div>`;
+}
+
+const SpeechRecognition = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
+
+/** Dictation with the browser's speech recognition (the text lands in the input for review). */
+function useDictation(getText, setText) {
+  const rec = useRef(null);
+  const [listening, setListening] = useState(false);
+  useEffect(() => () => rec.current?.abort(), []);
+  const stop = () => rec.current?.stop();
+  // On send: drop what is still being recognised, or it would land back in the emptied input.
+  const cancel = () => {
+    const r = rec.current;
+    if (!r) return;
+    rec.current = null;
+    r.onresult = null;
+    try {
+      r.abort();
+    } catch {
+      /* already ended */
+    }
+    setListening(false);
+  };
+  const start = () => {
+    if (!SpeechRecognition) return;
+    const r = new SpeechRecognition();
+    rec.current = r;
+    const base = getText().trimEnd();
+    r.lang = navigator.language || 'en-US';
+    r.continuous = true;
+    r.interimResults = true;
+    r.onresult = (e) => {
+      if (rec.current !== r) return;
+      const said = [...e.results].map((x) => x[0]?.transcript || '').join('').trim();
+      setText(base && said ? `${base} ${said}` : base || said);
+    };
+    r.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Allow the microphone for this site to dictate', 'err');
+      else if (e.error !== 'aborted' && e.error !== 'no-speech') toast(`Dictation stopped: ${e.error}`, 'err');
+    };
+    r.onend = () => {
+      if (rec.current === r) rec.current = null;
+      setListening(false);
+    };
+    try {
+      r.start();
+      haptic(10);
+      setListening(true);
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  };
+  return { supported: !!SpeechRecognition, listening, toggle: () => (listening ? stop() : start()), stop, cancel };
+}
+
+export function Composer({ store, conn, sessionUri, session, chat, chatState, autoFocus = false }) {
+  const draftKey = `draft:${sessionUri}`;
+  const [text, setText] = useState(() => sessionStorage.getItem(draftKey) || '');
+  const [attachments, setAttachments] = useState([]);
+  const readImage = (u) => store.readImage(u);
+  const [uploading, setUploading] = useState(0);
+  const [sheet, setSheet] = useState(null);
+  const [menu, setMenu] = useState(false);
+  // Full screen, for a long message, and whether the text already runs over more than one line.
+  const [expanded, setExpanded] = useState(false);
+  const [tall, setTall] = useState(false);
+  const ta = useRef(null);
+  const fileInput = useRef(null);
+  const textRef = useRef(text);
+  textRef.current = text;
+  const dictation = useDictation(() => textRef.current, setText);
+  useEscape(expanded, () => setExpanded(false));
+
+  useEffect(() => {
+    if (text) sessionStorage.setItem(draftKey, text);
+    else sessionStorage.removeItem(draftKey);
+    const el = ta.current;
+    if (el) {
+      // Full screen, the input takes the room it gets; otherwise it grows with the text.
+      el.style.height = 'auto';
+      if (!expanded) el.style.height = `${Math.min(180, el.scrollHeight)}px`;
+      else el.style.height = '';
+      const cs = getComputedStyle(el);
+      setTall(el.scrollHeight >= (parseFloat(cs.minHeight) || 42) + (parseFloat(cs.lineHeight) || 22) * 0.6);
+    }
+  }, [text, expanded, tall]);
+
+  const toggleExpanded = () => {
+    setExpanded(!expanded);
+    // Still in the tap, so the keyboard opens (or stays) on a phone.
+    ta.current?.focus({ preventScroll: true });
+  };
+
+  // Desktop: focus the input when a session opens, like VS Code's chat (not on touch, where it pops the keyboard).
+  useEffect(() => {
+    if (autoFocus && fine()) ta.current?.focus({ preventScroll: true });
+  }, []);
+
+  const active = !!chatState?.activeTurn;
+  const currentModel = chat ? store.modelFor(chat) : null;
+  const models = store.models(session?.provider);
+  const cfg = store.sessionState.get(sessionUri)?.config;
+  const props = cfg?.schema?.properties || {};
+  const values = cfg?.values || {};
+  const modeOpts = enumOptions(props.mode);
+  const approveOpts = enumOptions(props.autoApprove);
+  const label = (opts, v) => opts.find((o) => o.value === v)?.label || v;
+
+  const setModel = (m) => {
+    try {
+      store.setModel(chat, m);
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  };
+
+  async function addFiles(files) {
+    for (const file of files) {
+      if (file.size > MAX_UPLOAD) {
+        toast(`${file.name} is larger than 20 MB`, 'err');
+        continue;
+      }
+      setUploading((n) => n + 1);
+      try {
+        const f = await prepareFile(file);
+        const items = await uploadFile(conn, sessionUri, f);
+        setAttachments((a) => [...a, { name: f.name, items, picture: f.picture }]);
+      } catch (err) {
+        toast(`Upload failed: ${err.message}`, 'err');
+      } finally {
+        setUploading((n) => n - 1);
+      }
+    }
+  }
+
+  /** how: 'send' (idle), 'steer' (default while working), 'queue' or 'stop'. */
+  function send(how) {
+    if (!text.trim() && !attachments.length) return;
+    const t = text.trim() || filesOnlyText(attachments.map((a) => !!a.picture));
+    const atts = attachments.flatMap((a) => a.items);
+    const mode = how || (active ? 'steer' : 'send');
+    dictation.cancel();
+    try {
+      if (!active || mode === 'send') {
+        const r = store.sendMessage(sessionUri, { text: t, attachments: atts, model: currentModel || undefined });
+        if (r === 'queued') toast('Added to the queue');
+      } else if (mode === 'steer') {
+        store.steer(sessionUri, { text: t, attachments: atts });
+        toast('Sent to the running agent');
+      } else if (mode === 'queue') {
+        store.sendMessage(sessionUri, { text: t, attachments: atts, model: currentModel || undefined });
+        toast('Added to the queue — sends when the agent is done');
+      } else if (mode === 'stop') {
+        store.stopAndSend(sessionUri, { text: t, attachments: atts, model: currentModel || undefined }).catch((err) => toast(err.message, 'err'));
+        toast('Stopping the agent, then sending');
+      }
+      haptic(10);
+      setText('');
+      setAttachments([]);
+      setMenu(false);
+      setExpanded(false);
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  }
+
+  // Desktop keys, like VS Code: Enter sends (steers while working), Alt+Enter adds to the queue.
+  const onKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && fine()) {
+      e.preventDefault();
+      send(e.altKey && active ? 'queue' : undefined);
+    }
+  };
+
+  // Ctrl+V / ⌘V of a screenshot or copied files attaches them; pasted text stays text.
+  const onPaste = (e) => {
+    const files = pastedFiles(e.clipboardData, attachments.filter((a) => a.name.startsWith('Pasted image')).length);
+    if (!files) return;
+    e.preventDefault();
+    addFiles(files);
+  };
+
+  // Files dropped anywhere on the input area are attached.
+  const [dragging, setDragging] = useState(false);
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  const onDragOver = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragging) setDragging(true);
+  };
+  const onDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false);
+  };
+  const onDrop = (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDragging(false);
+    addFiles([...e.dataTransfer.files]);
+  };
+
+  const queued = chatState?.queuedMessages || [];
+  const steering = chatState?.steeringMessage;
+  const hasText = !!text.trim() || attachments.length > 0;
+  const mode = values.mode || props.mode?.default;
+  const approval = values.autoApprove || props.autoApprove?.default;
+  const chip = modelChip(models, currentModel);
+  const opts = hasOptions(models, currentModel) ? optionsChip(models, currentModel) : '';
+  const placeholder = dictation.listening ? 'Listening…' : active ? 'Steer the agent, or add to the queue…' : `Ask ${providerLabel(session?.provider)} or describe a task…`;
+  return html`<div class=${`composer-wrap ${dragging ? 'dropping' : ''} ${expanded ? 'expanded' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
+    ${(queued.length > 0 || steering) && html`<div class="pending-list">
+      ${steering && html`<${PendingItem} key=${steering.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="steering" item=${steering} />`}
+      ${queued.map((q) => html`<${PendingItem} key=${q.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="queued" item=${q} />`)}
+    </div>`}
+    <div class=${`composer ${dictation.listening ? 'listening' : ''} ${tall ? 'tall' : ''}`}>
+      <${GrowButton} expanded=${expanded} onToggle=${toggleExpanded} />
+      <${AttachmentChips} list=${attachments} read=${readImage} onRemove=${(i) => setAttachments(attachments.filter((_, j) => j !== i))} busy=${uploading} />
+      <textarea ref=${ta} rows="1" placeholder=${placeholder} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${onKey} onPaste=${onPaste}></textarea>
+      <input ref=${fileInput} type="file" multiple class="hidden" accept=${ATTACH_ACCEPT} onChange=${(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
+      <div class="cbar">
+        <div class="left">
+          <button class="pick icon" onClick=${() => fileInput.current?.click()} aria-label="Attach photo or file"><${Icon} name="clip" /></button>
+          ${models.length > 0 && html`<button class="pick" onClick=${() => setSheet('model')} aria-label=${`Model: ${modelSummary(models, currentModel)}`}><span class="model-name">${chip.name}</span><${Icon} name="down" cls="chev" /></button>`}
+          ${opts && html`<button class="pick opts" onClick=${() => setSheet('options')} aria-label=${`Model options: ${opts}`}><span>${opts}</span><${Icon} name="down" cls="chev" /></button>`}
+        </div>
+        ${dictation.supported && html`<button class=${`pick icon mic ${dictation.listening ? 'on' : ''}`} onClick=${dictation.toggle} aria-pressed=${dictation.listening ? 'true' : 'false'} aria-label=${dictation.listening ? 'Stop dictation' : 'Dictate'}><${Icon} name="mic" /></button>`}
+        ${active && html`<button class="stop" onClick=${() => { haptic(20); store.cancelTurn(chat); }} aria-label="Stop the agent"><${Icon} name="stop" /></button>`}
+        ${active
+          ? html`<div class="send-split">
+              <button class="send" disabled=${!hasText || uploading > 0} onClick=${() => send('steer')} aria-label="Steer with message"><${Icon} name="send" /></button>
+              <button class="send-more" disabled=${!hasText || uploading > 0} onClick=${() => setMenu(!menu)} aria-label="More send options" aria-expanded=${menu ? 'true' : 'false'}><${Icon} name="down" /></button>
+              ${menu && html`<div class="send-menu" role="menu">
+                <button role="menuitem" onClick=${() => send('stop')}><${Icon} name="stop" /><span class="grow">Stop and Send</span></button>
+                <button role="menuitem" onClick=${() => send('queue')}><${Icon} name="plus" /><span class="grow">Add to Queue</span><kbd>Alt+Enter</kbd></button>
+                <button role="menuitem" class="on" onClick=${() => send('steer')}><${Icon} name="bolt" /><span class="grow">Steer with Message</span><kbd>Enter</kbd></button>
+              </div>`}
+            </div>`
+          : html`<button class="send" disabled=${!hasText || uploading > 0} onClick=${() => send()} aria-label="Send"><${Icon} name="send" /></button>`}
+      </div>
+    </div>
+    ${(modeOpts.length > 0 || approveOpts.length > 0) && html`<div class="csub">
+      ${modeOpts.length > 0 && html`<button class="sub" onClick=${() => setSheet('mode')} aria-label=${`Mode: ${label(modeOpts, mode)}`}><${Icon} name=${MODE_ICONS[mode] || 'chat'} /><span>${label(modeOpts, mode)}</span></button>`}
+      ${approveOpts.length > 0 && html`<button class=${`sub ${approval === 'autoApprove' ? 'warn' : approval === 'assisted' ? 'accent' : ''}`} onClick=${() => setSheet('approve')} aria-label=${`Tool approvals: ${label(approveOpts, approval)}`}><${Icon} name=${APPROVAL_ICONS[approval] || 'shield'} /><span>${label(approveOpts, approval)}</span></button>`}
+    </div>`}
+    ${menu && html`<div class="menu-scrim" onClick=${() => setMenu(false)}></div>`}
+    <${ModelSheet} open=${sheet === 'model'} onClose=${() => setSheet(null)} models=${models} value=${currentModel} onChange=${setModel} />
+    <${ModelOptionsSheet} open=${sheet === 'options'} onClose=${() => setSheet(null)} models=${models} value=${currentModel} onChange=${setModel} midSession=${(chatState?.turns?.length || 0) > 0 || active} />
+    <${OptionSheet} open=${sheet === 'mode'} title="Mode" value=${mode} options=${modeOpts} icons=${MODE_ICONS} onPick=${(v) => store.setConfig(sessionUri, { mode: v })} onClose=${() => setSheet(null)} />
+    <${OptionSheet} open=${sheet === 'approve'} title="Tool approvals" value=${approval} options=${approveOpts} icons=${APPROVAL_ICONS} onPick=${(v) => store.setConfig(sessionUri, { autoApprove: v })} onClose=${() => setSheet(null)} />
+  </div>`;
+}
