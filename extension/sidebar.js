@@ -94,7 +94,11 @@ class SidebarProvider {
       case 'logs':
         return run('pocketPilot.showLogs');
       case 'installUpdate':
-        return run('pocketPilot.installUpdate');
+        return this.service.installUpdate({ fromPanel: true }).catch(() => {});
+      case 'checkUpdates':
+        return this.service.checkForUpdate({ quiet: false, fromPanel: true });
+      case 'restartExtensions':
+        return this.service.restartExtensions();
       case 'updateNotes':
         if (/^https:\/\/github\.com\//.test(String(this.service.update?.notes))) return vscode.env.openExternal(vscode.Uri.parse(this.service.update.notes));
         return undefined;

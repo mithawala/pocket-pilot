@@ -211,6 +211,139 @@ test('updates: a VSIX install is offered a newer GitHub release and installs it 
   }
 });
 
+/** The extension as installed by VS Code: extensions.json next to its folder says how and which version. */
+function installedContext(storage, { source = 'vsix', onDisk } = {}) {
+  const extDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-extdir-'));
+  const ctx = makeContext(storage);
+  ctx.extensionPath = path.join(extDir, `mithawala.pocket-pilot-${ctx.extension.packageJSON.version}`);
+  const write = (version) => fs.writeFileSync(path.join(extDir, 'extensions.json'), JSON.stringify([
+    { identifier: { id: 'GitHub.copilot-chat' }, version: '1.0.0', metadata: { source: 'gallery' } },
+    { identifier: { id: 'mithawala.pocket-pilot' }, version, metadata: { source } },
+  ]));
+  write(onDisk || ctx.extension.packageJSON.version);
+  return { ctx, write };
+}
+
+test('updates from the panel: version, check (even when the GitHub API is rate-limited), Update, Restart extensions', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-upd-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const mock = createVscodeMock({}, {});
+  const installed = [];
+  mock.commands.set('workbench.extensions.installExtension', (uri) => installed.push(uri.fsPath));
+  const restarts = [];
+  mock.commands.set('workbench.action.restartExtensionHost', () => restarts.push(Date.now()));
+  const uninstall = installMock(mock.api);
+  const realFetch = globalThis.fetch;
+  const fetched = [];
+  let latest = '99.1.0';
+  let vsixStatus = 200;
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    fetched.push(u);
+    // The API is rate-limited; the releases page still redirects to the latest release.
+    if (u === 'https://api.github.com/repos/mithawala/pocket-pilot/releases/latest') return new Response('{"message":"API rate limit exceeded"}', { status: 403 });
+    if (u === 'https://github.com/mithawala/pocket-pilot/releases/latest') {
+      assert.equal(init?.redirect, 'manual');
+      return new Response(null, { status: 302, headers: { location: `https://github.com/mithawala/pocket-pilot/releases/tag/v${latest}` } });
+    }
+    if (u === `https://github.com/mithawala/pocket-pilot/releases/download/v${latest}/pocket-pilot.vsix`) {
+      return vsixStatus === 200 ? new Response(Buffer.concat([Buffer.from('PK\u0003\u0004'), Buffer.alloc(4000)]), { status: 200 }) : new Response('Not Found', { status: vsixStatus });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  };
+  let service;
+  try {
+    delete require.cache[require.resolve('../extension/extension.js')];
+    const ext = require('../extension/extension.js');
+    const { ctx } = installedContext(storage);
+    ({ service } = await ext.activate(ctx));
+    const current = ctx.extension.packageJSON.version;
+    const posted = [];
+    let onMessage;
+    const view = { webview: { options: {}, cspSource: 'vscode-resource:', asWebviewUri: (u) => u.fsPath, onDidReceiveMessage: (fn) => { onMessage = fn; }, postMessage: (m) => posted.push(m) }, onDidChangeVisibility: () => {}, visible: true };
+    service.sidebar.resolveWebviewView(view);
+    const release = () => service.viewState().release;
+    assert.equal(release().current, current, 'the panel shows the running version');
+    assert.equal(release().source, 'vsix');
+    assert.equal(release().checkedAt, null);
+
+    // Check for updates, from the panel: the answer shows in the panel, without notifications.
+    await onMessage({ type: 'checkUpdates' });
+    assert.equal(release().available, '99.1.0');
+    assert.ok(release().checkedAt && !release().checkError && !release().checking);
+    assert.deepEqual(mock.calls.infos, [], 'no notification for a check from the panel');
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(posted.at(-1).state.release.available, '99.1.0', 'the panel was told');
+
+    // A failed download says why, and the panel can try again.
+    vsixStatus = 404;
+    await onMessage({ type: 'installUpdate' });
+    assert.equal(release().installError, 'Download failed (404)');
+    assert.equal(release().available, '99.1.0');
+    assert.equal(installed.length, 0);
+    vsixStatus = 200;
+
+    // Update: installs through VS Code; the panel then offers Restart extensions.
+    const done = onMessage({ type: 'installUpdate' });
+    assert.equal(release().installing, '99.1.0', 'the panel shows the update under way');
+    await done;
+    assert.equal(installed.length, 1);
+    assert.match(installed[0], /pocket-pilot-99\.1\.0\.vsix$/);
+    assert.deepEqual(release(), { ...release(), installing: null, installError: null, pending: '99.1.0', available: null });
+    assert.deepEqual(mock.calls.infos, [], 'the panel says it, not a notification');
+    await onMessage({ type: 'restartExtensions' });
+    assert.equal(restarts.length, 1, 'Restart extensions restarts the extension host (not the window)');
+
+    // Already installed: a later background check doesn't offer it again.
+    await service.checkForUpdate();
+    assert.deepEqual(mock.calls.infos, []);
+
+    // Up to date.
+    latest = current;
+    service._justInstalled = null;
+    await onMessage({ type: 'checkUpdates' });
+    assert.equal(release().available, null);
+    assert.equal(service.update, null);
+    assert.deepEqual(mock.calls.infos, []);
+    assert.ok(fetched.every((u) => u.startsWith('https://api.github.com/') || u.startsWith('https://github.com/')), 'only GitHub is asked');
+  } finally {
+    globalThis.fetch = realFetch;
+    await service?.dispose();
+    uninstall();
+  }
+});
+
+test('updates: a version VS Code installed but this window doesn\'t run yet asks for a restart; Marketplace installs leave updates to VS Code', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-upd-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const mock = createVscodeMock({}, {});
+  const uninstall = installMock(mock.api);
+  const realFetch = globalThis.fetch;
+  let asked = 0;
+  globalThis.fetch = async () => {
+    asked++;
+    throw new Error('must not ask GitHub');
+  };
+  let service;
+  try {
+    delete require.cache[require.resolve('../extension/extension.js')];
+    const ext = require('../extension/extension.js');
+    const { ctx, write } = installedContext(storage, { source: 'gallery' });
+    ({ service } = await ext.activate(ctx));
+    const release = () => service.viewState().release;
+    assert.equal(release().source, 'gallery');
+    assert.equal(release().pending, null);
+    await service.checkForUpdate({ quiet: false, fromPanel: true });
+    assert.equal(asked, 0, 'the Marketplace version is updated by VS Code');
+    // VS Code installed a newer version (or another window did): it runs after a restart.
+    await new Promise((r) => setTimeout(r, 20));
+    write('99.2.0');
+    assert.equal(release().pending, '99.2.0');
+    assert.equal(release().available, null);
+  } finally {
+    globalThis.fetch = realFetch;
+    await service?.dispose();
+    uninstall();
+  }
+});
 test('tunnel: closing or reloading VS Code keeps the tunnel and its local port; Stop ends it', async () => {
   const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-keep-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
   const settings = { 'tunnel.mode': 'none', 'security.passkey': 'off', 'rendezvous.enabled': false, pwaUrl: '' };

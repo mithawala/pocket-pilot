@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.15
+
+- **The VS Code panel shows your version and updates in a click.** The bottom of the Pocket Pilot panel shows the version you run and whether it's the latest, for example *Pocket Pilot 0.7.15 · up to date · Check again*. **Check again** asks GitHub right away. A newer release shows at the top of the panel with **Update** and **What's new**. The panel follows the update while it downloads and installs, and says why if it fails.
+- **Restart extensions instead of reloading the window.** Once an update is installed, the panel offers **Restart extensions**. Only the extensions of that VS Code window restart: VS Code's agent host keeps your agent sessions running, the tunnel keeps its address, and your devices reconnect by themselves. The panel also offers it when VS Code (or another window) installed a newer version that this window doesn't run yet.
+- **Update checks work on busy networks.** GitHub's API answers only 60 requests an hour per address without a sign-in, which an office network can use up. Pocket Pilot then finds the latest release through the GitHub releases page instead.
+- A window that mirrors remote access shows the version that serves it, if that's not its own.
+- Installed from the Marketplace, the panel shows the version, and VS Code keeps it up to date as before.
+- **Updating:** 0.7.14 and earlier find this release on GitHub too (within 12 hours, or right away with *Pocket Pilot: Check for Updates*) and offer **Update**, but then ask you to reload the window. Instead, you can run **Developer: Restart Extension Host**. From 0.7.15 on, the panel offers **Restart extensions** itself.
+
 ## 0.7.14
 
 - **Very long chats open on the phone.** A chat with thousands of tool calls can grow past 150 MB, mostly tool output and screenshots. The phone app couldn't open one: it showed *Could not open chat: transport closed*, reconnected and tried again in a loop, downloading the whole chat each time. Now:

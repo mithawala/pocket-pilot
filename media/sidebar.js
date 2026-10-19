@@ -137,8 +137,54 @@
       </div>`;
     }
     body += `<div class="links"><button class="link" data-a="settings">Settings</button> · <button class="link" data-a="logs">Logs</button></div>`;
-    const update = st.update ? `<div class="update"><span>Pocket Pilot <b>${esc(st.update.version)}</b> is available.</span><button class="primary" data-a="installUpdate">Update</button><button class="link" data-a="updateNotes">What's new</button></div>` : '';
-    root.innerHTML = header + update + body;
+    body += versionLine(st);
+    root.innerHTML = header + updateBanner(st) + body;
+  }
+
+  /** At the top while there is something to do: update, updating, restart to finish. */
+  function updateBanner(st) {
+    const r = st.release;
+    if (!r) return '';
+    if (r.installing) {
+      return `<div class="update"><span class="spin" aria-hidden="true"></span><span>Updating Pocket Pilot to <b>${esc(r.installing)}</b>…</span></div>`;
+    }
+    if (r.pending && !r.available) {
+      return `<div class="update"><span>Pocket Pilot <b>${esc(r.pending)}</b> is installed. Restart extensions to start using it. Your agent sessions keep running, and your devices reconnect by themselves.</span><button class="primary" data-a="restartExtensions" title="Restarts the extensions of this VS Code window (Developer: Restart Extension Host)">Restart extensions</button></div>`;
+    }
+    if (r.available) {
+      return `<div class="update"><span>Pocket Pilot <b>${esc(r.available)}</b> is available. You have ${esc(r.current)}.</span><button class="primary" data-a="installUpdate">Update</button><button class="link" data-a="updateNotes">What's new</button>${r.installError ? `<div class="uerr">The update failed: ${esc(r.installError)}</div>` : ''}</div>`;
+    }
+    return '';
+  }
+
+  /** Which version runs here, and whether it's the latest. */
+  function versionLine(st) {
+    const r = st.release;
+    if (!r) return '';
+    const parts = [`Pocket Pilot ${esc(r.current)}`];
+    let title = '';
+    let action = '';
+    if (r.installing) parts.push(`updating to ${esc(r.installing)}…`);
+    else if (r.pending && !r.available) parts.push(`${esc(r.pending)} installed, restart to use it`);
+    else if (r.available) parts.push(`${esc(r.available)} available`);
+    else if (r.source === 'gallery') {
+      parts.push('updates from the Marketplace');
+      title = 'Installed from the Visual Studio Marketplace: VS Code keeps it up to date.';
+    } else if (r.checking) parts.push('checking for updates…');
+    else if (r.checkError) {
+      parts.push('couldn’t check for updates');
+      title = r.checkError;
+      action = 'Try again';
+    } else if (r.checkedAt) {
+      parts.push('up to date');
+      title = `Checked GitHub ${ago(r.checkedAt)}`;
+      action = 'Check again';
+    } else action = 'Check for updates';
+    if (action) parts.push(`<button class="link" data-a="checkUpdates">${action}</button>`);
+    let line = `<div class="version" title="${esc(title)}">${parts.join(' · ')}</div>`;
+    // A window mirroring remote access shows which version serves it, if that's not its own.
+    if (st.mirror && st.hostVersion && st.hostVersion !== r.current) line += `<div class="version muted">Remote access runs ${esc(st.hostVersion)} in ${esc(st.mirror.label)}.</div>`;
+    return line;
   }
 
   root.addEventListener('click', (e) => {

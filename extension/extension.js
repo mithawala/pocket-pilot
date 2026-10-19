@@ -905,9 +905,9 @@ class PocketPilotService {
   /** What the panel shows: this window's own state, or the running window's (mirrored). */
   viewState() {
     if (this.state === 'standby' && this.mirror?.view) {
-      return { ...this.mirror.view, state: 'running', mirror: { label: this.standby?.label || this.mirror.label || 'another window' }, update: this.update || null };
+      return { ...this.mirror.view, state: 'running', mirror: { label: this.standby?.label || this.mirror.label || 'another window' }, update: this.update || null, release: this._releaseState() };
     }
-    return { ...this._ownViewState(), update: this.update || null };
+    return { ...this._ownViewState(), update: this.update || null, release: this._releaseState() };
   }
 
   _ownViewState() {
@@ -915,6 +915,8 @@ class PocketPilotService {
     const online = new Map((this.relay ? this.relay.activeConnections() : []).map((c) => [c.deviceId, c]));
     return {
       state: this.state,
+      // The version serving remote access: windows that mirror this one show it if theirs differs.
+      hostVersion: this.ctx.extension.packageJSON.version,
       error: this.error,
       standby: this.standby ? { label: this.standby.label } : null,
       hostName: this.identity?.name,
@@ -967,63 +969,154 @@ class PocketPilotService {
 
   // ------------------------------------------------------------------ updates
 
+  /** This extension's entry in VS Code's extensions.json: how it was installed and which version is on disk. */
+  _installedEntry() {
+    const file = path.join(path.dirname(this.ctx.extensionPath), 'extensions.json');
+    try {
+      const mtime = fs.statSync(file).mtimeMs;
+      if (this._entryCache?.mtime !== mtime) {
+        const list = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const e = list.find((x) => x.identifier?.id?.toLowerCase() === EXTENSION_ID);
+        this._entryCache = { mtime, source: e?.metadata?.source || 'unknown', version: e?.version || null };
+      }
+      return this._entryCache;
+    } catch {
+      return { source: 'unknown', version: null };
+    }
+  }
+
   /** How VS Code installed this extension: 'gallery' (Marketplace: VS Code updates it) or 'vsix'. */
   _installSource() {
+    return this._installedEntry().source;
+  }
+
+  /** A newer version already installed (by Update, VS Code or another window) that runs after a restart. */
+  _pendingVersion() {
+    const current = this.ctx.extension.packageJSON.version;
+    const pending = [this._installedEntry().version, this._justInstalled].filter((v) => v && cmpVersion(v, current) > 0);
+    return pending.sort((a, b) => cmpVersion(b, a))[0] || null;
+  }
+
+  /** The version line and update banner of the panel. */
+  _releaseState() {
+    const pending = this._pendingVersion();
+    const available = this.update && !(pending && cmpVersion(pending, this.update.version) >= 0) ? this.update.version : null;
+    const check = this._updateCheck || {};
+    return {
+      current: this.ctx.extension.packageJSON.version,
+      source: this._installSource(),
+      available,
+      pending,
+      installing: this._installing || null,
+      installError: this._installError || null,
+      checking: check.status === 'checking',
+      checkedAt: check.at || null,
+      checkError: check.status === 'error' ? check.error : null,
+    };
+  }
+
+  /** The latest release on GitHub: { version, notes, vsix }. */
+  async _latestRelease() {
     try {
-      const list = JSON.parse(fs.readFileSync(path.join(path.dirname(this.ctx.extensionPath), 'extensions.json'), 'utf8'));
-      return list.find((e) => e.identifier?.id?.toLowerCase() === EXTENSION_ID)?.metadata?.source || 'unknown';
-    } catch {
-      return 'unknown';
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'pocket-pilot' }, signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
+      const rel = await res.json();
+      const asset = (rel.assets || []).find((a) => a.name === 'pocket-pilot.vsix');
+      return { version: String(rel.tag_name || '').replace(/^v/, ''), notes: rel.html_url, vsix: asset?.browser_download_url || null };
+    } catch (err) {
+      // Without a token GitHub's API answers 60 requests an hour per address, which a shared office
+      // network can use up. The releases page redirects to the latest release without that limit.
+      const res = await fetch(`https://github.com/${REPO}/releases/latest`, { redirect: 'manual', headers: { 'User-Agent': 'pocket-pilot' }, signal: AbortSignal.timeout(15000) }).catch(() => null);
+      const tag = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/(v\d+\.\d+\.\d+)$/.exec(res?.headers.get('location') || '')?.[1];
+      if (!tag) throw err;
+      return { version: tag.slice(1), notes: `https://github.com/${REPO}/releases/tag/${tag}`, vsix: `https://github.com/${REPO}/releases/download/${tag}/pocket-pilot.vsix` };
     }
   }
 
-  /** VS Code pins VSIX installs and never updates them: look for new releases on GitHub instead. */
-  async checkForUpdate({ quiet = true } = {}) {
-    if (this._installSource() === 'gallery') return;
+  /**
+   * VS Code pins VSIX installs and never updates them: look for new releases on GitHub instead.
+   * `quiet`: a background check (a notification once per new version); `fromPanel`: the panel shows the result.
+   */
+  async checkForUpdate({ quiet = true, fromPanel = false } = {}) {
+    if (this._installSource() === 'gallery' || this._updateCheck?.status === 'checking') return;
     const current = this.ctx.extension.packageJSON.version;
+    const loud = !quiet && !fromPanel;
+    this._updateCheck = { status: 'checking', at: this._updateCheck?.at || null };
+    this.changed();
     let rel;
     try {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'pocket-pilot' } });
-      if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
-      rel = await res.json();
+      rel = await this._latestRelease();
     } catch (err) {
-      if (!quiet) vscode.window.showWarningMessage(`Pocket Pilot: could not check for updates (${err.message}).`);
-      return;
-    }
-    const latest = String(rel.tag_name || '').replace(/^v/, '');
-    const asset = (rel.assets || []).find((a) => a.name === 'pocket-pilot.vsix');
-    if (!latest || !asset || cmpVersion(latest, current) <= 0) {
-      this.update = null;
-      if (!quiet) vscode.window.showInformationMessage(`Pocket Pilot ${current} is the latest version.`);
+      this._updateCheck = { status: 'error', at: Date.now(), error: err.message };
       this.changed();
+      if (loud) vscode.window.showWarningMessage(`Pocket Pilot: could not check for updates (${err.message}).`);
       return;
     }
-    this.update = { version: latest, notes: rel.html_url, vsix: asset.browser_download_url };
+    this._updateCheck = { status: 'done', at: Date.now() };
+    if (!rel.version || !rel.vsix || cmpVersion(rel.version, current) <= 0) {
+      this.update = null;
+      this.changed();
+      if (loud) vscode.window.showInformationMessage(`Pocket Pilot ${current} is the latest version.`);
+      return;
+    }
+    this.update = rel;
     this.changed();
-    if (this.ctx.globalState.get(STATE_UPDATE_NOTIFIED) === latest && quiet) return;
-    await this.ctx.globalState.update(STATE_UPDATE_NOTIFIED, latest);
-    const pick = await vscode.window.showInformationMessage(`Pocket Pilot ${latest} is available (you have ${current}).`, 'Update', 'What\'s new');
+    const pending = this._pendingVersion();
+    if (fromPanel || (pending && cmpVersion(pending, rel.version) >= 0)) return;
+    if (this.ctx.globalState.get(STATE_UPDATE_NOTIFIED) === rel.version && quiet) return;
+    await this.ctx.globalState.update(STATE_UPDATE_NOTIFIED, rel.version);
+    const pick = await vscode.window.showInformationMessage(`Pocket Pilot ${rel.version} is available (you have ${current}).`, 'Update', 'What\'s new');
     if (pick === 'Update') await this.installUpdate();
-    else if (pick) vscode.env.openExternal(vscode.Uri.parse(this.update.notes));
+    else if (pick) vscode.env.openExternal(vscode.Uri.parse(rel.notes));
   }
 
-  async installUpdate() {
-    if (!this.update) return this.checkForUpdate({ quiet: false });
+  /** Downloads the latest release from GitHub and installs it; it runs after Restart extensions. */
+  async installUpdate({ fromPanel = false } = {}) {
+    if (this._installing) return;
+    if (!this.update) {
+      await this.checkForUpdate({ quiet: false, fromPanel });
+      if (!this.update) return;
+    }
     const { version, vsix } = this.update;
     if (!/^https:\/\/github\.com\//.test(vsix)) throw new Error('Unexpected download location');
     const dir = path.join(this.storageDir, 'updates');
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `pocket-pilot-${version}.vsix`);
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Updating Pocket Pilot to ${version}…` }, async () => {
-      const res = await fetch(vsix, { headers: { 'User-Agent': 'pocket-pilot' }, redirect: 'follow' });
+    const install = async () => {
+      const res = await fetch(vsix, { headers: { 'User-Agent': 'pocket-pilot' }, redirect: 'follow', signal: AbortSignal.timeout(120000) });
       if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length < 1000 || buf.length > 100 * 1024 * 1024 || buf[0] !== 0x50 || buf[1] !== 0x4b) throw new Error('The download is not a VSIX package');
       fs.writeFileSync(file, buf);
       await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(file));
-    });
-    const pick = await vscode.window.showInformationMessage(`Pocket Pilot ${version} is installed. Reload the window to use it.`, 'Reload');
-    if (pick) vscode.commands.executeCommand('workbench.action.reloadWindow');
+    };
+    this._installing = version;
+    this._installError = null;
+    this.changed();
+    try {
+      if (fromPanel) await install();
+      else await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Updating Pocket Pilot to ${version}…` }, install);
+      this._justInstalled = version;
+      this.logLine('info', `Installed Pocket Pilot ${version}; it runs after the extensions restart`);
+    } catch (err) {
+      this._installError = err.message;
+      this.logLine('warn', `Update to ${version} failed: ${err.message}`);
+      throw err;
+    } finally {
+      this._installing = null;
+      this.changed();
+    }
+    if (fromPanel) return;
+    const pick = await vscode.window.showInformationMessage(`Pocket Pilot ${version} is installed. Restart extensions to use it.`, 'Restart extensions');
+    if (pick) await this.restartExtensions();
+  }
+
+  /**
+   * Starts the new version: restarts this window's extensions (VS Code's agent host and its sessions keep
+   * running, and the tunnel keeps its address), so paired devices reconnect within seconds.
+   */
+  restartExtensions() {
+    return vscode.commands.executeCommand('workbench.action.restartExtensionHost');
   }
 }
 
