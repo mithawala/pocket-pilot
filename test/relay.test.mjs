@@ -61,6 +61,8 @@ function startFakeAgentHost() {
         reply({});
       } else if (m.method === 'listSessions') {
         reply({ items: [{ resource: 'copilotcli:/s1', provider: 'copilotcli', title: 'Test session', status: 1 }] });
+      } else if (m.method === 'subscribe' && state.chats?.[m.params.channel]) {
+        reply({ snapshot: { resource: m.params.channel, fromSeq: 10, state: state.chats[m.params.channel] } });
       } else if (m.method === 'dispatchAction') {
         c.send(JSON.stringify({ jsonrpc: '2.0', method: 'action', params: { channel: m.params.channel, action: m.params.action, serverSeq: 11, origin: { clientId: 'x', clientSeq: m.params.clientSeq } } }));
       } else if (m.id !== undefined) {
@@ -492,6 +494,59 @@ test('the phone gets corrected session statuses, including changes pushed by the
     const ev = await events.next();
     assert.equal(ev.value.event.type, 'sessionSummaryChanged');
     assert.deepEqual(ev.value.event.params.changes, { status: 33 });
+    await client.shutdown().catch(() => {});
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
+test('a very long chat reaches the phone slimmed: finished tool output trimmed, answers and running tools intact', async () => {
+  const CHAT = 'ahp-chat://default/long';
+  const output = 'line of tool output\n'.repeat(20000);
+  const turns = Array.from({ length: 30 }, (_, i) => ({
+    id: `t${i}`,
+    message: { text: `step ${i}` },
+    state: 'complete',
+    responseParts: [
+      { kind: 'markdown', id: `m${i}`, content: `Answer ${i}: ${'detail '.repeat(3000)}` },
+      { kind: 'toolCall', toolCall: { status: 'completed', toolCallId: `c${i}`, toolName: 'run', toolInput: JSON.stringify({ command: 'npm test' }), content: [{ type: 'text', text: output }, { type: 'embeddedResource', data: crypto.randomBytes(30000).toString('base64'), contentType: 'image/png' }] } },
+    ],
+  }));
+  const running = { status: 'running', toolCallId: 'live', toolName: 'run', content: [{ type: 'text', text: output }] };
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' } });
+  env.fake.state.chats = { [CHAT]: { turns, activeTurn: { id: 'now', message: { text: 'go on' }, responseParts: [{ kind: 'toolCall', toolCall: running }] } } };
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { transport } = await ready;
+    const sizes = [];
+    const realDeliver = transport._deliver.bind(transport);
+    transport._deliver = (text) => {
+      sizes.push(text.length);
+      realDeliver(text);
+    };
+    const client = new AhpClient(transport, { requestTimeoutMs: 20000 });
+    client.connect();
+    await client.initialize({ clientId: 'phone-long', protocolVersions: ['0.9.0'], initialSubscriptions: [] });
+    const { result } = await client.subscribe(CHAT);
+    const raw = JSON.stringify(env.fake.state.chats[CHAT]).length;
+    const got = result.snapshot.state;
+    assert.ok(raw > 12e6, `test chat is ${raw} chars`);
+    assert.ok(Math.max(...sizes) < raw / 5, `the phone got ${Math.max(...sizes)} of ${raw} chars`);
+    assert.equal(got.turns.length, 30);
+    got.turns.forEach((t, i) => {
+      assert.equal(t.responseParts[0].content, turns[i].responseParts[0].content, 'answers are never trimmed');
+      const [text, image] = t.responseParts[1].toolCall.content;
+      assert.equal(image.data, '', 'screenshots are not sent');
+      assert.ok(text.text.length < (i >= 20 ? 6100 : 400), `turn ${i}: ${text.text.length}`);
+      assert.match(text.text, /trimmed: \d+ KB more on your computer/);
+      assert.equal(t.responseParts[1].toolCall.toolInput, JSON.stringify({ command: 'npm test' }));
+    });
+    assert.deepEqual(got.activeTurn.responseParts[0].toolCall, running, 'a running tool call is left alone');
     await client.shutdown().catch(() => {});
   } finally {
     conn?.stop();

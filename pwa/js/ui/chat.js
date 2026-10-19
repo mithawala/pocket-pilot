@@ -92,6 +92,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const sessionState = store.sessionState.get(uri);
   const chat = store.chatFor(uri);
   const chatState = chat ? store.chatState.get(chat) : null;
+  const failed = chat && !chatState ? store.failedChats.get(chat) : null;
   const provider = session?.provider || sessionState?.provider;
   const models = store.models(provider);
   const lastTurnId = chatState?.turns?.[chatState.turns.length - 1]?.id;
@@ -207,7 +208,14 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
     <div class="scroll-wrap">
       <div class="scroll" ref=${scrollRef} onScroll=${onScroll}>
         <div class="chat" ref=${contentRef}>
-          ${!chatState && html`<div class="chat-empty"><${Spinner} lg /><p>Loading conversation…</p></div>`}
+          ${!chatState && (failed
+            ? html`<div class="chat-empty">
+                <div class="big"><${Icon} name="alert-circle" /></div>
+                <h2>Couldn’t open this conversation</h2>
+                <p>${failed}</p>
+                <button class="btn primary" onClick=${() => store.retryChat(uri)}>Try again</button>
+              </div>`
+            : html`<div class="chat-empty"><${Spinner} lg /><p>Loading conversation…${store.incoming >= 1048576 ? html`<br /><span class="small muted">${Math.round(store.incoming / 1048576)} MB received</span>` : ''}</p></div>`)}
           ${chatState?.turnsNextCursor && hidden === 0 && html`<button class="btn sm load-older" onClick=${() => store.loadOlder(chat).catch((e) => toast(e.message, 'err'))}>Load older messages</button>`}
           ${hidden > 0 && html`<button class="btn sm load-older" onClick=${() => setShown(shown + PAGE)}>Show ${Math.min(PAGE, hidden)} earlier turns</button>`}
           ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} isLast=${!active && t.id === lastTurnId} ctx=${ctx} />`)}

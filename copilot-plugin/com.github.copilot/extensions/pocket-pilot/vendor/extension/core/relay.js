@@ -9,6 +9,7 @@ const ws = require('./wslite');
 const agentHost = require('./agentHost');
 const webauthn = require('./webauthn');
 const push = require('./push');
+const { slimForPhone } = require('./slim');
 const { deviceIdFor } = require('./store');
 const { loadSecureChannel, loadTotp } = require('./identity');
 
@@ -811,7 +812,7 @@ class DeviceConnection extends EventEmitter {
     } else if (msg.method === 'root/sessionAdded' || msg.method === 'root/sessionSummaryChanged') {
       text = this._adjustSummaries(msg, text);
     }
-    this._sendAhp(text);
+    this._sendAhp(slimForPhone(msg, text));
   }
 
   /** Corrects session statuses the host over-reports as errors (see SessionMonitor.statusFor). */

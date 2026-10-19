@@ -4,7 +4,7 @@
 // The phone pairs, sees the session, sends a message, approves a shell command and gets the answer;
 // then messages typed "on the PC" show up on the phone, a picture attached to one included. Uses a
 // throwaway POCKET_PILOT_HOME, a local tunnel (no cloudflared) and a small model.
-//   node scripts/e2e-copilot.mjs [--sdk <copilot-sdk dir>] [--cli <copilot executable>] [--model gpt-5-mini]
+//   node scripts/e2e-copilot.mjs [--sdk <copilot-sdk dir>] [--cli <copilot executable>] [--model <id>]
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,7 +27,9 @@ function onPath(name) {
   return name;
 }
 const cli = onPath(arg('cli', process.env.COPILOT_CLI_PATH || 'copilot'));
-const model = arg('model', 'gpt-5-mini');
+// Defaults to a small GPT model the runtime offers (the catalog changes as models are retired).
+let model = arg('model', null);
+const smallModels = (ids) => ids.filter((id) => /^gpt-/.test(id) && /mini|luna/.test(id));
 const watchdog = setTimeout(() => fail('timed out'), 6 * 60 * 1000);
 const t0 = Date.now();
 const step = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${m}`);
@@ -99,6 +101,11 @@ const client = new CopilotClient({
 });
 await client.start();
 step(`runtime started (${cli})`);
+const offered = (await client.listModels()).map((m) => m.id);
+const [smallA, smallB] = smallModels(offered);
+model = model || smallA;
+if (!model) fail(`no small GPT model among ${offered.join(', ')}; pass --model`);
+step(`model ${model}`);
 const session = await client.createSession({
   workingDirectory: ws,
   model,
@@ -274,14 +281,17 @@ await until(async () => (await session.rpc.mode.get().catch(() => null)) === 'in
 step('mode switched from the phone: interactive -> plan -> interactive');
 
 // 5. The model choice syncs both ways: the phone switches the runtime, and a switch on the PC shows on the phone.
-store.setModel(chat, { id: 'gpt-5.4-mini', config: { thinkingLevel: 'low' } });
+const phoneModel = smallA || model;
+const pcModel = smallB || offered.find((id) => id !== phoneModel && /^gpt-/.test(id));
+if (!pcModel) fail('no second GPT model to switch to on the PC');
+store.setModel(chat, { id: phoneModel, config: { thinkingLevel: 'low' } });
 await until(async () => {
   const cur = await session.rpc.model.getCurrent().catch(() => null);
-  return cur?.modelId === 'gpt-5.4-mini' && cur.reasoningEffort === 'low';
+  return cur?.modelId === phoneModel && cur.reasoningEffort === 'low';
 }, 'the phone\'s model in the runtime', 30000);
-await session.setModel('gpt-5-mini', { reasoningEffort: 'high' });
-await until(() => store.modelFor(chat)?.id === 'gpt-5-mini' && store.modelFor(chat).config?.thinkingLevel === 'high', 'the PC\'s model on the phone', 30000);
-step('model synced: phone -> runtime (GPT-5.4 mini · Low) and runtime -> phone (GPT-5 mini · High)');
+await session.setModel(pcModel, { reasoningEffort: 'high' });
+await until(() => store.modelFor(chat)?.id === pcModel && store.modelFor(chat).config?.thinkingLevel === 'high', 'the PC\'s model on the phone', 30000);
+step(`model synced: phone -> runtime (${phoneModel} · Low) and runtime -> phone (${pcModel} · High)`);
 
 // 6. Steering from the phone reaches the running agent.
 store.sendMessage(uri, { text: 'Use the shell tool to run: Start-Sleep -Seconds 8 ; then reply with one short sentence.', model: store.modelFor(chat) });

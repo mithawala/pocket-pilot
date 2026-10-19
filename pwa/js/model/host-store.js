@@ -1,20 +1,24 @@
 // Live mirror of one PC's agent host: session list, subscribed sessions and chats, and the
 // user actions the phone can take. State is reduced with the official AHP reducers, so the
 // phone renders exactly what VS Code renders.
-import { AhpClient } from '../../vendor/ahp/client/index.js';
+import { AhpClient, RpcError, RpcTimeoutError } from '../../vendor/ahp/client/index.js';
 import { rootReducer, sessionReducer, chatReducer } from '../../vendor/ahp/types/index.js';
 import { PROTOCOL_VERSIONS } from '../core/protocol.js';
+import { TOO_LARGE } from '../net/host-connection.js';
 import { S, has, uuid, effectiveStatus } from '../lib/format.js';
 import { waitingOn } from '../lib/asks.js';
 
 const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
 
+const errorText = (err) => (err instanceof RpcError ? String(err.message).replace(/^RPC error -?\d+: /, '') : err?.message || String(err));
+
 export class HostStore extends EventTarget {
   /** @param {import('../net/host-connection.js').HostConnection} conn */
-  constructor(conn, { unsubscribeDelayMs = DEFAULT_UNSUB_DELAY } = {}) {
+  constructor(conn, { unsubscribeDelayMs = DEFAULT_UNSUB_DELAY, requestTimeoutMs = 45000 } = {}) {
     super();
     this.unsubDelay = unsubscribeDelayMs;
+    this.requestTimeoutMs = requestTimeoutMs;
     this.conn = conn;
     this.clientId = `pocket-pilot-${uuid().slice(0, 13)}`;
     this.client = null;
@@ -35,10 +39,16 @@ export class HostStore extends EventTarget {
     this.unsubTimers = new Map();
     this.localTurns = new Map();
     this.draftModels = new Map();
+    // Chats the computer could not open for the phone (e.g. too large): shown with a Try again button.
+    this.failedChats = new Map();
+    // Bytes received so far of a large message on its way (a long chat), 0 when none.
+    this.incoming = 0;
+    // VS Code is taking long to list the sessions (the phone keeps asking).
+    this.slowSessions = false;
     this.errors = [];
     this.ahpConnected = false;
     this.ahpReason = '';
-    this.onReady = (e) => this._onReady(e.detail).catch((err) => this._error(`Could not load sessions: ${err.message}`));
+    this.onReady = (e) => this._onReady(e.detail).catch((err) => this._error(`Could not load sessions: ${errorText(err)}`));
     this.onControl = (e) => {
       const m = e.detail.message;
       if (m.t === 'ahp.status') {
@@ -48,15 +58,23 @@ export class HostStore extends EventTarget {
       }
     };
     this.onState = () => this._emit('status');
+    this.onProgress = (e) => {
+      this.incoming = e.detail.bytes;
+      // Replies queue up behind a large message: while its bytes keep coming, nothing has timed out.
+      if (this.incoming) this._extendTimeouts();
+      this._emit('progress');
+    };
     conn.addEventListener('ready', this.onReady);
     conn.addEventListener('control', this.onControl);
     conn.addEventListener('state', this.onState);
+    conn.addEventListener('progress', this.onProgress);
   }
 
   dispose() {
     this.conn.removeEventListener('ready', this.onReady);
     this.conn.removeEventListener('control', this.onControl);
     this.conn.removeEventListener('state', this.onState);
+    this.conn.removeEventListener('progress', this.onProgress);
     this.client?.shutdown().catch(() => {});
   }
 
@@ -79,12 +97,12 @@ export class HostStore extends EventTarget {
 
   async _onReady({ transport }) {
     this.client?.shutdown().catch(() => {});
-    const client = new AhpClient(transport, { requestTimeoutMs: 45000 });
+    const client = new AhpClient(transport, { requestTimeoutMs: this.requestTimeoutMs });
     this.client = client;
     client.connect();
     const events = client.events();
     this._pump(client, events);
-    const subs = [ROOT, ...this.subscribed];
+    const subs = [ROOT, ...[...this.subscribed].filter((uri) => !this.failedChats.has(uri))];
     let done = false;
     if (this.initialized) {
       try {
@@ -102,25 +120,79 @@ export class HostStore extends EventTarget {
           for (const snap of r.snapshots || []) this._applySnapshot(snap);
         }
         done = true;
-      } catch {
+      } catch (err) {
+        if (this._tooLarge(err, client, subs)) return;
         this.clientId = `pocket-pilot-${uuid().slice(0, 13)}`;
       }
     }
     if (!done) {
-      const init = await client.initialize({
-        clientId: this.clientId,
-        protocolVersions: [...PROTOCOL_VERSIONS],
-        initialSubscriptions: subs,
-        locale: navigator.language,
-      });
+      let init;
+      try {
+        init = await client.initialize({
+          clientId: this.clientId,
+          protocolVersions: [...PROTOCOL_VERSIONS],
+          initialSubscriptions: subs,
+          locale: navigator.language,
+        });
+      } catch (err) {
+        if (this._tooLarge(err, client, subs)) return;
+        throw err;
+      }
       this.lastSeq = init.serverSeq || 0;
       this.defaultDirectory = init.defaultDirectory || this.defaultDirectory;
       for (const snap of init.snapshots || []) this._applySnapshot(snap);
       this.initialized = true;
     }
     this.ahpConnected = true;
-    await this.refreshSessions();
+    await this._loadSessions(client);
     this._emit('status');
+  }
+
+  /** Lists the sessions, asking again while VS Code is slow to answer (it can take minutes when busy). */
+  async _loadSessions(client) {
+    for (;;) {
+      try {
+        await this.refreshSessions();
+        break;
+      } catch (err) {
+        if (client !== this.client || !(err instanceof RpcTimeoutError)) throw err;
+        this.slowSessions = true;
+        this._emit('status');
+      }
+    }
+    if (this.slowSessions) {
+      this.slowSessions = false;
+      this._emit('status');
+    }
+  }
+
+  /**
+   * An open chat made the (re)connect reply too large for the phone: mark the open chats as failed and
+   * connect again without them. Returns false for any other error.
+   */
+  _tooLarge(err, client, subs) {
+    if (!(err instanceof RpcError && err.code === TOO_LARGE) || client !== this.client) return false;
+    for (const uri of subs) {
+      if (this._kind(uri) !== 'chat') continue;
+      this.subscribed.delete(uri);
+      this.failedChats.set(uri, errorText(err));
+    }
+    this.conn.sock?.close(1000, 'retry without large chats');
+    return true;
+  }
+
+  /** Restarts the timeout of every request still waiting for its reply. */
+  _extendTimeouts() {
+    const c = this.client;
+    const ms = c?.requestTimeoutMs;
+    if (!(c?.pending instanceof Map) || !(ms > 0)) return;
+    for (const [id, p] of c.pending) {
+      if (!p?.timer) continue;
+      clearTimeout(p.timer);
+      p.timer = setTimeout(() => {
+        if (c.pending.delete(id)) p.reject(new RpcTimeoutError(p.method, ms));
+      }, ms);
+    }
   }
 
   async _pump(client, events) {
@@ -170,6 +242,7 @@ export class HostStore extends EventTarget {
     }
     const kind = this._kind(uri);
     (kind === 'chat' ? this.chatState : this.sessionState).set(uri, snap.state);
+    if (kind === 'chat') this.failedChats.delete(uri);
     this.snapshotSeq.set(uri, snap.fromSeq ?? 0);
     const queued = this.pending.get(uri) || [];
     this.pending.delete(uri);
@@ -237,7 +310,13 @@ export class HostStore extends EventTarget {
         if (client === this.client && result?.snapshot) this._applySnapshot(result.snapshot);
       }).catch((err) => {
         this.subscribed.delete(uri);
-        this._error(`Could not open ${kind}: ${err.message}`);
+        if (kind === 'chat' && err instanceof RpcError) {
+          // The computer answered (e.g. too large): show it on the chat instead of asking again by itself.
+          this.failedChats.set(uri, errorText(err));
+          this._emit('chat', uri);
+          return;
+        }
+        this._error(`Could not open ${kind}: ${errorText(err)}`);
       });
     }
   }
@@ -255,6 +334,8 @@ export class HostStore extends EventTarget {
       clearTimeout(t);
       this.unsubTimers.delete(sessionUri);
     }
+    // Opening the chat again tries again.
+    if (!this.watchers.get(sessionUri)) this.failedChats.delete(this.chatFor(sessionUri));
     this.watchers.set(sessionUri, (this.watchers.get(sessionUri) || 0) + 1);
     this._subscribe(sessionUri, 'session');
     this._ensureChat(sessionUri);
@@ -285,7 +366,16 @@ export class HostStore extends EventTarget {
     const prev = this._chatFor.get(sessionUri);
     if (prev && prev !== chat) this._release(prev);
     this._chatFor.set(sessionUri, chat);
+    if (this.failedChats.has(chat)) return;
     this._subscribe(chat, 'chat');
+  }
+
+  /** Tries again to open a session's chat the computer could not open before. */
+  retryChat(sessionUri) {
+    const chat = this.chatFor(sessionUri);
+    if (!chat || !this.failedChats.delete(chat)) return;
+    this._ensureChat(sessionUri);
+    this._emit('chat', chat);
   }
 
   chatFor(sessionUri) {

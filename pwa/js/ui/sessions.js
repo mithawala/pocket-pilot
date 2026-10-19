@@ -373,7 +373,7 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
             <button role="tab" aria-selected=${groupBy === 'recent'} class=${groupBy === 'recent' ? 'on' : ''} onClick=${() => setGroupBy('recent')}><${Icon} name="clock" />Recent</button>
             <button role="tab" aria-selected=${groupBy === 'folder'} class=${groupBy === 'folder' ? 'on' : ''} onClick=${() => setGroupBy('folder')}><${Icon} name="folder" />Folders</button>
           </div>
-          ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg /></div>`}
+          ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg />${store.slowSessions && html`<p>${copilotHost ? 'The GitHub Copilot app' : 'VS Code'} is taking a while to list your sessions. Still asking…</p>`}</div>`}
           ${groups.map(([title, items]) => items.length > 0 && html`<div key=${title}>
             <div class="group-title">${title}</div>
             ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}

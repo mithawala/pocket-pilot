@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.14
+
+- **Very long chats open on the phone.** A chat with thousands of tool calls can grow past 150 MB, mostly tool output and screenshots. The phone app couldn't open one: it showed *Could not open chat: transport closed*, reconnected and tried again in a loop, downloading the whole chat each time. Now:
+  - **The computer sends what the phone shows.** Finished tool calls keep up to 6,000 characters of output (all the phone shows) in the last ten turns, and a 300-character preview in older turns of a long chat. Screenshots and other binary tool output stay on the computer. Answers, your messages, running tool calls and approvals are never trimmed. A real 154 MB chat now arrives as 40 MB, 6.5 MB over the network instead of 72 MB.
+  - **The phone copes with what's left.** It trims a reply over 64 MB while it arrives (every string over 64 KB), so even a computer that hasn't updated yet can send such a chat. A reply still too large fails on its own with *Couldn't open this conversation* and **Try again**, instead of breaking the connection. Opening the chat again also tries again.
+  - While a large chat loads, the screen shows how many megabytes have arrived, and nothing else times out meanwhile.
+- **Sessions load when VS Code is slow.** VS Code sometimes takes minutes to list the sessions, and the phone gave up after 45 seconds (*Could not load sessions: Request "listSessions" timed out after 45000ms*). It now keeps asking, and says it's waiting.
+- **Updating:** the phone app updates itself, and that's enough to open long chats. Update the VS Code extension and the Copilot app plugin to get the smaller downloads. In VS Code, the new version takes over after **Developer: Restart Extension Host** or a window reload.
+
 ## 0.7.13
 
 - **Works with VS Code 1.141.** VS Code 1.141 speaks a newer version of the Agent Host Protocol (0.10.0) and accepts no other, so the phone app couldn't load your sessions (*Could not load sessions: RPC error -32005 … server accepts ^0.10.0*). Pocket Pilot's notifications from VS Code stopped too. Pocket Pilot now uses version 1.0.0 of the protocol library, which understands everything 0.10.0 adds (such as per-chat read state). It offers 0.10.0 together with 1.0.0 and the versions earlier VS Code releases speak, so it works with VS Code 1.141, the releases before it and the next ones (tested against VS Code 1.141 itself: it negotiates 0.10.0).

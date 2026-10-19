@@ -6,9 +6,13 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.13';
+export const APP_VERSION = '0.7.14';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
+// A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and
+// screenshots the phone can't show anyway. One still too large fails its request with this error code.
+const SLIM = { above: 64 * 1024 * 1024, stringMax: 64 * 1024 };
+export const TOO_LARGE = -32099;
 
 export class PairingError extends Error {
   constructor(code, message, { untrusted = false, peerCode = '' } = {}) {
@@ -33,8 +37,8 @@ function wsUrl(httpUrl) {
   return httpUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/ws';
 }
 
-function createMessenger(sock, cipher, compress) {
-  const messenger = new sc.SecureMessenger(cipher, (f) => sock.send(f), { compress });
+function createMessenger(sock, cipher, compress, onProgress) {
+  const messenger = new sc.SecureMessenger(cipher, (f) => sock.send(f), { compress, slim: SLIM, onProgress });
   const recv = async (timeoutMs) => {
     for (;;) {
       const f = await sock.next(timeoutMs);
@@ -272,7 +276,7 @@ export class HostConnection extends EventTarget {
       const first = await sock.next(15000);
       if (first.text === undefined) throw new PairingError('protocol', 'Unexpected response');
       const done = await hello.complete(first.text, { hostPublicKey: unb64u(this.record.hostPublicKey) });
-      const ch = createMessenger(sock, done.cipher, done.peerCompression);
+      const ch = createMessenger(sock, done.cipher, done.peerCompression, (bytes) => this._progress(bytes));
       this.ch = ch;
       // A code typed in the last minute goes along: iOS may have dropped the connection that asked for it
       // while the person was reading it in their authenticator app.
@@ -367,7 +371,14 @@ export class HostConnection extends EventTarget {
   async _pump(ch, transport) {
     try {
       for (;;) {
-        const text = await ch.recv(0);
+        let text;
+        try {
+          text = await ch.recv(0);
+        } catch (err) {
+          if (err?.code !== 'too-large' || !err.inSync) throw err;
+          this._tooLarge(err, transport);
+          continue;
+        }
         if (text[0] === 'A') transport._deliver(text.slice(1));
         else if (text[0] === 'C') this._onControl(JSON.parse(text.slice(1)));
       }
@@ -375,6 +386,23 @@ export class HostConnection extends EventTarget {
       transport._end();
       if (!(err instanceof SocketClosedError)) this.sock?.close(4000, 'protocol error');
     }
+  }
+
+  /** A reply too large for this phone even trimmed fails its own request; the connection carries on. */
+  _tooLarge(err, transport) {
+    const m = /^A\{(?:"jsonrpc":"2\.0",)?"id":(\d+),"(?:result|error)"/.exec(err.head || '');
+    if (!m) return;
+    const message = `This is too large to load on your phone (more than ${Math.round(sc.MAX_MESSAGE_BYTES / 1048576)} MB, even with tool output trimmed).`;
+    transport._deliver(JSON.stringify({ jsonrpc: '2.0', id: Number(m[1]), error: { code: TOO_LARGE, message } }));
+  }
+
+  /** Bytes received so far of a large message (0 when it is complete), at most a few times a second. */
+  _progress(bytes) {
+    const now = Date.now();
+    if (bytes && now - (this._progressAt || 0) < 400) return;
+    this._progressAt = bytes ? now : 0;
+    this.incoming = bytes;
+    this._emit('progress', { bytes });
   }
 
   _onControl(m) {
@@ -398,6 +426,7 @@ export class HostConnection extends EventTarget {
     this.transport = null;
     this.ch = null;
     this.sock = null;
+    if (this.incoming) this._progress(0);
     for (const p of this._pending.values()) p({ ok: false, error: 'disconnected' });
     this._pending.clear();
     if (this.stopped) return;

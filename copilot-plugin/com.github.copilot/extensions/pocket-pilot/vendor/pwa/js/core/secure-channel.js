@@ -166,6 +166,267 @@ export function supportsCompression() {
   }
 }
 
+// ---------------------------------------------------------------- oversized messages
+// A very long chat can arrive as one message of hundreds of megabytes, mostly tool output and
+// screenshots (base64). Instead of failing, a messenger with `slim` options trims every long JSON
+// string of such a message while its frames arrive, so it never has to fit in memory whole.
+
+const QUOTE = 0x22;
+const BACKSLASH = 0x5c;
+const BLOCK_BYTES = 1024 * 1024;
+const MAX_STREAM_BYTES = 1024 * 1024 * 1024;
+const HEAD_BYTES = 256;
+
+const sizeText = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/** Growable output buffer with a size limit. */
+class ByteSink {
+  constructor(limit) {
+    this.limit = limit;
+    this.blocks = [];
+    this.block = new Uint8Array(BLOCK_BYTES);
+    this.pos = 0;
+    this.size = 0;
+  }
+
+  write(bytes, start = 0, end = bytes.length) {
+    let n = end - start;
+    if (n <= 0) return;
+    this.size += n;
+    if (this.size > this.limit) throw new HandshakeError('too-large', 'Message too large');
+    while (n > 0) {
+      if (this.pos === this.block.length) {
+        this.blocks.push(this.block);
+        this.block = new Uint8Array(BLOCK_BYTES);
+        this.pos = 0;
+      }
+      const k = Math.min(n, this.block.length - this.pos);
+      this.block.set(bytes.subarray(start, start + k), this.pos);
+      this.pos += k;
+      start += k;
+      n -= k;
+    }
+  }
+
+  bytes() {
+    const out = new Uint8Array(this.size);
+    let off = 0;
+    for (const b of this.blocks) {
+      out.set(b, off);
+      off += b.length;
+    }
+    out.set(this.block.subarray(0, this.pos), off);
+    return out;
+  }
+}
+
+/**
+ * Copies JSON text (UTF-8 bytes, in chunks) through, cutting every string longer than `max` bytes and
+ * noting how much was left out. Never cuts inside an escape sequence or a multi-byte character, so the
+ * output stays valid JSON.
+ */
+export class StringTrimmer {
+  constructor(max, limit = Infinity) {
+    this.max = max;
+    this.sink = new ByteSink(limit);
+    this.inString = false;
+    this.esc = 0; // -1: right after a backslash; 1-4: hex digits of a \u escape still to come
+    this.length = 0; // bytes kept of the current string
+    this.cutting = false;
+    this.skipped = 0; // bytes left out of the current string
+    this.trimmed = 0; // strings cut so far
+  }
+
+  push(b) {
+    const n = b.length;
+    let from = 0; // first byte not yet copied
+    let i = 0;
+    let q = -2; // next quote at or after i (-1: none left in this chunk)
+    let s = -2; // next backslash at or after i
+    while (i < n) {
+      if (q !== -1 && q < i) q = b.indexOf(QUOTE, i);
+      if (!this.inString) {
+        if (q === -1) break;
+        this.inString = true;
+        this.length = 0;
+        i = q + 1;
+        continue;
+      }
+      if (this.esc !== 0) {
+        this.esc = this.esc === -1 ? (b[i] === 0x75 ? 4 : 0) : this.esc - 1;
+        if (this.cutting) this.skipped++;
+        else this.length++;
+        i++;
+        continue;
+      }
+      if (s !== -1 && s < i) s = b.indexOf(BACKSLASH, i);
+      let stop = q === -1 ? n : q;
+      if (s !== -1 && s < stop) stop = s;
+      if (this.cutting) {
+        this.skipped += stop - i;
+        i = stop;
+      } else if (stop - i > this.max - this.length) {
+        let at = i + Math.max(0, this.max - this.length);
+        while (at < stop && (b[at] & 0xc0) === 0x80) at++;
+        this.length += at - i;
+        i = at;
+        if (at < stop) {
+          this.sink.write(b, from, at);
+          this.cutting = true;
+          this.skipped = 0;
+          continue;
+        }
+      } else {
+        this.length += stop - i;
+        i = stop;
+      }
+      if (i >= n) break;
+      if (b[i] === BACKSLASH) {
+        if (!this.cutting && this.length >= this.max) {
+          this.sink.write(b, from, i);
+          this.cutting = true;
+          this.skipped = 0;
+        }
+        this.esc = -1;
+        if (this.cutting) this.skipped++;
+        else this.length++;
+        i++;
+        continue;
+      }
+      // The closing quote.
+      if (this.cutting) {
+        this.sink.write(utf8.encode(`\\n… (trimmed: ${sizeText(this.skipped)} more on your computer)`));
+        this.cutting = false;
+        this.trimmed++;
+        from = i;
+      }
+      this.inString = false;
+      i++;
+    }
+    if (!this.cutting) this.sink.write(b, from, n);
+  }
+
+  bytes() {
+    return this.sink.bytes();
+  }
+}
+
+/** A message's bytes as they arrive; past `above` bytes, long strings are trimmed (see StringTrimmer). */
+class Collector {
+  constructor({ above, stringMax }, limit) {
+    this.above = above;
+    this.stringMax = stringMax;
+    this.limit = limit;
+    this.chunks = [];
+    this.size = 0;
+    this.head = new Uint8Array(0);
+    this.trimmer = null;
+  }
+
+  push(bytes) {
+    if (this.head.length < HEAD_BYTES) this.head = concat(this.head, bytes.subarray(0, HEAD_BYTES - this.head.length));
+    if (!this.trimmer) {
+      if (this.size + bytes.length <= this.above) {
+        this.chunks.push(bytes);
+        this.size += bytes.length;
+        return;
+      }
+      this.trimmer = new StringTrimmer(this.stringMax, this.limit);
+      const raw = this.chunks;
+      this.chunks = null;
+      for (let i = 0; i < raw.length; i++) {
+        this.trimmer.push(raw[i]);
+        raw[i] = null;
+      }
+    }
+    this.trimmer.push(bytes);
+  }
+
+  bytes() {
+    if (this.trimmer) return this.trimmer.bytes();
+    return this.chunks.length === 1 ? this.chunks[0] : concat(...this.chunks);
+  }
+}
+
+/** One inbound message on the streaming path, decompressed and collected while its frames arrive. */
+class Incoming {
+  constructor(compressed, slim, limit) {
+    this.collector = new Collector(slim, limit);
+    this.received = 0;
+    this.frames = 0;
+    this.overflow = null;
+    this.failure = null;
+    this.head = null;
+    this.writer = null;
+    if (!compressed) return;
+    const ds = new DecompressionStream('deflate-raw');
+    this.writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+    this.pumped = (async () => {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        this._push(value);
+      }
+    })();
+    this.pumped.catch((err) => {
+      if (!this.overflow) this.failure = err;
+    });
+  }
+
+  _push(bytes) {
+    if (this.overflow) return;
+    try {
+      this.collector.push(bytes);
+    } catch (err) {
+      if (err?.code !== 'too-large') throw err;
+      this._overflow(err);
+    }
+  }
+
+  _overflow(err) {
+    this.overflow = err;
+    this.head = this.collector.head;
+    this.collector = null;
+    this.writer?.abort(err).catch(() => {});
+  }
+
+  async write(bytes) {
+    this.received += bytes.length;
+    this.frames++;
+    if (this.failure) throw new HandshakeError('bad-frame', 'Message could not be decompressed');
+    if (this.overflow) return;
+    if (this.received > MAX_STREAM_BYTES) return this._overflow(new HandshakeError('too-large', 'Message too large'));
+    if (!this.writer) return this._push(bytes);
+    try {
+      await this.writer.write(bytes);
+    } catch {
+      if (!this.overflow) throw new HandshakeError('bad-frame', 'Message could not be decompressed');
+    }
+  }
+
+  /** Resolves to the message's bytes; a message too large even trimmed rejects (its frames all read). */
+  async end() {
+    if (this.writer && !this.overflow && !this.failure) {
+      try {
+        await this.writer.close();
+        await this.pumped;
+      } catch {
+        if (!this.overflow) throw new HandshakeError('bad-frame', 'Message could not be decompressed');
+      }
+    }
+    if (this.failure) throw new HandshakeError('bad-frame', 'Message could not be decompressed');
+    if (this.overflow) {
+      const e = new HandshakeError('too-large', 'Message too large');
+      e.inSync = true;
+      e.size = this.received;
+      e.head = utf8d.decode(this.head || new Uint8Array(0));
+      throw e;
+    }
+    return this.collector.bytes();
+  }
+}
+
 // ---------------------------------------------------------------- message layer
 
 /**
@@ -176,18 +437,24 @@ export class SecureMessenger {
   /**
    * @param {Cipher} cipher
    * @param {(frame: Uint8Array) => void} sendFrame
-   * @param {{compress?: boolean, maxMessageBytes?: number}} [opts]
+   * @param {{compress?: boolean, maxMessageBytes?: number, slim?: {above: number, stringMax: number}, onProgress?: (bytes: number) => void}} [opts]
+   *   `slim`: messages over `above` bytes arrive with JSON strings over `stringMax` bytes trimmed, and one
+   *   still over `maxMessageBytes` rejects with a `too-large` error marked `inSync` (the channel carries on).
+   *   `onProgress`: called with the bytes received so far of a message spanning several frames, then 0.
    */
   constructor(cipher, sendFrame, opts = {}) {
     this.cipher = cipher;
     this.sendFrame = sendFrame;
     this.compress = !!opts.compress && supportsCompression();
     this.maxMessageBytes = opts.maxMessageBytes || MAX_MESSAGE_BYTES;
+    this.slim = opts.slim || null;
+    this.onProgress = opts.onProgress || null;
     this._sendChain = Promise.resolve();
     this._recvChain = Promise.resolve();
     this._parts = [];
     this._partsSize = 0;
     this._partsFlags = 0;
+    this._incoming = null;
   }
 
   /** Queues a text message. Resolves when all of its frames have been handed to sendFrame. */
@@ -224,6 +491,7 @@ export class SecureMessenger {
       const plain = await this.cipher.open(frame);
       if (plain.length < 1) throw new HandshakeError('bad-frame', 'Empty frame');
       const flags = plain[0];
+      if (this.slim) return this._receiveStreaming(flags, plain.subarray(1));
       if (this._parts.length === 0) this._partsFlags = flags & FLAG_DEFLATE;
       this._parts.push(plain.subarray(1));
       this._partsSize += plain.length - 1;
@@ -242,6 +510,27 @@ export class SecureMessenger {
     const p = this._recvChain.then(run);
     this._recvChain = p.catch(() => {});
     return p;
+  }
+
+  async _receiveStreaming(flags, body) {
+    let m = this._incoming;
+    if (!m) {
+      const compressed = (flags & FLAG_DEFLATE) !== 0;
+      if (compressed && !hasCompression) throw new HandshakeError('no-deflate', 'Peer sent compressed data');
+      m = this._incoming = new Incoming(compressed, this.slim, this.maxMessageBytes);
+    }
+    const more = (flags & FLAG_MORE) !== 0;
+    if (!more) this._incoming = null;
+    await m.write(body);
+    if (more) {
+      this.onProgress?.(m.received);
+      return null;
+    }
+    try {
+      return utf8d.decode(await m.end());
+    } finally {
+      if (m.frames > 1) this.onProgress?.(0);
+    }
   }
 }
 
