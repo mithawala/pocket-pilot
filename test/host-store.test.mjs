@@ -12,13 +12,13 @@ const CHAT = 'ahp-chat://default/s1';
  * request with an error instead; `listReply(n, answer)` decides when the n-th listSessions is answered
  * (VS Code sometimes takes minutes).
  */
-function fakeHost(transport, { errorFor, listReply } = {}) {
+function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig } = {}) {
   let seq = 100;
   const received = [];
   const subscriptions = new Set();
   const send = (m) => transport.send(m);
-  const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT };
-  const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [] };
+  const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT, ...(sessionConfig ? { config: sessionConfig } : {}) };
+  const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [], ...(chatConfig ? { config: chatConfig } : {}) };
   let lists = 0;
   (async () => {
     for (;;) {
@@ -33,7 +33,7 @@ function fakeHost(transport, { errorFor, listReply } = {}) {
         continue;
       }
       if (m.method === 'initialize') {
-        reply({ protocolVersion: '0.9.0', serverSeq: seq, snapshots: [{ resource: 'ahp-root://', state: { agents: [{ provider: 'copilotcli', displayName: 'Copilot', description: '', models: [{ id: 'm1', name: 'Model 1', provider: 'copilotcli' }] }] }, fromSeq: seq }] });
+        reply({ protocolVersion, serverSeq: seq, snapshots: [{ resource: 'ahp-root://', state: { agents: [{ provider: 'copilotcli', displayName: 'Copilot', description: '', models: [{ id: 'm1', name: 'Model 1', provider: 'copilotcli' }] }] }, fromSeq: seq }] });
       } else if (m.method === 'listSessions') {
         const answer = () => reply({ items: [{ resource: SESSION, provider: 'copilotcli', title: 'Test', status: 33, createdAt: '', modifiedAt: '2026-01-01T00:00:00Z', workingDirectories: ['file:///c%3A/work'] }] });
         if (listReply) listReply(++lists, answer);
@@ -230,5 +230,60 @@ test('a reconnect too large for the phone starts over without the open chats', a
   await until(() => host3.received.some((m) => m.method === 'listSessions'));
   assert.equal(host3.received.some((m) => JSON.stringify(m.params || {}).includes(CHAT)), false);
   assert.ok(host2.received.length > 0);
+  stop();
+});
+
+// VS Code 1.143's settings schema: mode and approvals can be set per chat, the folder only per session.
+const VSCODE_CONFIG = {
+  schema: {
+    type: 'object',
+    properties: {
+      mode: { type: 'string', title: 'Agent Mode', enum: ['interactive', 'plan', 'autopilot'], enumLabels: ['Interactive', 'Plan', 'Autopilot'], default: 'interactive', sessionMutable: true, chatMutable: true },
+      autoApprove: { type: 'string', title: 'Approvals', enum: ['default', 'assisted', 'autoApprove'], enumLabels: ['Manual permissions', 'Assisted permissions', 'Allow all'], default: 'default', sessionMutable: true, chatMutable: true },
+      isolation: { type: 'string', title: 'Isolation', enum: ['folder', 'worktree'], sessionMutable: true },
+    },
+  },
+  values: { mode: 'interactive', autoApprove: 'autoApprove', isolation: 'folder' },
+};
+const dispatched = (host) => host.received.filter((m) => m.method === 'dispatchAction').map((m) => ({ channel: m.params.channel, ...m.params.action }));
+
+test('a chat set to Autopilot in VS Code shows Autopilot, and changing the mode on the phone changes it for that chat', async () => {
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.1.0', sessionConfig: VSCODE_CONFIG, chatConfig: { values: { mode: 'autopilot', isolation: 'worktree' } } });
+  await until(() => store.sessionsLoaded);
+  assert.equal(store.protocolVersion, '1.1.0');
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  const cfg = store.configFor(SESSION);
+  assert.equal(cfg.values.mode, 'autopilot', 'the chat\'s own mode, not the session\'s "interactive"');
+  assert.equal(cfg.values.autoApprove, 'autoApprove', 'the session\'s approvals where the chat has none of its own');
+  assert.equal(cfg.values.isolation, 'folder', 'a setting a chat can\'t have stays the session\'s');
+  assert.deepEqual(cfg.schema, VSCODE_CONFIG.schema);
+
+  store.setConfig(SESSION, { mode: 'interactive', isolation: 'worktree' });
+  await until(() => store.configFor(SESSION).values.mode === 'interactive');
+  assert.deepEqual(dispatched(host), [
+    { channel: CHAT, type: 'chat/configChanged', config: { mode: 'interactive' } },
+    { channel: SESSION, type: 'session/configChanged', config: { isolation: 'worktree' } },
+  ], 'like VS Code: per-chat settings to the chat, the rest to the session');
+  await until(() => store.configFor(SESSION).values.isolation === 'worktree');
+
+  // A change made in VS Code shows on the phone.
+  host.push(CHAT, { type: 'chat/configChanged', config: { mode: 'plan' } });
+  await until(() => store.configFor(SESSION).values.mode === 'plan');
+  host.push(CHAT, { type: 'chat/configChanged', config: { autoApprove: 'default' }, replace: true });
+  await until(() => store.configFor(SESSION).values.autoApprove === 'default');
+  assert.equal(store.configFor(SESSION).values.mode, 'interactive', 'replace drops the chat\'s other own settings: back to the session\'s');
+  stop();
+});
+
+test('computers before protocol 1.1.0 get settings on the session, as before', async () => {
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.0.0', sessionConfig: VSCODE_CONFIG });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  assert.equal(store.configFor(SESSION).values.mode, 'interactive');
+  store.setConfig(SESSION, { mode: 'plan' });
+  await until(() => store.configFor(SESSION).values.mode === 'plan');
+  assert.deepEqual(dispatched(host), [{ channel: SESSION, type: 'session/configChanged', config: { mode: 'plan' } }]);
   stop();
 });

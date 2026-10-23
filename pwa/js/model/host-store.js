@@ -2,7 +2,7 @@
 // user actions the phone can take. State is reduced with the official AHP reducers, so the
 // phone renders exactly what VS Code renders.
 import { AhpClient, RpcError, RpcTimeoutError } from '../../vendor/ahp/client/index.js';
-import { rootReducer, sessionReducer, chatReducer } from '../../vendor/ahp/types/index.js';
+import { rootReducer, sessionReducer, chatReducer, compareProtocolVersions } from '../../vendor/ahp/types/index.js';
 import { PROTOCOL_VERSIONS } from '../core/protocol.js';
 import { TOO_LARGE } from '../net/host-connection.js';
 import { S, has, uuid, effectiveStatus } from '../lib/format.js';
@@ -12,6 +12,18 @@ const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
 
 const errorText = (err) => (err instanceof RpcError ? String(err.message).replace(/^RPC error -?\d+: /, '') : err?.message || String(err));
+
+// A chat's own settings (AHP 1.1.0): mode and approvals set for one chat, over the session's.
+const CHAT_CONFIG_SINCE = '1.1.0';
+
+/** The chat reducer, plus what AHP 1.1.0 adds to the bundled 1.0.0 library: a chat's own settings. */
+function reduceChat(state, action) {
+  if (action.type === 'chat/configChanged') {
+    const values = action.replace || !state.config ? { ...action.config } : { ...state.config.values, ...action.config };
+    return { ...state, config: { ...state.config, values } };
+  }
+  return chatReducer(state, action);
+}
 
 export class HostStore extends EventTarget {
   /** @param {import('../net/host-connection.js').HostConnection} conn */
@@ -23,6 +35,8 @@ export class HostStore extends EventTarget {
     this.clientId = `pocket-pilot-${uuid().slice(0, 13)}`;
     this.client = null;
     this.initialized = false;
+    // The protocol version the computer chose (from the last `initialize`).
+    this.protocolVersion = null;
     this.lastSeq = 0;
     this.root = null;
     this.defaultDirectory = null;
@@ -139,6 +153,7 @@ export class HostStore extends EventTarget {
         throw err;
       }
       this.lastSeq = init.serverSeq || 0;
+      this.protocolVersion = init.protocolVersion || null;
       this.defaultDirectory = init.defaultDirectory || this.defaultDirectory;
       for (const snap of init.snapshots || []) this._applySnapshot(snap);
       this.initialized = true;
@@ -279,7 +294,7 @@ export class HostStore extends EventTarget {
     }
     if (env.serverSeq <= (this.snapshotSeq.get(uri) ?? -1)) return;
     try {
-      map.set(uri, kind === 'chat' ? chatReducer(cur, env.action) : sessionReducer(cur, env.action));
+      map.set(uri, kind === 'chat' ? reduceChat(cur, env.action) : sessionReducer(cur, env.action));
     } catch (err) {
       console.warn('reducer failed', env.action?.type, err);
       return;
@@ -581,8 +596,33 @@ export class HostStore extends EventTarget {
     this._dispatch(chat, { type: 'chat/turnResume', turnId });
   }
 
-  setConfig(sessionUri, config) {
-    this._dispatch(sessionUri, { type: 'session/configChanged', config });
+  /**
+   * The settings a chat runs with (agent mode, tool approvals): the session's, with the chat's own on top
+   * (VS Code's pickers set mode and approvals per chat). VS Code takes only settings the session's schema
+   * lets a chat have.
+   */
+  configFor(sessionUri, chat = this.chatFor(sessionUri)) {
+    const cfg = this.sessionState.get(sessionUri)?.config;
+    if (!cfg) return null;
+    const own = chat ? this.chatState.get(chat)?.config?.values : null;
+    const props = cfg.schema?.properties || {};
+    const mine = Object.entries(own || {}).filter(([k]) => props[k]?.chatMutable);
+    return mine.length ? { ...cfg, values: { ...cfg.values, ...Object.fromEntries(mine) } } : cfg;
+  }
+
+  /**
+   * Changes settings like VS Code does: those a chat can have go to the chat (so they apply even where the
+   * chat had its own), the rest to the session. Computers that don't know chat settings get them all on
+   * the session.
+   */
+  setConfig(sessionUri, config, chat = this.chatFor(sessionUri)) {
+    const props = this.sessionState.get(sessionUri)?.config?.schema?.properties || {};
+    const perChat = !!chat && this.chatState.has(chat) && !!this.protocolVersion && compareProtocolVersions(this.protocolVersion, CHAT_CONFIG_SINCE) >= 0;
+    const forChat = {};
+    const forSession = {};
+    for (const [k, v] of Object.entries(config)) (perChat && props[k]?.chatMutable ? forChat : forSession)[k] = v;
+    if (Object.keys(forChat).length) this._dispatch(chat, { type: 'chat/configChanged', config: forChat });
+    if (Object.keys(forSession).length) this._dispatch(sessionUri, { type: 'session/configChanged', config: forSession });
   }
 
   markRead(sessionUri) {

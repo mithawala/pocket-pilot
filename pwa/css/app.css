@@ -526,6 +526,8 @@ a.btn { text-decoration: none; }
 .list-item > svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .list-item .check { margin-left: auto; color: var(--accent); display: grid; place-items: center; }
 .list-item .check svg { width: 18px; height: 18px; }
+/* A remark above a sheet's choices (e.g. VS Code's Auto Reply answering questions in every mode). */
+.sheet-note { margin: 0 4px 10px; line-height: 1.45; }
 /* A paired computer in the switcher: pick it, or rename it with the button next to it. */
 .host-pick { display: flex; align-items: center; gap: 2px; }
 .host-pick > .list-item { flex: 1; min-width: 0; }

@@ -34,8 +34,9 @@ export function GrowButton({ expanded, onToggle }) {
   </button>`;
 }
 
-function OptionSheet({ open, title, options, value, icons, onPick, onClose }) {
+function OptionSheet({ open, title, options, value, icons, onPick, onClose, note }) {
   return html`<${Sheet} open=${open} onClose=${onClose} title=${title}>
+    ${note && html`<p class="muted small sheet-note">${note}</p>`}
     ${options.map((o) => html`<button class=${`list-item ${o.value === value ? 'on' : ''}`} onClick=${() => { onPick(o.value); onClose(); }}>
       ${icons?.[o.value] && html`<${Icon} name=${icons[o.value]} />`}
       <div class="grow"><div>${o.label}</div>${o.description && html`<div class="muted small">${o.description}</div>`}</div>
@@ -268,12 +269,22 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const active = !!chatState?.activeTurn;
   const currentModel = chat ? store.modelFor(chat) : null;
   const models = store.models(session?.provider);
-  const cfg = store.sessionState.get(sessionUri)?.config;
+  // The chat's own mode and approvals (VS Code sets them per chat), over the session's.
+  const cfg = store.configFor(sessionUri, chat);
   const props = cfg?.schema?.properties || {};
   const values = cfg?.values || {};
   const modeOpts = enumOptions(props.mode);
   const approveOpts = enumOptions(props.autoApprove);
   const label = (opts, v) => opts.find((o) => o.value === v)?.label || v;
+  // VS Code's Auto Reply setting (chat.autoReply) answers the agent's questions in every mode.
+  const autoReply = store.root?.config?.values?.autoReplyEnabled === true;
+  const setConfig = (change) => {
+    try {
+      store.setConfig(sessionUri, change, chat);
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  };
 
   const setModel = (m) => {
     try {
@@ -414,7 +425,7 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
     ${menu && html`<div class="menu-scrim" onClick=${() => setMenu(false)}></div>`}
     <${ModelSheet} open=${sheet === 'model'} onClose=${() => setSheet(null)} models=${models} value=${currentModel} onChange=${setModel} />
     <${ModelOptionsSheet} open=${sheet === 'options'} onClose=${() => setSheet(null)} models=${models} value=${currentModel} onChange=${setModel} midSession=${(chatState?.turns?.length || 0) > 0 || active} />
-    <${OptionSheet} open=${sheet === 'mode'} title="Mode" value=${mode} options=${modeOpts} icons=${MODE_ICONS} onPick=${(v) => store.setConfig(sessionUri, { mode: v })} onClose=${() => setSheet(null)} />
-    <${OptionSheet} open=${sheet === 'approve'} title="Tool approvals" value=${approval} options=${approveOpts} icons=${APPROVAL_ICONS} onPick=${(v) => store.setConfig(sessionUri, { autoApprove: v })} onClose=${() => setSheet(null)} />
+    <${OptionSheet} open=${sheet === 'mode'} title="Mode" value=${mode} options=${modeOpts} icons=${MODE_ICONS} onPick=${(v) => setConfig({ mode: v })} onClose=${() => setSheet(null)} note=${autoReply ? 'Auto Reply is on in VS Code (chat.autoReply): the agent answers its own questions in every mode. Turn it off there for questions to wait for you.' : null} />
+    <${OptionSheet} open=${sheet === 'approve'} title="Tool approvals" value=${approval} options=${approveOpts} icons=${APPROVAL_ICONS} onPick=${(v) => setConfig({ autoApprove: v })} onClose=${() => setSheet(null)} />
   </div>`;
 }

@@ -1,5 +1,6 @@
 // Protocol versions: VS Code 1.141 speaks 0.10.0 and accepts only 0.10.x; the phone app and the
 // extension's notification monitor offered 0.9.0 and older, and couldn't load sessions at all.
+// VS Code 1.143 speaks 1.1.0 (chat settings) and accepts 1.x and 0.9.x: offered 1.0.0, it hid them.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -30,15 +31,40 @@ function vscodeNegotiate(offered, current) {
   return best;
 }
 
+/**
+ * VS Code 1.143's negotiation (agentHostMain.js): the highest offered version with the same major as one
+ * of its baselines (and the same minor below 1.0.0), and no older than that baseline.
+ */
+function vscode143Negotiate(offered, baselines = ['1.0.0', '0.9.0']) {
+  const parse = (v) => v.split('.').map(Number);
+  const cmp = (p, q) => {
+    const [a, b, c] = parse(p);
+    const [x, y, z] = parse(q);
+    return a - x || b - y || c - z;
+  };
+  let best;
+  for (const v of offered) {
+    const [a, b, c] = parse(v);
+    const ok = baselines.some((base) => {
+      const [x, y, z] = parse(base);
+      return a === x && (a > 0 || b === y) && (a > 0 || b > 0 || c === z) && cmp(v, base) >= 0;
+    });
+    if (ok && (best === undefined || cmp(v, best) > 0)) best = v;
+  }
+  return best;
+}
+
 test('the versions offered: every release of VS Code finds its own, most preferred first', () => {
-  assert.deepEqual([...PROTOCOL_VERSIONS], ['1.0.0', '0.10.0', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.2', '0.5.1']);
+  assert.deepEqual([...PROTOCOL_VERSIONS], ['1.1.0', '1.0.0', '0.10.0', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.2', '0.5.1']);
   for (const v of SUPPORTED_PROTOCOL_VERSIONS) assert.ok(PROTOCOL_VERSIONS.includes(v), `the library's ${v}`);
   assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '0.10.0'), '0.10.0', 'VS Code 1.141');
   assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '0.9.0'), '0.9.0', 'VS Code 1.140 and earlier');
   assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '0.7.0'), '0.7.0');
   assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '1.0.0'), '1.0.0', 'VS Code on the 1.0.0 release');
-  assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '1.1.0'), '1.0.0', 'and later 1.x releases');
-  assert.equal(vscodeNegotiate(['0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.2', '0.5.1'], '0.10.0'), undefined, 'what the app offered before: rejected');
+  assert.equal(vscodeNegotiate(PROTOCOL_VERSIONS, '1.2.0'), '1.1.0', 'and later 1.x releases');
+  assert.equal(vscode143Negotiate(PROTOCOL_VERSIONS), '1.1.0', 'VS Code 1.143: with chat settings');
+  assert.equal(vscode143Negotiate(['1.0.0', '0.10.0', '0.9.0']), '1.0.0', 'what the app offered before: no chat settings');
+  assert.equal(vscodeNegotiate(['0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.2', '0.5.1'], '0.10.0'), undefined, 'what the app offered before 0.7.13: rejected');
 });
 
 /** An agent host that negotiates like VS Code 1.141, with its error for clients it doesn't accept. */

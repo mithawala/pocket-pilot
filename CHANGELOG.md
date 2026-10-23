@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.16
+
+- **The phone shows the mode a chat really runs in.** VS Code 1.143 sets the agent mode and tool approvals per chat. A chat set to Autopilot in VS Code still showed *Interactive* on the phone, which is its session's setting. So it wasn't clear why the agent answered its own questions (*You weren't available, so I chose…*): in Autopilot, VS Code answers them for you. The phone now shows each chat's own mode and approvals, and follows changes made in VS Code. Changing them on the phone changes them for that chat, like the pickers in VS Code. Before, a change from the phone went to the session, and a chat with its own setting kept it.
+- Pocket Pilot speaks version 1.1.0 of the Agent Host Protocol with VS Code 1.143 (the version that added per-chat settings), and the versions before it with earlier releases.
+- When VS Code's experimental **Auto Reply** setting (`chat.autoReply`) is on, the phone's Mode sheet says that the agent answers its own questions in every mode.
+- Tested live against VS Code 1.143 with the phone app's code:
+  - In Interactive, the agent's question waited until the phone answered it, and the agent got the answer.
+  - In Autopilot, VS Code answered it by itself.
+- **Updating:** the phone app updates itself, and that's all this needs.
+
 ## 0.7.15
 
 - **The VS Code panel shows your version and updates in a click.** The bottom of the Pocket Pilot panel shows the version you run and whether it's the latest, for example *Pocket Pilot 0.7.15 · up to date · Check again*. **Check again** asks GitHub right away. A newer release shows at the top of the panel with **Update** and **What's new**. The panel follows the update while it downloads and installs, and says why if it fails.
