@@ -88,13 +88,25 @@ test('sendPush posts an encrypted body with the right headers', async () => {
     return { status: 201, text: async () => '' };
   };
   const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: ua.getPublicKey().toString('base64url'), auth: auth.toString('base64url') } };
-  const r = await push.sendPush(sub, { title: 'Needs input', body: 'x'.repeat(5000) }, { privateJwk, subject: 'mailto:a@b.c', topic: 'session:1', fetchImpl });
+  const r = await push.sendPush(sub, { title: 'Needs input', body: 'x'.repeat(5000) }, { privateJwk, subject: 'mailto:a@b.c', topic: 'host-1:copilotcli:/s1', fetchImpl });
   assert.equal(r.ok, true);
   assert.equal(captured.init.headers['Content-Encoding'], 'aes128gcm');
-  assert.equal(captured.init.headers.Topic, 'session1');
+  assert.equal(captured.init.headers.Topic, push.pushTopic('host-1:copilotcli:/s1'));
   const payload = JSON.parse(decryptAsBrowser(captured.init.body, ua, auth));
   assert.equal(payload.title, 'Needs input');
   assert.ok(payload.body.length <= 400);
   const gone = await push.sendPush(sub, { title: 'x' }, { privateJwk, subject: 'mailto:a@b.c', fetchImpl: async () => ({ status: 410, text: async () => 'gone' }) });
   assert.equal(gone.gone, true);
+});
+
+test('notification topics are valid base64url that Apple takes (it refused "input" and "error"), one per session', () => {
+  const keys = ['input', 'error', 'done', 'host-1:copilotcli:/0e4f9a35-7c1b-4b8e-9a51-3c2b1d0e9f77', 'host-1:test', 'host-1:address', '', 'é😀'];
+  const topics = keys.map((k) => push.pushTopic(k));
+  for (const t of topics) {
+    assert.match(t, /^[A-Za-z0-9_-]{24}$/, `${t}: 24 base64url characters (at most 32)`);
+    assert.equal(t.length % 4, 0, 'decodes without padding');
+    assert.equal(Buffer.from(t, 'base64url').toString('base64url'), t, 'round-trips as base64url');
+  }
+  assert.equal(new Set(topics).size, topics.length, 'different sessions get different topics');
+  assert.equal(push.pushTopic('host-1:copilotcli:/s1'), push.pushTopic('host-1:copilotcli:/s1'), 'the same session always gets the same topic');
 });

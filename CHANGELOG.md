@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.17
+
+- **Pocket Pilot finds VS Code again after an update.** After VS Code restarted to update (to 1.144), the phone showed no sessions and the extension logged *Agent host monitor: connect ENOENT* every 30 seconds. VS Code had left behind the address of its previous agent host, from a run before the update, and Pocket Pilot kept connecting there. On Windows, the old process number can stay taken long after the process has ended, so the entry looked alive. Pocket Pilot now checks that an agent host's pipe (or socket) is really there, and picks the most recently started one. This could happen after any VS Code restart that didn't end cleanly, not only with 1.144, which works as before (Agent Host Protocol 1.1.0).
+- **"Needs your input" and error notifications reach iPhones.** Apple's push service refused them (*BadWebPushTopic*, in the extension's log): it doesn't accept a topic like *input* or *error*. Only *finished* notifications got through. Each notification now has a valid topic per session, for VS Code and for the Copilot app plugin. While your phone is offline, a newer notification about the same session replaces the older one, and notifications about other sessions are kept. Before, a newer notification replaced any older one of the same kind.
+- The README says which VS Code versions work: 1.133 and later, not just the latest.
+- **Updating:** update the VS Code extension: click **Update** in the Pocket Pilot panel, then **Restart extensions**. Your agent sessions keep running. Update the Copilot app plugin on the app's Plugins page. The phone app needs nothing.
+
 ## 0.7.16
 
 - **The phone shows the mode a chat really runs in.** VS Code 1.143 sets the agent mode and tool approvals per chat. A chat set to Autopilot in VS Code still showed *Interactive* on the phone, which is its session's setting. So it wasn't clear why the agent answered its own questions (*You weren't available, so I chose…*): in Autopilot, VS Code answers them for you. The phone now shows each chat's own mode and approvals, and follows changes made in VS Code. Changing them on the phone changes them for that chat, like the pickers in VS Code. Before, a change from the phone went to the session, and a chat with its own setting kept it.

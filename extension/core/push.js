@@ -69,8 +69,18 @@ function vapidAuthorization(endpoint, privateJwk, subject, now = Date.now()) {
 }
 
 /**
+ * The Topic header for a notification: a newer one with the same topic replaces one the push service
+ * hasn't delivered yet. Apple's service refuses topics that aren't valid base64url (BadWebPushTopic: it
+ * took "done" but never "input" or "error"), so the topic is 18 bytes of SHA-256 of `key` in base64url:
+ * 24 characters that need no padding.
+ */
+function pushTopic(key) {
+  return crypto.createHash('sha256').update(String(key)).digest().subarray(0, 18).toString('base64url');
+}
+
+/**
  * Sends one notification. Resolves to {ok, gone, status}. `gone` means the subscription is dead
- * and should be deleted.
+ * and should be deleted. `topic`: what newer notifications replace while undelivered (e.g. its session).
  */
 async function sendPush(subscription, payload, { privateJwk, subject, ttl = 3600, urgency = 'high', topic, fetchImpl = fetch }) {
   if (!subscription || !isAllowedPushEndpoint(subscription.endpoint)) return { ok: false, gone: true, status: 0, error: 'endpoint not allowed' };
@@ -87,7 +97,7 @@ async function sendPush(subscription, payload, { privateJwk, subject, ttl = 3600
     'Content-Type': 'application/octet-stream',
     Authorization: vapidAuthorization(subscription.endpoint, privateJwk, subject),
   };
-  if (topic) headers.Topic = String(topic).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
+  if (topic) headers.Topic = pushTopic(topic);
   try {
     const res = await fetchImpl(subscription.endpoint, { method: 'POST', headers, body });
     const status = res.status;
@@ -99,4 +109,4 @@ async function sendPush(subscription, payload, { privateJwk, subject, ttl = 3600
   }
 }
 
-module.exports = { encryptPayload, generateVapidKeys, vapidPublicKey, vapidAuthorization, sendPush, isAllowedPushEndpoint };
+module.exports = { encryptPayload, generateVapidKeys, vapidPublicKey, vapidAuthorization, sendPush, isAllowedPushEndpoint, pushTopic };

@@ -35,7 +35,37 @@ function endpointDir(userDataPath) {
   return path.join(userDataPath, 'agent-host', 'local-endpoint', 'entries');
 }
 
-/** Lists live endpoints, editor-owned first, newest protocol first. */
+const PIPE_PREFIX = /^\\\\[.?]\\pipe\\/i;
+
+/** The named pipes that exist right now (Windows; null elsewhere, or if they can't be listed). */
+function existingPipes() {
+  if (process.platform !== 'win32') return null;
+  try {
+    return new Set(fs.readdirSync('\\\\.\\pipe\\').map((n) => n.toLowerCase()));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether an endpoint's pipe or socket is still there. VS Code leaves the entry of an agent host that
+ * didn't shut down cleanly (as when it restarts to update), and on Windows the old process ID can stay
+ * taken long after, so the process check alone can't tell a stale entry from the running one.
+ */
+function transportExists(entry, pipes) {
+  const ep = entry.endpoint;
+  if (ep.type !== 'socket' && ep.type !== 'pipe') return true;
+  const p = String(ep.path || '');
+  if (PIPE_PREFIX.test(p)) return !pipes || pipes.has(p.replace(PIPE_PREFIX, '').toLowerCase());
+  if (process.platform === 'win32' || p.startsWith('\0')) return true;
+  try {
+    return fs.statSync(p).isSocket();
+  } catch (err) {
+    return err.code !== 'ENOENT' && err.code !== 'ENOTDIR';
+  }
+}
+
+/** Lists live endpoints: editor-owned first, then the most recently started one. */
 function listEndpoints(userDataPath) {
   const dir = endpointDir(userDataPath);
   let files;
@@ -44,19 +74,22 @@ function listEndpoints(userDataPath) {
   } catch {
     return [];
   }
-  const out = [];
+  const pipes = existingPipes();
+  const found = [];
   for (const f of files) {
     try {
-      const e = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      const file = path.join(dir, f);
+      const e = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (!e || !e.endpoint || typeof e.connectionToken !== 'string') continue;
-      if (!isAlive(e.pid)) continue;
-      out.push(e);
+      if (!isAlive(e.pid) || !transportExists(e, pipes)) continue;
+      found.push({ e, at: fs.statSync(file).mtimeMs });
     } catch {
       /* partially written or foreign file */
     }
   }
-  out.sort((a, b) => (a.type === 'editor' ? 0 : 1) - (b.type === 'editor' ? 0 : 1) || cmpVersion(b.protocolVersion, a.protocolVersion));
-  return out;
+  // One VS Code runs per user data folder at a time: the newest entry is the running one.
+  found.sort((a, b) => (a.e.type === 'editor' ? 0 : 1) - (b.e.type === 'editor' ? 0 : 1) || b.at - a.at || cmpVersion(b.e.protocolVersion, a.e.protocolVersion));
+  return found.map((x) => x.e);
 }
 
 function selectEndpoint(userDataPath, { types = ['editor'], minProtocol = '0.5.1' } = {}) {
@@ -109,4 +142,4 @@ function transportFor(conn) {
   };
 }
 
-module.exports = { listEndpoints, selectEndpoint, describeEndpoint, openConnection, transportFor, userDataFromGlobalStorage, endpointDir, cmpVersion };
+module.exports = { listEndpoints, selectEndpoint, describeEndpoint, openConnection, transportFor, userDataFromGlobalStorage, endpointDir, cmpVersion, transportExists };

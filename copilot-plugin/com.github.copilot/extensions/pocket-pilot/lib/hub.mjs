@@ -387,7 +387,7 @@ async function boot(log, cleanups) {
 
   async function pushTo(devices, payload, opts) {
     for (const d of devices) {
-      const r = await push.sendPush(d.push, payload, { privateJwk: vapid.privateJwk, subject: PUSH_SUBJECT, topic: payload.kind, ...opts });
+      const r = await push.sendPush(d.push, payload, { privateJwk: vapid.privateJwk, subject: PUSH_SUBJECT, topic: payload.tag || payload.kind, ...opts });
       if (r.ok) log('info', `Push "${payload.title}" -> ${d.name}`);
       else {
         log('warn', `Push to ${d.name} failed (${r.status}): ${r.error || ''}`);
