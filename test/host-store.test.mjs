@@ -12,13 +12,13 @@ const CHAT = 'ahp-chat://default/s1';
  * request with an error instead; `listReply(n, answer)` decides when the n-th listSessions is answered
  * (VS Code sometimes takes minutes).
  */
-function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig } = {}) {
+function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig, chatExtra } = {}) {
   let seq = 100;
   const received = [];
   const subscriptions = new Set();
   const send = (m) => transport.send(m);
   const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT, ...(sessionConfig ? { config: sessionConfig } : {}) };
-  const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [], ...(chatConfig ? { config: chatConfig } : {}) };
+  const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [], ...(chatConfig ? { config: chatConfig } : {}), ...chatExtra };
   let lists = 0;
   (async () => {
     for (;;) {
@@ -285,5 +285,70 @@ test('computers before protocol 1.1.0 get settings on the session, as before', a
   store.setConfig(SESSION, { mode: 'plan' });
   await until(() => store.configFor(SESSION).values.mode === 'plan');
   assert.deepEqual(dispatched(host), [{ channel: SESSION, type: 'session/configChanged', config: { mode: 'plan' } }]);
+  stop();
+});
+
+// VS Code 1.144 (AHP 1.1.0) keeps every waiting message in queuedMessages with its kind, and the steering
+// one again in steeringMessage. The phone showed a steering message twice (also as "Queued"), and Remove
+// or Send Immediately on that copy did nothing, so a second copy got sent. Like the real chat: an
+// orphaned copy (s0), the current steering message (s1), and a queued message (q1).
+const msg = (text) => ({ text, origin: { kind: 'user' } });
+const PENDING_1_1 = {
+  activeTurn: { id: 't1', startedAt: '', message: msg('go'), responseParts: [] },
+  steeringMessage: { id: 's1', kind: 'steering', message: msg('Also make the labs relevant') },
+  queuedMessages: [
+    { id: 's0', kind: 'steering', message: msg('Also make the labs relevant') },
+    { id: 's1', kind: 'steering', message: msg('Also make the labs relevant') },
+    { id: 'q1', kind: 'queued', message: msg('Then write the summary') },
+  ],
+};
+const shown = (store) => store.pendingMessages(CHAT).map((m) => `${m.kind}:${m.id}:${m.message.text}`);
+
+test('VS Code 1.144: each waiting message shows once with its kind, and Remove, Edit and Send Immediately work', async () => {
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.1.0', chatExtra: structuredClone(PENDING_1_1) });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  assert.deepEqual(shown(store), ['steering:s0:Also make the labs relevant', 'steering:s1:Also make the labs relevant', 'queued:q1:Then write the summary'], 'not s1 a second time as "Queued"');
+
+  // Remove the orphaned copy: VS Code removes it only when the kind matches.
+  store.removePending(CHAT, 'steering', 's0');
+  await until(() => !store.pendingMessages(CHAT).some((m) => m.id === 's0'));
+  assert.deepEqual(dispatched(host).at(-1), { channel: CHAT, type: 'chat/pendingMessageRemoved', kind: 'steering', id: 's0' });
+  assert.equal(store.chatState.get(CHAT).steeringMessage.id, 's1', 'the current steering message stays');
+
+  store.editPending(CHAT, 'queued', 'q1', 'Then write a short summary');
+  await until(() => store.pendingMessages(CHAT).some((m) => m.id === 'q1' && m.message.text === 'Then write a short summary'));
+
+  // Send Immediately: the queued message becomes steering, once.
+  store.sendPendingNow(SESSION, CHAT, 'q1');
+  await until(() => !store.pendingMessages(CHAT).some((m) => m.id === 'q1') && store.pendingMessages(CHAT).length === 2);
+  const [first, second] = store.pendingMessages(CHAT);
+  assert.equal(first.id, 's1');
+  assert.equal(second.kind, 'steering');
+  assert.equal(second.message.text, 'Then write a short summary');
+  assert.equal(store.chatState.get(CHAT).steeringMessage.id, second.id);
+
+  // The agent takes the steering messages (VS Code removes each one it hands over).
+  host.push(CHAT, { type: 'chat/pendingMessageRemoved', kind: 'steering', id: 's1' });
+  host.push(CHAT, { type: 'chat/pendingMessageRemoved', kind: 'steering', id: second.id });
+  await until(() => store.pendingMessages(CHAT).length === 0);
+  assert.equal(store.chatState.get(CHAT).queuedMessages, undefined);
+  assert.equal(store.chatState.get(CHAT).steeringMessage, undefined);
+  stop();
+});
+
+test('older VS Code: steering is only in steeringMessage, as before', async () => {
+  const { store } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.0.0', chatExtra: { activeTurn: PENDING_1_1.activeTurn, queuedMessages: [{ id: 'q1', message: msg('Then write the summary') }] } });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  store.steer(SESSION, { text: 'Use TypeScript' });
+  await until(() => store.chatState.get(CHAT).steeringMessage);
+  assert.deepEqual(shown(store), ['steering:' + store.chatState.get(CHAT).steeringMessage.id + ':Use TypeScript', 'queued:q1:Then write the summary']);
+  assert.equal(store.chatState.get(CHAT).queuedMessages.length, 1, 'the 1.0.0 reducer: steering stays out of the queue list');
+  store.removePending(CHAT, 'steering', store.chatState.get(CHAT).steeringMessage.id);
+  await until(() => !store.chatState.get(CHAT).steeringMessage);
+  assert.deepEqual(shown(store), ['queued:q1:Then write the summary']);
   stop();
 });

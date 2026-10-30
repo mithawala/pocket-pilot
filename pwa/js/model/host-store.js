@@ -15,14 +15,53 @@ const errorText = (err) => (err instanceof RpcError ? String(err.message).replac
 
 // A chat's own settings (AHP 1.1.0): mode and approvals set for one chat, over the session's.
 const CHAT_CONFIG_SINCE = '1.1.0';
+// From AHP 1.1.0 (VS Code 1.144) every waiting message, steering included, is in `queuedMessages` with
+// its kind; `steeringMessage` still holds the steering one for older clients.
+const PENDING_LIST_SINCE = '1.1.0';
 
-/** The chat reducer, plus what AHP 1.1.0 adds to the bundled 1.0.0 library: a chat's own settings. */
-function reduceChat(state, action) {
+const atLeast = (version, since) => !!version && compareProtocolVersions(version, since) >= 0;
+
+/**
+ * The chat reducer, plus what AHP 1.1.0 adds to the bundled 1.0.0 library: a chat's own settings, and
+ * waiting messages kept in one list (as VS Code 1.144's reducer does).
+ */
+function reduceChat(state, action, version) {
   if (action.type === 'chat/configChanged') {
     const values = action.replace || !state.config ? { ...action.config } : { ...state.config.values, ...action.config };
     return { ...state, config: { ...state.config, values } };
   }
+  if (atLeast(version, PENDING_LIST_SINCE)) {
+    if (action.type === 'chat/pendingMessageSet') {
+      const entry = { id: action.id, kind: action.kind, message: action.message };
+      const list = [...(state.queuedMessages || [])];
+      const at = list.findIndex((m) => m.id === action.id);
+      if (at < 0) list.push(entry);
+      else list[at] = entry;
+      const next = { ...state, queuedMessages: list };
+      if (action.kind === 'steering') next.steeringMessage = entry;
+      else if (state.steeringMessage?.id === action.id) next.steeringMessage = undefined;
+      return next;
+    }
+    if (action.type === 'chat/pendingMessageRemoved') {
+      let next = state;
+      if (action.kind === 'steering' && state.steeringMessage?.id === action.id) next = { ...next, steeringMessage: undefined };
+      const list = state.queuedMessages || [];
+      const at = list.findIndex((m) => m.id === action.id && (m.kind || 'queued') === action.kind);
+      if (at < 0) return next;
+      const rest = list.filter((_, i) => i !== at);
+      return { ...next, queuedMessages: rest.length ? rest : undefined };
+    }
+  }
   return chatReducer(state, action);
+}
+
+/** The messages waiting in a chat, each once with its kind: steering first, then the queue (like VS Code). */
+export function pendingOf(cs) {
+  if (!cs) return [];
+  const list = (cs.queuedMessages || []).map((m) => ({ ...m, kind: m.kind || 'queued' }));
+  const steering = list.filter((m) => m.kind === 'steering');
+  if (cs.steeringMessage && !list.some((m) => m.id === cs.steeringMessage.id)) steering.unshift({ ...cs.steeringMessage, kind: 'steering' });
+  return [...steering, ...list.filter((m) => m.kind !== 'steering')];
 }
 
 export class HostStore extends EventTarget {
@@ -294,7 +333,7 @@ export class HostStore extends EventTarget {
     }
     if (env.serverSeq <= (this.snapshotSeq.get(uri) ?? -1)) return;
     try {
-      map.set(uri, kind === 'chat' ? reduceChat(cur, env.action) : sessionReducer(cur, env.action));
+      map.set(uri, kind === 'chat' ? reduceChat(cur, env.action, this.protocolVersion) : sessionReducer(cur, env.action));
     } catch (err) {
       console.warn('reducer failed', env.action?.type, err);
       return;
@@ -550,9 +589,13 @@ export class HostStore extends EventTarget {
     this._dispatch(chat, { type: 'chat/pendingMessageRemoved', kind, id });
   }
 
+  /** The messages waiting in a chat: steering first, then the queue. */
+  pendingMessages(chat) {
+    return pendingOf(this.chatState.get(chat));
+  }
+
   _pending(chat, kind, id) {
-    const cs = this.chatState.get(chat);
-    return kind === 'steering' ? (cs?.steeringMessage?.id === id ? cs.steeringMessage : null) : cs?.queuedMessages?.find((m) => m.id === id) || null;
+    return this.pendingMessages(chat).find((m) => m.id === id && m.kind === kind) || null;
   }
 
   /** Changes the text of a message that is still waiting (VS Code's "Edit" on a queued message). */

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.19
+
+- **Steering and queued messages show once, and Remove works.** VS Code 1.144 keeps every waiting message in one list, steering included, and the steering one again on its own for older apps. The phone showed a steering message twice: as *Steering* and again as *Queued*. Remove and *Send Immediately* on that second copy did nothing, and *Send Immediately* sent the same steering again as a new copy. The phone now lists each waiting message once with its real kind: steering first, then the queue, like VS Code. Remove, Edit and *Send Immediately* work.
+- Tested live against VS Code 1.144: a steering message sent while the agent ran a command reached it at once (VS Code shows it as a turn of its own), and a queued message ran after it.
+- A chat may still hold two copies of a steering message from before: remove the extra one with ×.
+- **Updating:** the phone app updates itself, and that's all this needs.
+
 ## 0.7.18
 
 - **The effort level shows once, and the one you tap sticks.** VS Code 1.144 lists a model's effort level twice: as `thinkingLevel`, which it uses itself, and again as `reasoningEffort` for other apps. It sends apps like Pocket Pilot only the second one. The phone showed both as *Effort Level*, and the first one always fell back to its default, so a tap there didn't seem to stick (*Medium 1M Max*). The phone now shows each option once, reads it the way VS Code does, and sets both names. The same goes for the Auto model's *Optimize for* option (`tier` and `autoTier`).

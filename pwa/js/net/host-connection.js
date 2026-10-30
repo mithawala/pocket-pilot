@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.18';
+export const APP_VERSION = '0.7.19';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 // A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and

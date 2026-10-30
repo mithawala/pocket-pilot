@@ -379,8 +379,8 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
     addFiles([...e.dataTransfer.files]);
   };
 
-  const queued = chatState?.queuedMessages || [];
-  const steering = chatState?.steeringMessage;
+  // Each waiting message once, with its own kind (VS Code 1.144 keeps steering in the queue list too).
+  const pending = store.pendingMessages(chat);
   const hasText = !!text.trim() || attachments.length > 0;
   const mode = values.mode || props.mode?.default;
   const approval = values.autoApprove || props.autoApprove?.default;
@@ -388,9 +388,8 @@ export function Composer({ store, conn, sessionUri, session, chat, chatState, au
   const opts = hasOptions(models, currentModel) ? optionsChip(models, currentModel) : '';
   const placeholder = dictation.listening ? 'Listening…' : active ? 'Steer the agent, or add to the queue…' : `Ask ${providerLabel(session?.provider)} or describe a task…`;
   return html`<div class=${`composer-wrap ${dragging ? 'dropping' : ''} ${expanded ? 'expanded' : ''}`} onDragOver=${onDragOver} onDragLeave=${onDragLeave} onDrop=${onDrop}>
-    ${(queued.length > 0 || steering) && html`<div class="pending-list">
-      ${steering && html`<${PendingItem} key=${steering.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="steering" item=${steering} />`}
-      ${queued.map((q) => html`<${PendingItem} key=${q.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind="queued" item=${q} />`)}
+    ${pending.length > 0 && html`<div class="pending-list">
+      ${pending.map((m) => html`<${PendingItem} key=${m.id} store=${store} sessionUri=${sessionUri} chat=${chat} kind=${m.kind} item=${m} />`)}
     </div>`}
     <div class=${`composer ${dictation.listening ? 'listening' : ''} ${tall ? 'tall' : ''}`}>
       <${GrowButton} expanded=${expanded} onToggle=${toggleExpanded} />
