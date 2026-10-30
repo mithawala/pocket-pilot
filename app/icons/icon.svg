@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><title>Pocket Pilot</title><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+<radialGradient id="glow" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#6366f1" stop-opacity=".55"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#c3cfdf"/></linearGradient>
+<linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+<linearGradient id="pocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d42c4"/><stop offset="1" stop-color="#1b2785"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#bg)"/><rect width="512" height="512" rx="112" fill="url(#glow)"/><g transform="translate(25.6 2) scale(.9)">
+<path d="M318 126L344 86" stroke="#c3cfdf" stroke-width="9" stroke-linecap="round"/>
+<circle cx="348" cy="78" r="13" fill="#f472b6"/>
+<path d="M128 296C128 172 184 110 256 110S384 172 384 296C384 340 352 372 308 372H204C160 372 128 340 128 296Z" fill="url(#metal)"/>
+<circle cx="136" cy="286" r="11" fill="#94a3b8"/>
+<circle cx="376" cy="286" r="11" fill="#94a3b8"/>
+<rect x="150" y="198" width="212" height="102" rx="51" fill="url(#visor)"/>
+<path d="M178 222Q226 206 278 212" stroke="#fff" stroke-opacity=".55" stroke-width="10" stroke-linecap="round" fill="none"/>
+<circle cx="220" cy="254" r="22" fill="#fff" opacity=".25"/>
+<circle cx="292" cy="254" r="22" fill="#fff" opacity=".25"/>
+<circle cx="220" cy="254" r="11" fill="#fff"/>
+<circle cx="292" cy="254" r="11" fill="#fff"/>
+</g>
+<path d="M88 296Q256 262 424 296L406 416Q400 444 372 448H140Q112 444 106 416Z" fill="url(#pocket)"/>
+<path d="M110 310Q256 280 402 310" stroke="#8ea4ff" stroke-width="6" stroke-dasharray="16 12" stroke-linecap="round" fill="none"/>
+<path d="M150 342H362" stroke="#3f55d6" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+<ellipse cx="172" cy="288" rx="30" ry="21" fill="url(#metal)"/>
+<ellipse cx="340" cy="288" rx="30" ry="21" fill="url(#metal)"/>
+<path d="M162 282v12M178 280v14M332 280v14M348 282v12" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/></svg>
