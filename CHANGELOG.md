@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.20
+
+- **A steering message that doesn't get through can be sent now.** VS Code 1.144 holds back steering in some turns: a message stays under *Steering* until the agent finishes the turn, then runs as the next message, like a queued one. This happens when the turn itself was started by an earlier steering message, for example one sent while the agent waited for your answer. The bug is in VS Code's agent host, which VS Code's own chat window uses too, not in Pocket Pilot. When a steering message has waited 20 seconds, the phone now says the agent hasn't picked it up yet and offers **Stop and send**. This stops the current turn and sends the message as a new one, so the agent gets it right away. Normal steering keeps working as before, and you can still wait for the turn to end.
+- Tested live against VS Code 1.144:
+  - A steering message sent during a turn that steering had started waited 47 seconds, until that turn ended.
+  - With Stop and send, it ran 0.2 seconds later, once.
+  - In the new turn, the next steering message reached the agent at once, and the agent followed it.
+- **Updating:** the phone app updates itself, and that's all this needs.
+
 ## 0.7.19
 
 - **Steering and queued messages show once, and Remove works.** VS Code 1.144 keeps every waiting message in one list, steering included, and the steering one again on its own for older apps. The phone showed a steering message twice: as *Steering* and again as *Queued*. Remove and *Send Immediately* on that second copy did nothing, and *Send Immediately* sent the same steering again as a new copy. The phone now lists each waiting message once with its real kind: steering first, then the queue, like VS Code. Remove, Edit and *Send Immediately* work.

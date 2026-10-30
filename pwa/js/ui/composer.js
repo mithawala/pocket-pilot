@@ -52,6 +52,8 @@ function enumOptions(schema) {
 
 const MODE_ICONS = { interactive: 'chat', plan: 'checklist', autopilot: 'rocket' };
 const APPROVAL_ICONS = { default: 'shield', assisted: 'shield-check', autoApprove: 'shield-off' };
+// How long a steering message may wait before the phone offers to stop the turn and send it.
+const STEERING_STUCK_MS = 20000;
 
 /**
  * A message waiting for the agent, like VS Code's queue above the chat input: the text, two lines of it
@@ -63,12 +65,22 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
+  const [, tick] = useState(0);
   const box = useRef(null);
   const shown = useRef(null);
   const text = item.message?.text || '';
   const { images, others } = splitAttachments(item.message);
   const read = (u) => store.readImage(u);
   const label = kind === 'steering' ? 'Steering' : 'Queued';
+  // The agent normally takes steering within seconds. VS Code 1.144 keeps steering sent during a turn
+  // that steering started until that turn ends: after a while, offer to stop the turn and send it now.
+  const since = kind === 'steering' ? store.waitingSince(item.id) : 0;
+  const stuck = kind === 'steering' && Date.now() - since >= STEERING_STUCK_MS;
+  useEffect(() => {
+    if (kind !== 'steering' || stuck) return undefined;
+    const t = setTimeout(() => tick((n) => n + 1), since + STEERING_STUCK_MS - Date.now() + 50);
+    return () => clearTimeout(t);
+  }, [kind, stuck, since]);
   const hint = kind === 'steering' ? 'Sent to the running agent after its next tool call' : 'Sent when the agent finishes its current turn';
   const run = (fn) => {
     try {
@@ -160,6 +172,10 @@ function PendingItem({ store, sessionUri, chat, kind, item }) {
         }} aria-label=${`${label}: ${text}. Tap to edit`}><b>${label}</b> ${text}</div>
       ${images.length > 0 && html`<${Thumbs} images=${images} read=${read} size="sm" />`}
       ${others.length > 0 && html`<div class="att">${others.map((a, i) => html`<span class="chip" key=${i}><${Icon} name="clip" /><span>${a.label}</span></span>`)}</div>`}
+      ${stuck && html`<div class="stuck">
+        <span class="muted small">The agent hasn't picked this up yet and may not until this turn ends.</span>
+        <button class="btn sm" onClick=${() => store.deliverSteeringNow(sessionUri, chat, item.id).catch((err) => toast(err.message, 'err'))} title="Stops the running turn and sends this as a new message">Stop and send</button>
+      </div>`}
     </div>
     <div class="pa">
       ${(long || open) && html`<button onClick=${() => setOpen(!open)} aria-expanded=${open ? 'true' : 'false'} aria-label=${open ? 'Show less' : 'Show the whole message'} title=${open ? 'Show less' : 'Show all'}><${Icon} name=${open ? 'up' : 'down'} size="16" /></button>`}

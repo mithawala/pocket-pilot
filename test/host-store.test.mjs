@@ -352,3 +352,21 @@ test('older VS Code: steering is only in steeringMessage, as before', async () =
   assert.deepEqual(shown(store), ['queued:q1:Then write the summary']);
   stop();
 });
+
+test('Stop and send for a steering message the agent never took: removed, the turn stopped, sent as a new turn', async () => {
+  const chatExtra = structuredClone(PENDING_1_1);
+  chatExtra.activeTurn.startedAt = new Date().toISOString();
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.1.0', chatExtra });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  const before = Date.now();
+  assert.ok(store.waitingSince('s1') >= before - 5 && store.waitingSince('s1') === store.waitingSince('s1'), 'the time this phone first saw it, kept');
+  await store.deliverSteeringNow(SESSION, CHAT, 's1');
+  await until(() => store.chatState.get(CHAT).activeTurn?.message?.text === 'Also make the labs relevant');
+  const sent = dispatched(host).map((a) => `${a.type}${a.kind ? `:${a.kind}` : ''}${a.id ? `:${a.id}` : ''}`);
+  assert.deepEqual(sent, ['chat/pendingMessageRemoved:steering:s1', 'chat/turnCancelled', 'chat/turnStarted'], 'removed first, so VS Code does not run it a second time');
+  assert.deepEqual(store.pendingMessages(CHAT).map((m) => m.id), ['s0', 'q1'], 'the others stay');
+  await assert.rejects(() => Promise.resolve().then(() => store.deliverSteeringNow(SESSION, CHAT, 's1')), /already sent/);
+  stop();
+});

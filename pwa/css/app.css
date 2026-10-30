@@ -467,6 +467,10 @@ a.btn { text-decoration: none; }
 .pending-item .pa button { display: grid; place-items: center; width: 28px; height: 26px; color: var(--muted); border-radius: 5px; }
 .pending-item .pa button:hover { color: var(--text); background: var(--surface); }
 .pending-item .att { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 2px; }
+/* A steering message the agent hasn't taken for a while: why, and Stop and send. */
+.pending-item .stuck { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 4px 0 2px; }
+.pending-item .stuck .muted { flex: 1 1 180px; line-height: 1.4; }
+.pending-item .stuck .btn.sm { height: 28px; padding: 0 10px; }
 .chip.pic { padding-left: 7px; }
 .pending-item.editing { border-color: var(--focus); }
 .pending-item .pe { flex: 1; min-width: 0; }

@@ -92,6 +92,8 @@ export class HostStore extends EventTarget {
     this.unsubTimers = new Map();
     this.localTurns = new Map();
     this.draftModels = new Map();
+    // When this phone first saw each waiting message (id -> time).
+    this._seenPending = new Map();
     // Chats the computer could not open for the phone (e.g. too large): shown with a Try again button.
     this.failedChats = new Map();
     // Bytes received so far of a large message on its way (a long chat), 0 when none.
@@ -614,6 +616,26 @@ export class HostStore extends EventTarget {
     this.removePending(chat, 'queued', id);
     if (this.chatState.get(chat)?.activeTurn) this.steer(sessionUri, { text: cur.message.text, attachments: cur.message.attachments });
     else this.sendMessage(sessionUri, { text: cur.message.text, attachments: cur.message.attachments, model: cur.message.model });
+  }
+
+  /**
+   * Delivers a steering message the agent hasn't taken yet: stops the running turn and sends it as a new
+   * one. VS Code 1.144 holds steering sent during a turn that steering started until that turn ends.
+   */
+  deliverSteeringNow(sessionUri, chat, id) {
+    const cur = this._pending(chat, 'steering', id);
+    if (!cur) throw new Error('That message was already sent to the agent');
+    this.removePending(chat, 'steering', id);
+    return this.stopAndSend(sessionUri, { text: cur.message.text, attachments: cur.message.attachments, model: cur.message.model || this.modelFor(chat) || undefined });
+  }
+
+  /** When this phone first saw a message waiting (a steering message waiting long seems stuck). */
+  waitingSince(id) {
+    if (!this._seenPending.has(id)) {
+      if (this._seenPending.size > 200) this._seenPending.delete(this._seenPending.keys().next().value);
+      this._seenPending.set(id, Date.now());
+    }
+    return this._seenPending.get(id);
   }
 
   confirmTool(chat, turnId, toolCallId, approved, option) {
