@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.18
+
+- **The effort level shows once, and the one you tap sticks.** VS Code 1.144 lists a model's effort level twice: as `thinkingLevel`, which it uses itself, and again as `reasoningEffort` for other apps. It sends apps like Pocket Pilot only the second one. The phone showed both as *Effort Level*, and the first one always fell back to its default, so a tap there didn't seem to stick (*Medium 1M Max*). The phone now shows each option once, reads it the way VS Code does, and sets both names. The same goes for the Auto model's *Optimize for* option (`tier` and `autoTier`).
+- Picking a model on the phone no longer sets the second copy to its first choice (*Low*) instead of the default.
+- Tested live against VS Code 1.144: Medium → High → Low came back as tapped, and the message ran with Low.
+- **Updating:** the phone app updates itself, and that's all this needs.
+
 ## 0.7.17
 
 - **Pocket Pilot finds VS Code again after an update.** After VS Code restarted to update (to 1.144), the phone showed no sessions and the extension logged *Agent host monitor: connect ENOENT* every 30 seconds. VS Code had left behind the address of its previous agent host, from a run before the update, and Pocket Pilot kept connecting there. On Windows, the old process number can stay taken long after the process has ended, so the entry looked alive. Pocket Pilot now checks that an agent host's pipe (or socket) is really there, and picks the most recently started one. This could happen after any VS Code restart that didn't end cleanly, not only with 1.144, which works as before (Agent Host Protocol 1.1.0).

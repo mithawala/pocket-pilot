@@ -3,35 +3,79 @@
 import { html, useEffect, useRef } from '../lib/ui.js';
 import { Sheet, Icon } from './common.js';
 
-function enumProps(model) {
-  return Object.entries(model?.configSchema?.properties || {}).filter(([, p]) => Array.isArray(p.enum) && p.enum.length > 0);
+// VS Code 1.144 lists two options twice, under a second name for other clients: `reasoningEffort`
+// copies `thinkingLevel` and `autoTier` copies `tier` (same title and choices, no default). It sends
+// apps that aren't VS Code (like this one) the choice under the second name only, and reads the first
+// name, then the second. The phone shows each option once, reads it the same way, and sets both names.
+const KNOWN_COPIES = { reasoningEffort: 'thinkingLevel', autoTier: 'tier' };
+const sameChoices = (a, b) => JSON.stringify(a.enum) === JSON.stringify(b.enum);
+
+/** The options that copy another one: { copy: original }. */
+function copiesOf(props) {
+  const out = {};
+  const shown = [];
+  for (const [k, p] of Object.entries(props)) {
+    if (!Array.isArray(p?.enum) || !p.enum.length) continue;
+    const known = KNOWN_COPIES[k];
+    let of = known && Array.isArray(props[known]?.enum) && sameChoices(props[known], p) ? known : null;
+    if (!of && p.default === undefined) of = shown.find((s) => props[s].title === p.title && sameChoices(props[s], p)) || null;
+    if (of) out[k] = of;
+    else shown.push(k);
+  }
+  return out;
+}
+
+/** A model's options, each once: [key, schema, keys of its copies]. */
+function modelOptions(model) {
+  const props = model?.configSchema?.properties || {};
+  const copies = copiesOf(props);
+  return Object.entries(props)
+    .filter(([k, p]) => Array.isArray(p?.enum) && p.enum.length > 0 && !copies[k])
+    .map(([k, p]) => [k, p, Object.keys(copies).filter((c) => copies[c] === k)]);
 }
 
 const optLabel = (p, v) => p.enumLabels?.[p.enum.indexOf(v)] ?? String(v);
 
+/** The value chosen for an option in `config` (under its own name, else a copy's), if any. */
+function chosen([k, p, copies], config) {
+  for (const key of [k, ...copies]) {
+    const v = config?.[key];
+    if (v !== undefined && p.enum.includes(v)) return v;
+  }
+  return undefined;
+}
+
+/** `config` with an option set to `v`, under its own name and its copies'. */
+function withOption([k, , copies], config, v) {
+  const next = { ...(config || {}) };
+  for (const key of [k, ...copies]) next[key] = v;
+  return next;
+}
+
 /** Config for `model`, keeping previous values where the new model supports them. */
 export function modelDefaults(model, prevConfig = {}) {
-  const config = {};
-  for (const [k, p] of enumProps(model)) {
-    const prev = prevConfig?.[k];
-    config[k] = p.enum.includes(prev) ? prev : p.default !== undefined ? p.default : p.enum[0];
+  let config = {};
+  for (const opt of modelOptions(model)) {
+    const p = opt[1];
+    const prev = chosen(opt, prevConfig);
+    config = withOption(opt, config, prev !== undefined ? prev : p.default !== undefined ? p.default : p.enum[0]);
   }
   return config;
 }
 
 /** The value each option has for `sel` (its own choice, else the model's default). */
-function optionValue(p, k, sel) {
-  const v = sel?.config?.[k];
-  return v !== undefined && p.enum.includes(v) ? v : p.default !== undefined ? p.default : undefined;
+function optionValue(opt, sel) {
+  const v = chosen(opt, sel?.config);
+  return v !== undefined ? v : opt[1].default;
 }
 
 export function modelSummary(models, sel) {
   if (!sel) return 'Default model';
   const m = models.find((x) => x.id === sel.id);
   const bits = [m?.name || sel.id];
-  for (const [k, p] of enumProps(m)) {
-    const v = sel.config?.[k];
-    if (v !== undefined) bits.push(optLabel(p, v));
+  for (const opt of modelOptions(m)) {
+    const v = chosen(opt, sel.config);
+    if (v !== undefined) bits.push(optLabel(opt[1], v));
   }
   return bits.join(' · ');
 }
@@ -46,14 +90,20 @@ export function modelChip(models, sel) {
 /** The options chip's text, e.g. "Max 1M" (thinking level + context size); '' if the model has none. */
 export function optionsChip(models, sel) {
   const m = models.find((x) => x.id === sel?.id);
-  return enumProps(m).map(([k, p]) => {
-    const v = optionValue(p, k, sel);
-    return v === undefined ? null : optLabel(p, v);
+  return modelOptions(m).map((opt) => {
+    const v = optionValue(opt, sel);
+    return v === undefined ? null : optLabel(opt[1], v);
   }).filter(Boolean).join(' ');
 }
 
 export function hasOptions(models, sel) {
-  return enumProps(models.find((x) => x.id === sel?.id)).length > 0;
+  return modelOptions(models.find((x) => x.id === sel?.id)).length > 0;
+}
+
+/** `sel` with option `key` of its model set to `value` (under every name VS Code knows it by). */
+export function chooseOption(models, sel, key, value) {
+  const opt = modelOptions(models.find((x) => x.id === sel?.id)).find(([k]) => k === key);
+  return opt ? { ...sel, config: withOption(opt, sel?.config, value) } : sel;
 }
 
 function describe(m) {
@@ -83,19 +133,22 @@ export function ModelSheet({ open, onClose, models, value, onChange }) {
 /** The current model's options (VS Code's "Max 1M" menu): each tap applies at once. */
 export function ModelOptionsSheet({ open, onClose, models, value, onChange, midSession }) {
   const m = models.find((x) => x.id === value?.id);
-  const props = enumProps(m);
-  const set = (k, v) => onChange({ ...value, config: { ...(value?.config || {}), [k]: v } });
+  const options = modelOptions(m);
   return html`<${Sheet} open=${open} onClose=${onClose} title=${m?.name || 'Model options'}>
     ${midSession && html`<div class="opt-note"><${Icon} name="info" /><span>Changing these options mid-session resets the prompt cache and may increase cost.</span></div>`}
-    ${props.map(([k, p]) => html`<div class="opt-group" key=${k}>
+    ${options.map((opt) => {
+      const [k, p] = opt;
+      const current = optionValue(opt, value);
+      return html`<div class="opt-group" key=${k}>
       <div class="section-title">${p.title || k}</div>
       ${p.enum.map((v, i) => {
-        const on = optionValue(p, k, value) === v;
-        return html`<button key=${String(v)} class=${`list-item ${on ? 'on' : ''}`} onClick=${() => set(k, v)} title=${p.enumDescriptions?.[i] || ''}>
+        const on = current === v;
+        return html`<button key=${String(v)} class=${`list-item ${on ? 'on' : ''}`} onClick=${() => onChange(chooseOption(models, value, k, v))} title=${p.enumDescriptions?.[i] || ''}>
           <div class="grow"><span>${optLabel(p, v)}</span>${p.default === v && html`<span class="muted small def-tag">Default</span>`}${p.enumDescriptions?.[i] && html`<div class="muted small">${p.enumDescriptions[i]}</div>`}</div>
           ${on && html`<span class="check"><${Icon} name="check" /></span>`}
         </button>`;
       })}
-    </div>`)}
+    </div>`;
+    })}
   </${Sheet}>`;
 }

@@ -17,15 +17,21 @@ const CONFIG = {
   },
 };
 
-const thinking = (levels, def) => ({ type: 'string', title: 'Thinking Level', enum: levels, enumLabels: levels.map((l) => ({ none: 'None', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' })[l]), default: def });
+const thinking = (levels, def) => ({ type: 'string', title: 'Effort Level', enum: levels, enumLabels: levels.map((l) => ({ none: 'None', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' })[l]), default: def });
 const context = (sizes, labels, def) => ({ type: 'number', title: 'Context Size', enum: sizes, enumLabels: labels, default: def });
+// Like VS Code 1.144, which lists thinkingLevel again as reasoningEffort and tier as autoTier (no default).
+const withCopies = (m) => {
+  const props = { ...m.configSchema.properties };
+  for (const [from, to] of [['thinkingLevel', 'reasoningEffort'], ['tier', 'autoTier']]) if (props[from]) props[to] = { ...props[from], default: undefined };
+  return { ...m, configSchema: { ...m.configSchema, properties: props } };
+};
 const MODELS = [
   { id: 'auto', name: 'Auto', provider: 'copilotcli', configSchema: { type: 'object', properties: { tier: { type: 'string', title: 'Optimize for', enum: ['efficiency', 'balance', 'intelligence'], enumLabels: ['Efficiency', 'Balance', 'Intelligence'], default: 'balance' } } } },
   { id: 'claude-opus-5.5', name: 'Claude Opus 5.5', provider: 'copilotcli', maxContextWindow: 1000000, supportsVision: true, configSchema: { type: 'object', properties: { thinkingLevel: thinking(['low', 'medium', 'high', 'xhigh', 'max'], 'high'), contextSize: context([200000, 1000000], ['200K', '1M'], 1000000) } } },
   { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'copilotcli', maxContextWindow: 1050000, supportsVision: true, configSchema: { type: 'object', properties: { thinkingLevel: thinking(['none', 'low', 'medium', 'high', 'xhigh', 'max'], 'medium'), contextSize: context([272000, 922000], ['272K', '1M'], 272000) } } },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'copilotcli', maxContextWindow: 1000000, supportsVision: true, configSchema: { type: 'object', properties: { thinkingLevel: thinking(['low', 'medium', 'high', 'xhigh', 'max'], 'high'), contextSize: context([200000, 936000], ['200K', '1M'], 936000) } } },
   { id: 'gpt-5-mini', name: 'GPT-5 mini', provider: 'copilotcli', maxContextWindow: 264000, configSchema: { type: 'object', properties: { thinkingLevel: thinking(['low', 'medium', 'high'], 'medium') } } },
-];
+].map(withCopies);
 
 const AGENTS = [
   { provider: 'copilotcli', displayName: 'Copilot', description: 'GitHub Copilot agent', models: MODELS },

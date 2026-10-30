@@ -240,7 +240,7 @@ test('demo: new sessions keep the chosen model options and mode', async () => {
     const sol = models.find((m) => m.id === 'gpt-5.6-sol');
     // Carries over options the new model supports, falls back to its defaults otherwise.
     const model = { id: sol.id, config: modelDefaults(sol, { thinkingLevel: 'max', contextSize: 1000000 }) };
-    assert.deepEqual(model.config, { thinkingLevel: 'max', contextSize: 272000 });
+    assert.deepEqual(model.config, { thinkingLevel: 'max', reasoningEffort: 'max', contextSize: 272000 }, 'the effort level under both of VS Code\'s names');
     assert.equal(modelSummary(models, model), 'GPT-5.6 Sol · Max · 272K');
 
     const uri = await store.createSession({ provider: 'copilotcli', folder: 'file:///c%3A/Users/you/code/acme-web', text: 'Add a health check', model, config: { mode: 'plan', autoApprove: 'default' } });
