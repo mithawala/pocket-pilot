@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.0
+
+- **Your session's files on your phone.** In a chat, tap **⋯** and then **Files**:
+  - **Recent** lists the newest files anywhere in the session's folder, so a video the agent just rendered comes first.
+  - **Folders** goes folder by folder: folders first, then files, newest first.
+  - Tap a file to see it. Pictures and text open by themselves. A video, or anything else, downloads when you tap **Download**, with its progress, and then plays.
+  - **Save to iPhone** opens the share sheet: *Save Video* or *Save Image* puts it in Photos, and *Save to Files* keeps anything. On a computer, **Save** downloads it.
+- A file the agent links to in the chat opens the same way, so you can save it too.
+- Downloads come in pieces, a few at a time, so the chat keeps flowing in between. iOS drops the connection when the app goes to the background; the download goes on where it stopped once the app is back. A file that changes on your computer while it downloads starts over. Files up to 1 GB.
+- Only the files in your session folders can be listed and downloaded, checked on your computer for every request. A link in a session folder that leads somewhere else does not open.
+- Tested:
+  - On a simulated iPhone (Safari's engine) and in Edge: Recent, Folders, a picture full screen, a README, the downloaded 40-second film playing, and the share sheet getting the film byte for byte.
+  - Live against VS Code 1.145: a session folder of about 4,000 folders searched for its newest files in 2 to 4 seconds, and a 29 MB render downloaded byte for byte in under 2 seconds, also through a Cloudflare tunnel. Files outside the session folders were refused.
+- **Updating:** this needs the new version on your computer. In VS Code, click **Update** in the Pocket Pilot panel, then **Restart extensions**; your agent sessions keep running. In the GitHub Copilot app, update the plugin on the Plugins page. The phone app updates itself, and until your computer is updated, Files says so.
+
 ## 0.7.21
 
 - **Review shows what's waiting, also in sub-agents.** The phone said *4 requests are waiting for you*, but Review did nothing. The requests were in a sub-agent: a chat the agent starts for part of its work, which the phone doesn't open. In the case reported, a research sub-agent had waited all night for a sign-in to GitHub's MCP server, and the agent with it. The sub-agents' requests now show at the end of the chat, under the sub-agent's name, and Review goes to them. You answer approvals and questions there like the agent's own.

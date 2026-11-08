@@ -10,6 +10,8 @@ import { pairWithHost, HostConnection } from '../pwa/js/net/host-connection.js';
 import { encodePairingFragment, createClientHello, SecureMessenger } from '../pwa/js/core/secure-channel.js';
 import { newSecret, codeAt, stepAt } from '../pwa/js/core/totp.js';
 import { AhpClient } from '../pwa/vendor/ahp/client/index.js';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { childUri, Download } from '../pwa/js/lib/files.js';
 
 const waitUntil = async (fn, ms = 3000) => {
   const end = Date.now() + ms;
@@ -659,5 +661,152 @@ test('devices removed by another window are detected and reported', async () => 
     assert.equal(leader.update('d1', { name: 'x' }), null, 'updates of removed devices must not resurrect them');
   } finally {
     leader.unwatch();
+  }
+});
+
+test('files: a paired phone lists, finds and downloads the files in session folders, in pieces, and nothing outside them', async () => {
+  const { isInFolder } = require('../extension/core/attachments.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-files-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-files-out-'));
+  fs.mkdirSync(path.join(dir, 'renders'));
+  const film = crypto.randomBytes(3 * 512 * 1024 + 12345);
+  fs.writeFileSync(path.join(dir, 'renders', 'promo final #1.mp4'), film);
+  fs.writeFileSync(path.join(dir, 'README.md'), '# Notes\n');
+  const old = new Date(Date.now() - 3600000);
+  fs.utimesSync(path.join(dir, 'README.md'), old, old);
+  fs.mkdirSync(path.join(dir, '.git'));
+  fs.writeFileSync(path.join(dir, '.git', 'HEAD'), 'ref');
+  fs.mkdirSync(path.join(dir, 'node_modules', 'pkg'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'node_modules', 'pkg', 'index.js'), 'x');
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'secret');
+  const root = pathToFileURL(dir).href;
+  const checked = [];
+  const isReadAllowed = (uri) => {
+    checked.push(uri);
+    try {
+      return isInFolder(fileURLToPath(String(uri)), dir);
+    } catch {
+      return false;
+    }
+  };
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { isReadAllowed } });
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    await ready;
+    assert.equal(conn.canBrowseFiles, true, 'the PC says it can');
+
+    const list = await conn.files('list', { uri: root });
+    assert.deepEqual(list.entries.map((e) => `${e.type}:${e.name}`).sort(), ['directory:.git', 'directory:node_modules', 'directory:renders', 'file:README.md']);
+    assert.equal(list.entries.find((e) => e.name === 'README.md').size, 8);
+    const recent = await conn.files('recent', { uri: root });
+    assert.deepEqual(recent.files.map((f) => f.path), ['renders/promo final #1.mp4', 'README.md'], 'newest first, without .git and node_modules');
+
+    const fileUri = childUri(childUri(root, 'renders'), 'promo final #1.mp4');
+    const st = await conn.files('stat', { uri: fileUri });
+    assert.deepEqual([st.type, st.size], ['file', film.length]);
+    // The phone's own download: a few pieces at a time through the encrypted channel, joined in order.
+    const d = new Download(conn, fileUri);
+    const finished = new Promise((resolve) => d.addEventListener('change', () => ['done', 'failed'].includes(d.state) && resolve()));
+    d.start();
+    await finished;
+    assert.equal(d.state, 'done', d.error?.message);
+    assert.ok(Buffer.from(await d.blob.arrayBuffer()).equals(film), 'the same file, byte for byte');
+
+    // Two downloads at once and a listing: more requests than the PC runs at a time, so some wait their turn.
+    const two = [new Download(conn, fileUri), new Download(conn, fileUri)];
+    const both = two.map((x) => new Promise((resolve) => x.addEventListener('change', () => ['done', 'failed'].includes(x.state) && resolve())));
+    two.forEach((x) => x.start());
+    const listed = conn.files('list', { uri: root });
+    await Promise.all(both);
+    assert.deepEqual(two.map((x) => x.state), ['done', 'done'], two.map((x) => x.error?.message).join());
+    assert.equal((await listed).entries.length, 4);
+
+    // A piece is at most 1 MB, however much is asked for.
+    const big = await conn.files('read', { uri: fileUri, offset: 0, length: 50 * 1024 * 1024 });
+    assert.equal(Buffer.from(big.data, 'base64').length, 1024 * 1024);
+
+    // Nothing outside the session folders, however it is asked for.
+    const secret = pathToFileURL(path.join(outside, 'secret.txt')).href;
+    await assert.rejects(conn.files('read', { uri: secret, offset: 0, length: 10 }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('list', { uri: pathToFileURL(outside).href }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('recent', { uri: pathToFileURL(os.tmpdir()).href }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('read', { uri: `${root}/../${path.basename(outside)}/secret.txt`, offset: 0, length: 10 }), (e) => e.code === 'denied', '.. is resolved before the check');
+    await assert.rejects(conn.files('read', { uri: `${root}/..%2F${path.basename(outside)}%2Fsecret.txt`, offset: 0, length: 10 }), (e) => e.code === 'invalid');
+    assert.ok(checked.every((u) => !u.includes('..')), 'the check sees the address as read');
+    await assert.rejects(conn.files('read', { uri: 'https://example.com/x', offset: 0 }), (e) => e.code === 'invalid');
+    await assert.rejects(conn.files('read', { uri: fileUri, offset: -1 }), (e) => e.code === 'invalid');
+    await assert.rejects(conn.files('stat', { uri: childUri(root, 'gone.txt') }), (e) => e.code === 'not-found');
+    await assert.rejects(conn.files('fly', { uri: root }), (e) => e.code === 'unsupported');
+
+    // A link in the session folder that leads outside it: listed by the folder, but not opened.
+    fs.symlinkSync(outside, path.join(dir, 'link'), 'junction');
+    assert.ok((await conn.files('list', { uri: root })).entries.some((e) => e.name === 'link'));
+    await assert.rejects(conn.files('list', { uri: childUri(root, 'link') }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('read', { uri: childUri(childUri(root, 'link'), 'secret.txt'), offset: 0, length: 10 }), (e) => e.code === 'denied');
+    assert.ok(!(await conn.files('recent', { uri: root })).files.some((f) => f.name === 'secret.txt'), 'Recent does not follow it');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('files: a PC without read access says so in its welcome and refuses file requests', async () => {
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { isReadAllowed: undefined } });
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    await ready;
+    assert.equal(conn.canBrowseFiles, false);
+    await assert.rejects(conn.files('list', { uri: pathToFileURL(os.tmpdir()).href }), (e) => e.code === 'unsupported');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
+test('files: a session folder reached through a link works, and its links lead nowhere else', async () => {
+  const { isInFolder } = require('../extension/core/attachments.js');
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-files-real-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-files-out-'));
+  const alias = path.join(os.tmpdir(), `pp-files-alias-${crypto.randomBytes(4).toString('hex')}`);
+  fs.writeFileSync(path.join(real, 'README.md'), '# Notes\n');
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'secret');
+  fs.symlinkSync(real, alias, 'junction');
+  // The session's folder is the link (like /tmp on a Mac, which is /private/tmp).
+  const isReadAllowed = (uri) => {
+    try {
+      return isInFolder(fileURLToPath(String(uri)), alias);
+    } catch {
+      return false;
+    }
+  };
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { isReadAllowed } });
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    await ready;
+    const root = pathToFileURL(alias).href;
+    assert.deepEqual((await conn.files('list', { uri: root })).entries.map((e) => e.name), ['README.md']);
+    const piece = await conn.files('read', { uri: childUri(root, 'README.md'), offset: 0, length: 100 });
+    assert.equal(Buffer.from(piece.data, 'base64').toString(), '# Notes\n');
+    await assert.rejects(conn.files('read', { uri: pathToFileURL(path.join(outside, 'secret.txt')).href, offset: 0, length: 10 }), (e) => e.code === 'denied');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+    fs.rmSync(alias, { recursive: false, force: true });
+    fs.rmSync(real, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
   }
 });

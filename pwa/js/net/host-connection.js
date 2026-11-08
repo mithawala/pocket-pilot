@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.7.21';
+export const APP_VERSION = '0.8.0';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 // A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and
@@ -410,8 +410,8 @@ export class HostConnection extends EventTarget {
       this.stopped = true;
       this._setState('unpaired', 'This device was removed on your computer.');
     }
-    if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong') {
-      const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t;
+    if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong' || m.t === 'files.result') {
+      const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t === 'files.result' ? `files:${m.id}` : m.t;
       const p = this._pending.get(key);
       if (p) {
         this._pending.delete(key);
@@ -510,6 +510,28 @@ export class HostConnection extends EventTarget {
     const id = `${Date.now()}-${++this._seq}`;
     const r = await this._request(`upload:${id}`, { t: 'upload', id, session, name, mime, data }, 180000);
     if (!r.ok) throw new Error(r.error || 'Upload failed');
+    return r;
+  }
+
+  /** Whether the PC lets this device browse and download the files in its session folders. */
+  get canBrowseFiles() {
+    return !!this.welcome?.files;
+  }
+
+  /**
+   * Files in the PC's session folders (`files` messages): op `list`, `stat`, `read` or `recent`, with
+   * the file's `uri`. Rejects with the PC's reason and its `code` (`not-found`, `denied`, …).
+   */
+  async files(op, params = {}, timeoutMs = 60000) {
+    const id = `${Date.now()}-${++this._seq}`;
+    let r;
+    try {
+      r = await this._request(`files:${id}`, { t: 'files', id, op, ...params }, timeoutMs);
+    } catch (err) {
+      const timeout = err?.message === 'Timed out';
+      throw Object.assign(new Error(timeout ? 'Your computer took too long to answer' : 'Not connected to your computer'), { code: timeout ? 'timeout' : 'offline' });
+    }
+    if (!r.ok) throw Object.assign(new Error(r.error === 'disconnected' ? 'The connection to your computer dropped' : r.error || 'Your computer could not read this'), { code: r.error === 'disconnected' ? 'offline' : r.code || 'error' });
     return r;
   }
 

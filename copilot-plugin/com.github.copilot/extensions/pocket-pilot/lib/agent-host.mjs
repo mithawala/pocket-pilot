@@ -133,6 +133,23 @@ export function isInside(child, parent) {
   return rel === '' || (!!rel && !rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
+// Where session folders really are on disk (links resolved), looked up at most once a minute.
+const realDirs = new Map();
+function realDir(dir) {
+  const hit = realDirs.get(dir);
+  if (hit && Date.now() - hit.at < 60000) return hit.real;
+  let real = dir;
+  try {
+    real = fs.realpathSync.native(dir);
+  } catch {
+    /* gone */
+  }
+  realDirs.delete(dir);
+  realDirs.set(dir, { real, at: Date.now() });
+  if (realDirs.size > 500) realDirs.delete(realDirs.keys().next().value);
+  return real;
+}
+
 /** The in-process pipe the relay and the notification monitor use instead of a WebSocket. */
 class Pipe extends EventEmitter {
   constructor(deliver, onClose) {
@@ -192,12 +209,15 @@ export class CopilotAgentHost extends EventEmitter {
     return [...this.sessions.values()].map((e) => e.cwd).filter(Boolean);
   }
 
-  /** Whether a paired device may read this local file: inside a session folder, or attached to a message. */
+  /**
+   * Whether a paired device may read this local file: inside a session folder (by its address, or where
+   * the folder really is when it's reached through a link), or attached to a message.
+   */
   canRead(file) {
     const abs = path.resolve(String(file));
     const key = fileKey(abs);
     if ([...this.sessions.values()].some((e) => e.translator?.files?.has(key))) return true;
-    return this.workingDirectories().some((d) => isInside(abs, path.resolve(d)));
+    return this.workingDirectories().some((d) => isInside(abs, path.resolve(d)) || isInside(abs, realDir(path.resolve(d))));
   }
 
   setModels(list) {

@@ -265,6 +265,40 @@ a.btn { text-decoration: none; }
 .thumbs.xs .thumb > svg { width: 14px; height: 14px; }
 .file-img { display: block; width: 100%; padding: 0; background: var(--bg-3); border-radius: 6px; cursor: zoom-in; }
 .file-img img { display: block; max-width: 100%; max-height: 60vh; margin: 0 auto; }
+/* Files: Recent and Folders, and a page per file with its preview, the download and Save. */
+.files-bar { gap: 8px; margin: 2px 0 10px; }
+.files-bar .icon-btn { width: 38px; height: 38px; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
+.crumb { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.crumb .sep { margin: 0 3px; opacity: 0.6; }
+.crumb button { padding: 4px 3px; color: var(--accent); border-radius: 4px; }
+.crumb b { padding: 4px 3px; font-weight: 600; color: var(--strong); overflow-wrap: anywhere; }
+.file-list { display: grid; gap: 1px; }
+.file-row { align-items: center; }
+.file-row:disabled { opacity: 0.5; }
+.file-row .fr { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.file-row .fn { overflow-wrap: anywhere; line-height: 1.35; }
+.file-row .fm { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.file-note { padding: 10px 10px 4px; }
+.file-detail { display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.file-back { align-self: flex-start; margin-top: 2px; }
+.file-head { display: grid; gap: 3px; }
+.file-name { font-size: 16px; font-weight: 600; color: var(--strong); overflow-wrap: anywhere; line-height: 1.35; }
+.file-preview { min-width: 0; }
+.file-hero { display: grid; place-items: center; height: 150px; color: var(--muted); background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; }
+.file-hero svg { width: 46px; height: 46px; stroke-width: 1.4; }
+.file-hero.video svg, .file-hero.image svg { color: var(--accent); }
+.file-video { display: block; width: 100%; max-height: 60vh; background: #000; border-radius: 8px; }
+.file-audio { display: block; width: 100%; }
+.file-text pre { margin: 0; max-height: 55vh; }
+.file-actions { display: grid; gap: 8px; }
+.file-actions .errpart { margin: 0; }
+.file-hint { text-align: center; line-height: 1.4; }
+.file-wait { display: grid; place-items: center; min-height: 44px; }
+.dl { display: grid; gap: 8px; }
+.dl-bar { height: 6px; overflow: hidden; background: var(--bg-3); border: 1px solid var(--line); border-radius: 99px; }
+.dl-bar span { display: block; height: 100%; background: var(--btn); border-radius: 99px; transition: width 0.2s ease; }
+.dl-row { display: flex; align-items: center; gap: 10px; }
 .viewer { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; color: #fff; background: #000; animation: fade 0.15s ease; }
 .viewer-bar { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-top) + 6px) 10px 6px 16px; background: #000; }
 .viewer-title { flex: 1; min-width: 0; overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }

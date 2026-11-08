@@ -8,6 +8,7 @@ import { waitingOn, subagentAsks } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
 import { openPictures } from './viewer.js';
+import { FilesSheet, FileSheet } from './files.js';
 
 const PAGE = 25;
 
@@ -50,7 +51,7 @@ function FileViewer({ store, uri, onClose }) {
   </${Sheet}>`;
 }
 
-function SessionMenu({ open, onClose, store, uri, session, onDeleted }) {
+function SessionMenu({ open, onClose, store, uri, session, onDeleted, onFiles }) {
   const [name, setName] = useState('');
   useEffect(() => setName(session?.title || ''), [open]);
   return html`<${Sheet} open=${open} onClose=${onClose} title="Session">
@@ -60,7 +61,8 @@ function SessionMenu({ open, onClose, store, uri, session, onDeleted }) {
         <button class="btn sm" onClick=${() => { store.rename(uri, name.trim()); onClose(); }} disabled=${!name.trim()}>Rename</button></div>
       </div>
       <div class="kv">${(session?.workingDirectories || []).map(filePath).join('\n')}</div>
-      <button class="btn block" onClick=${() => { store.archive(uri, true); onClose(); onDeleted(); }}><${Icon} name="folder" /> Archive</button>
+      <button class="btn block" onClick=${() => { onClose(); onFiles(); }}><${Icon} name="folder" /> Files</button>
+      <button class="btn block" onClick=${() => { store.archive(uri, true); onClose(); onDeleted(); }}><${Icon} name="archive" /> Archive</button>
       <button class="btn block danger" onClick=${async () => {
         if (!confirm('Delete this session on your computer? This cannot be undone.')) return;
         try {
@@ -80,6 +82,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
   const [menu, setMenu] = useState(false);
+  const [files, setFiles] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
   const scrollRef = useRef(null);
   const contentRef = useRef(null);
@@ -198,6 +201,8 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const hidden = turns.length - visible.length;
   const title = session?.title || chatState?.title || 'Session';
   const folder = folderName(session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0]);
+  // The session's folder on the PC, where Files starts.
+  const root = session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0] || null;
   const empty = chatState && !turns.length && !active && !localPending.length;
 
   return html`<div class="screen">
@@ -241,7 +246,10 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
       ${!atBottom && chatState && html`<button class="jump" onClick=${() => { stick.current = true; pin(true); }} aria-label="Scroll to the latest message"><${Icon} name="arrow-down" /></button>`}
     </div>
     ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} autoFocus=${embedded} />`}
-    <${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />
-    <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} />
+    ${conn?.canBrowseFiles
+      ? html`<${FileSheet} conn=${conn} uri=${fileUri} root=${root} onClose=${() => setFileUri(null)} />`
+      : html`<${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />`}
+    <${FilesSheet} open=${files} onClose=${() => setFiles(false)} conn=${conn} root=${root} host=${hostApp(conn?.record)} />
+    <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} onFiles=${() => setFiles(true)} />
   </div>`;
 }

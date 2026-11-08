@@ -106,8 +106,10 @@ function cacheKey(att) {
 /**
  * Loads a picture attachment and resolves to `{ url, type, size }` with a blob: URL for <img>.
  * `read(uri)` fetches a `resource` from the PC (resourceRead with base64). Results are cached.
+ * A picture already downloaded (`{ type: 'url', url }`, from the files page) is shown as it is.
  */
 export function loadPicture(att, read) {
+  if (att?.type === 'url') return Promise.resolve({ url: att.url, type: att.contentType || '', size: att.size || 0 });
   const key = cacheKey(att);
   const hit = cache.get(key);
   if (hit) {

@@ -74,6 +74,74 @@ function folder(name) {
   return `file:///c%3A/Users/you/code/${name}`;
 }
 
+// The files in every demo project, for Files: path → minutes since it changed, and its bytes (none for a
+// folder). The film is the one on the product page (a real video the phone can play and save).
+const encode = (s) => new TextEncoder().encode(s);
+let film = null;
+function demoFilm() {
+  film ||= (async () => {
+    const r = await fetch(new URL('../video/pocket-pilot-in-sync.mp4', location.href));
+    if (!r.ok) throw new Error(String(r.status));
+    return new Uint8Array(await r.arrayBuffer());
+  })().catch(() => {
+    // Not served next to the app (local development): something to download anyway.
+    const b = new Uint8Array(1500000);
+    for (let i = 0; i < b.length; i++) b[i] = (i * 2654435761) >>> 24;
+    return b;
+  });
+  return film;
+}
+const DEMO_FILES = {
+  renders: { min: 4 },
+  'renders/launch-film.mp4': { min: 4, bytes: demoFilm },
+  screenshots: { min: 11 },
+  'screenshots/settings-before.svg': { min: 11, bytes: async () => encode(settingsScreenshot()) },
+  src: { min: 14 },
+  'src/settings': { min: 14 },
+  'src/settings/ThemeToggle.tsx': { min: 14, bytes: async () => encode("import { useEffect, useState } from 'react';\n\nexport function ThemeToggle() {\n  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');\n  useEffect(() => {\n    document.documentElement.dataset.theme = dark ? 'dark' : 'light';\n    localStorage.setItem('theme', dark ? 'dark' : 'light');\n  }, [dark]);\n  return <Switch label=\"Dark mode\" checked={dark} onChange={setDark} />;\n}\n") },
+  'README.md': { min: 60 * 50, bytes: async () => encode('# acme-web\n\nThe Acme storefront.\n\n- `npm run dev` starts it on http://localhost:5173\n- `npm test` runs the unit tests\n') },
+};
+const demoPath = (uri) => /^file:\/\/\/c%3A\/Users\/you\/code\/[^/]+(?:\/(.*))?$/.exec(String(uri).replace(/\/+$/, ''));
+const toBase64 = (bytes) => {
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  return btoa(s);
+};
+
+/** The demo's answers to `files` requests (see HostConnection.files). */
+async function demoFiles(op, { uri, offset = 0, length = 0, limit = 100 } = {}) {
+  const m = demoPath(uri);
+  if (!m) throw Object.assign(new Error('Only the files in your session folders can be opened'), { code: 'denied' });
+  const rel = m[1] ? decodeURIComponent(m[1]) : '';
+  const mtime = (min) => now - min * 60000;
+  // Files the demo chats link to but Files doesn't list: some code, as before.
+  if (rel && !DEMO_FILES[rel] && /\.\w+$/.test(rel) && op !== 'list') {
+    DEMO_FILES[rel] = { min: 20, hidden: true, bytes: async () => encode(`// ${rel.split('/').pop()}\n// (demo) The real app shows the file from your computer here.\nexport function example() {\n  return 42;\n}\n`) };
+  }
+  const info = async (p) => {
+    const f = DEMO_FILES[p];
+    return f.bytes ? { type: 'file', size: (await f.bytes()).length, mtime: mtime(f.min) } : { type: 'directory', size: 0, mtime: mtime(f.min) };
+  };
+  await new Promise((r) => setTimeout(r, 120));
+  if (rel && !DEMO_FILES[rel]) throw Object.assign(new Error('This is no longer on your computer'), { code: 'not-found' });
+  if (op === 'stat') return { ok: true, ...(rel ? await info(rel) : { type: 'directory', size: 0, mtime: mtime(4) }) };
+  if (op === 'list') {
+    const kids = Object.keys(DEMO_FILES).filter((p) => !DEMO_FILES[p].hidden && p.slice(0, p.lastIndexOf('/') + 1) === (rel ? `${rel}/` : '') && p !== rel);
+    return { ok: true, entries: await Promise.all(kids.map(async (p) => ({ name: p.split('/').pop(), ...(await info(p)) }))), truncated: false };
+  }
+  if (op === 'recent') {
+    const files = await Promise.all(Object.keys(DEMO_FILES).filter((p) => DEMO_FILES[p].bytes && !DEMO_FILES[p].hidden && (!rel || p.startsWith(`${rel}/`))).map(async (p) => ({ path: rel ? p.slice(rel.length + 1) : p, name: p.split('/').pop(), ...(await info(p)) })));
+    return { ok: true, files: files.sort((a, b) => b.mtime - a.mtime).slice(0, limit), truncated: false };
+  }
+  if (op === 'read') {
+    if (!DEMO_FILES[rel]?.bytes) throw Object.assign(new Error('This is a folder'), { code: 'not-a-file' });
+    const bytes = await DEMO_FILES[rel].bytes();
+    return { ok: true, data: toBase64(bytes.subarray(offset, offset + length)), size: bytes.length, mtime: mtime(DEMO_FILES[rel].min) };
+  }
+  throw Object.assign(new Error('Unknown file request'), { code: 'unsupported' });
+}
+
 const CHANGES = {
   auth: { additions: 214, deletions: 87, files: 12 },
   dark: { additions: 96, deletions: 4, files: 3 },
@@ -208,6 +276,12 @@ class DemoConnection extends EventTarget {
   async sendControl() {}
   async upload({ name }) {
     return { ok: true, path: `C:\\Users\\you\\code\\.pocket-pilot\\uploads\\${name}` };
+  }
+  get canBrowseFiles() {
+    return true;
+  }
+  files(op, params) {
+    return demoFiles(op, params);
   }
   async subscribePush() {
     return { ok: false, error: 'Notifications are not available in the demo' };

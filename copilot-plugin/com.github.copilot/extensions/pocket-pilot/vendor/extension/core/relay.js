@@ -12,6 +12,8 @@ const push = require('./push');
 const { slimForPhone } = require('./slim');
 const { deviceIdFor } = require('./store');
 const { loadSecureChannel, loadTotp } = require('./identity');
+const files = require('./files');
+const { fileURLToPath, pathToFileURL } = require('url');
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
 
@@ -32,6 +34,20 @@ const ALLOWED_REQUESTS = new Set([
   'resourceList', 'resourceResolve', 'resourceRead',
 ]);
 const ALLOWED_NOTIFICATIONS = new Set(['unsubscribe', 'dispatchAction']);
+
+// File requests one device may have running at once (a download asks for a few pieces ahead), and
+// waiting for their turn (two downloads at once).
+const MAX_FILE_OPS = 8;
+const MAX_FILE_WAITING = 64;
+// What the phone is told when the PC can't read something, by Node's error code.
+const FILE_ERRORS = {
+  ENOENT: ['not-found', 'This is no longer on your computer'],
+  ENOTDIR: ['not-found', 'This folder is no longer on your computer'],
+  EACCES: ['os-denied', "Your computer doesn't allow reading this"],
+  EPERM: ['os-denied', "Your computer doesn't allow reading this"],
+  EBUSY: ['busy', 'This file is in use on your computer'],
+  EISDIR: ['not-a-file', 'This is a folder'],
+};
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -484,6 +500,8 @@ class DeviceConnection extends EventEmitter {
       host: { id: o.identity.hostId, name: o.identity.name },
       passkey: !!fresh.passkey,
       factor: fresh.passkey ? 'passkey' : fresh.totp ? 'totp' : null,
+      // Browsing and downloading the files in session folders (version of the `files` messages).
+      ...(o.isReadAllowed ? { files: 1 } : {}),
       ...extras,
     });
     this.log('info', `Device "${fresh.name}" connected from ${this.meta.ip}`);
@@ -884,9 +902,91 @@ class DeviceConnection extends EventEmitter {
         this.relay.emit('device-removed', this.device.id);
         this.close(4401, 'Device forgotten');
         break;
+      case 'files':
+        // Not awaited: a long search or a download must not hold up the chat.
+        this._files(m).catch((err) => this.log('warn', `File request failed: ${err?.message || err}`));
+        break;
       default:
         break;
     }
+  }
+
+  /**
+   * Browsing and downloading files (`files` messages): `list` a folder, `stat` one entry, `read` a piece
+   * of a file, or find the `recent` files under a folder. Only inside the folders a device may read,
+   * like `resourceRead`. Answers with a `files.result` carrying the same id.
+   */
+  async _files(m) {
+    const { o } = this.relay;
+    const reply = (r) => this.sendControl({ t: 'files.result', id: m.id, ...r }).catch(() => {});
+    const fail = (code, error) => reply({ ok: false, code, error });
+    if (typeof m.id !== 'string' || m.id.length > 80) return;
+    if (!o.isReadAllowed) return fail('unsupported', 'Browsing files is not available');
+    if ((this.fileQueue?.length || 0) >= MAX_FILE_WAITING) return fail('busy', 'Too many requests at once');
+    const uri = typeof m.uri === 'string' ? m.uri : '';
+    let p;
+    try {
+      p = fileURLToPath(uri);
+    } catch {
+      return fail('invalid', 'Not a file on this computer');
+    }
+    // The address as read (`..` resolved), not as sent.
+    if (!o.isReadAllowed(pathToFileURL(p).href)) return fail('denied', 'Only the files in your session folders can be opened');
+    // A link in a session folder may point anywhere: where it leads must be allowed too.
+    let real = null;
+    try {
+      real = await fs.promises.realpath(p);
+    } catch {
+      /* not there: the request says so itself */
+    }
+    if (real && real !== p && !o.isReadAllowed(pathToFileURL(real).href)) return fail('denied', 'Only the files in your session folders can be opened');
+    await this._fileSlot();
+    if (this.state === 'closed') return this._fileDone();
+    try {
+      switch (m.op) {
+        case 'list':
+          return await reply({ ok: true, ...(await files.listFolder(p)) });
+        case 'stat':
+          return await reply({ ok: true, ...(await files.statPath(p)) });
+        case 'recent': {
+          const limit = Number.isInteger(m.limit) ? Math.min(200, Math.max(1, m.limit)) : 100;
+          return await reply({ ok: true, ...(await files.newestFiles(p, { limit })) });
+        }
+        case 'read': {
+          const offset = m.offset;
+          const length = Number.isInteger(m.length) ? m.length : files.MAX_CHUNK;
+          if (!Number.isSafeInteger(offset) || offset < 0 || length < 1) return await fail('invalid', 'Invalid range');
+          const r = await files.readPiece(p, offset, length);
+          if (offset === 0) this.log('info', `Device "${this.device?.name}" is downloading ${p} (${r.size} bytes)`);
+          return await reply({ ok: true, data: r.data.toString('base64'), size: r.size, mtime: r.mtime });
+        }
+        default:
+          return await fail('unsupported', `Unknown file request: ${String(m.op).slice(0, 20)}`);
+      }
+    } catch (err) {
+      const [code, message] = FILE_ERRORS[err?.code] || ['error', err?.message || 'Could not read this'];
+      return fail(code, message);
+    } finally {
+      this._fileDone();
+    }
+  }
+
+  /** Waits for one of the MAX_FILE_OPS places for a file request of this device. */
+  _fileSlot() {
+    this.fileOps ||= 0;
+    if (this.fileOps < MAX_FILE_OPS) {
+      this.fileOps++;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => (this.fileQueue ||= []).push(() => {
+      this.fileOps++;
+      resolve();
+    }));
+  }
+
+  _fileDone() {
+    this.fileOps--;
+    this.fileQueue?.shift()?.();
   }
 
   // ---------------------------------------------------------- lifecycle

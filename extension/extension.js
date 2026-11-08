@@ -10,7 +10,7 @@ const identityLib = require('./core/identity');
 const agentHost = require('./core/agentHost');
 const { cmpVersion } = agentHost;
 const { SessionMonitor } = require('./core/monitor');
-const { isSessionAttachment } = require('./core/attachments');
+const { isSessionAttachment, isInFolder } = require('./core/attachments');
 const { PersistentTunnel } = require('./core/tunnel');
 const { GistRendezvous } = require('./core/rendezvous');
 const { SharedState } = require('./shared');
@@ -825,7 +825,7 @@ class PocketPilotService {
     if (isSessionAttachment(p, this.userData, this.monitor.sessions.keys())) return true;
     return this.monitor.workingDirectories().some((d) => {
       try {
-        return isInside(p, vscode.Uri.parse(d).fsPath);
+        return isInFolder(p, vscode.Uri.parse(d).fsPath);
       } catch {
         return false;
       }
