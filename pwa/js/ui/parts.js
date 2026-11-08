@@ -3,7 +3,7 @@ import { html, Component, useState, useEffect, useRef } from '../lib/ui.js';
 import { renderMarkdown, renderInline, mdPlain, mdOf } from '../lib/markdown.js';
 import { highlightElement, rawLanguage } from '../lib/highlight.js';
 import { duration, haptic, providerLabel } from '../lib/format.js';
-import { openAsks, mcpServer } from '../lib/asks.js';
+import { openAsks, signInKey, serverName } from '../lib/asks.js';
 import { splitAttachments } from '../lib/attachments.js';
 import { Icon, Spinner, Switch, toast } from './common.js';
 import { Thumbs } from './viewer.js';
@@ -192,13 +192,34 @@ function ResultConfirmCard({ tc, turnId, ctx }) {
   </div>`;
 }
 
-/** An MCP tool paused on a sign-in, which only the PC can do. */
-function AuthCard({ tc, ctx }) {
-  const server = tc._meta?.mcpServerName || (mcpServer(tc) ? String(mcpServer(tc)).split(':').pop() : '') || tc.displayName || tc.toolName;
-  const tool = tc._meta?.mcpToolName;
+/**
+ * An MCP server waiting for a sign-in, which only the PC can do: one card per server, however many
+ * calls wait on it. Continue without signing in skips those calls (VS Code's Cancel), so the agent
+ * goes on without that server.
+ */
+function SignInCard({ tc, calls = 1, who = 'The agent', ctx }) {
+  const [busy, setBusy] = useState(false);
+  const server = serverName(tc);
+  // The card goes once the PC confirms; if it doesn't, the button works again.
+  useEffect(() => {
+    if (!busy) return undefined;
+    const t = setTimeout(() => setBusy(false), 10000);
+    return () => clearTimeout(t);
+  }, [busy]);
+  const skip = () => {
+    setBusy(true);
+    haptic(15);
+    try {
+      ctx.store.skipSignIn(ctx.sessionUri, signInKey(tc));
+    } catch (err) {
+      setBusy(false);
+      toast(err.message, 'err');
+    }
+  };
   return html`<div class="confirm info">
-    <div class="ch"><${Icon} name="key" /><span>Sign in to ${server} on your computer</span></div>
-    <div class="cm muted small">The agent is paused until you do${tool ? `, so it can use ${tool}` : ''}. Sign in from this chat in ${ctx.host || 'VS Code'}, or stop the agent to go on without it.</div>
+    <div class="ch"><${Icon} name="key" /><span>Sign in to ${server}</span></div>
+    <div class="cm">${who} ${/^These /.test(who) ? 'are' : 'is'} paused until you sign in${calls > 1 ? ` (${calls} calls are waiting)` : ''}. You can sign in only on your computer, in ${ctx.host || 'VS Code'}. Or continue without it: the agent goes on without ${server}.</div>
+    <div class="actions"><button class="btn" disabled=${busy} onClick=${skip}>Continue without signing in</button></div>
   </div>`;
 }
 
@@ -326,6 +347,10 @@ function answerText(part) {
 function Parts({ parts, turnId, active, ctx, retry, open }) {
   const grouped = groupParts(parts, open);
   const lastIdx = grouped.length - 1;
+  // One sign-in card per MCP server: one sign-in (or skipping it) settles every call waiting on it.
+  const signIns = new Map();
+  for (const p of open) if (p.toolCall?.status === 'auth-required') signIns.set(signInKey(p.toolCall), (signIns.get(signInKey(p.toolCall)) || 0) + 1);
+  const shownSignIns = new Set();
   return grouped.map((p, i) => {
     const live = active && i === lastIdx;
     switch (p.kind) {
@@ -339,7 +364,9 @@ function Parts({ parts, turnId, active, ctx, retry, open }) {
         // Only open requests get here (see groupParts).
         if (p.toolCall.status === 'pending-confirmation') return html`<${ConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />`;
         if (p.toolCall.status === 'pending-result-confirmation') return html`<${ResultConfirmCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} turnId=${turnId} ctx=${ctx} />`;
-        return html`<${AuthCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} ctx=${ctx} />`;
+        if (shownSignIns.has(signInKey(p.toolCall))) return null;
+        shownSignIns.add(signInKey(p.toolCall));
+        return html`<${SignInCard} key=${p.toolCall.toolCallId} tc=${p.toolCall} calls=${signIns.get(signInKey(p.toolCall))} ctx=${ctx} />`;
       case 'inputRequest':
         if (open.has(p)) return html`<${InputRequestCard} key=${p.request.id} request=${p.request} ctx=${ctx} />`;
         if (!p.response && active) {
@@ -413,4 +440,33 @@ export class Turn extends Component {
 
 export function PendingTurn({ message, read }) {
   return html`<div class="turn"><${UserMessage} message=${message} pending=${true} read=${read} /><div class="activity-line"><${Spinner} /><span class="shimmer">Sending…</span></div></div>`;
+}
+
+/**
+ * What the session's sub-agents wait on (see subagentAsks): this app doesn't load their chats, so their
+ * requests come at the end of the chat, each labeled with its sub-agent, and the answer goes to that
+ * sub-agent's chat. `titles` maps a chat to its title.
+ */
+export function SubagentRequests({ cards, titles, ctx }) {
+  if (!cards.length) return null;
+  const from = (chat) => titles.get(chat) || 'Sub-agent';
+  return html`<div class="sub-asks">${cards.map((c) => {
+    if (c.kind === 'signIn') {
+      const chats = [...new Set(c.calls.map((r) => r.chat))];
+      return html`<div class="sub-ask" key=${c.key}>
+        <div class="sub-from"><${Icon} name="branch" /><span>${chats.length === 1 ? from(chats[0]) : `${chats.length} sub-agents`}</span></div>
+        <${SignInCard} tc=${c.calls[0].toolCall} calls=${c.calls.length} who=${chats.length === 1 ? 'This sub-agent' : 'These sub-agents'} ctx=${ctx} />
+      </div>`;
+    }
+    const sub = { ...ctx, chat: c.entry.chat };
+    const tc = c.entry.toolCall;
+    return html`<div class="sub-ask" key=${c.key}>
+      <div class="sub-from"><${Icon} name="branch" /><span>${from(c.entry.chat)}</span></div>
+      ${c.kind === 'question'
+        ? html`<${InputRequestCard} request=${c.entry.request} ctx=${sub} />`
+        : tc.status === 'pending-result-confirmation'
+          ? html`<${ResultConfirmCard} tc=${tc} turnId=${c.entry.turnId} ctx=${sub} />`
+          : html`<${ConfirmCard} tc=${tc} turnId=${c.entry.turnId} ctx=${sub} />`}
+    </div>`;
+  })}</div>`;
 }

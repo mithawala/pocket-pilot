@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openAsks, waitingOn, isAsk } from '../pwa/js/lib/asks.js';
+import { openAsks, waitingOn, isAsk, subagentAsks, serverName, signInKey } from '../pwa/js/lib/asks.js';
 import { createDemo } from '../pwa/js/demo/demo.js';
 import { S } from '../pwa/js/lib/format.js';
 
@@ -65,4 +65,48 @@ test('asks: "needs you" in the list and header follows the chat the app shows', 
   } finally {
     store.dispose();
   }
+});
+
+test('asks: a sign-in counts once per MCP server, however many calls and chats wait on it', () => {
+  const chat = 'ahp-chat://main';
+  const sub = 'ahp-chat://sub-agent';
+  const gh = (id) => tool(id, 'auth-required', mcp('github-mcp-server')).toolCall;
+  // As seen live: 4 searches in one sub-agent wait for the same sign-in.
+  const session = { inputNeeded: ['a', 'b', 'c', 'd'].map((id) => ({ id, kind: 'toolAuthentication', chat: sub, turnId: 's', toolCall: gh(id) })) };
+  const idle = { turns: [] };
+  assert.equal(waitingOn(session, chat, idle), 1);
+  assert.equal(waitingOn(session, chat, null), 1);
+  const active = (parts) => ({ activeTurn: { id: 't', responseParts: parts } });
+  assert.equal(waitingOn(session, chat, active([{ kind: 'toolCall', toolCall: gh('m') }, { kind: 'toolCall', toolCall: gh('n') }])), 1, 'the chat waits for the same sign-in');
+  const more = { inputNeeded: [...session.inputNeeded, { id: 'q', kind: 'chatInput', chat: sub, request: { id: 'q1' } }, { id: 'x', kind: 'toolConfirmation', chat: sub, turnId: 's', toolCall: { toolCallId: 'x', status: 'pending-confirmation' } }] };
+  assert.equal(waitingOn(more, chat, idle), 3, 'a sign-in, a question and an approval');
+});
+
+test('asks: the sub-agents\' requests become cards: each approval and question, and one sign-in per server', () => {
+  const chat = 'ahp-chat://main';
+  const sub = 'ahp-chat://sub-agent';
+  const gh = (id) => tool(id, 'auth-required', mcp('github-mcp-server')).toolCall;
+  const approval = { id: 'x', kind: 'toolConfirmation', chat: sub, turnId: 's', toolCall: { toolCallId: 'x', status: 'pending-confirmation' } };
+  const question = { id: 'q', kind: 'chatInput', chat: sub, request: { id: 'q1' } };
+  const session = { inputNeeded: [
+    ...['a', 'b'].map((id) => ({ id, kind: 'toolAuthentication', chat: sub, turnId: 's', toolCall: gh(id) })),
+    approval,
+    question,
+    { id: 'own', kind: 'toolConfirmation', chat, turnId: 't', toolCall: { toolCallId: 'own', status: 'pending-confirmation' } },
+    { id: 'run', kind: 'toolClientExecution', chat: sub, turnId: 's', toolCall: { toolCallId: 'run', status: 'running' } },
+  ] };
+  const cards = subagentAsks(session, chat, { turns: [] });
+  assert.deepEqual(cards.map((c) => c.kind), ['signIn', 'tool', 'question'], 'not the open chat\'s own request, nor a client-run tool');
+  assert.equal(cards[0].key, 'github-mcp-server');
+  assert.equal(cards[0].server, 'github-mcp-server');
+  assert.deepEqual(cards[0].calls.map((r) => r.toolCall.toolCallId), ['a', 'b']);
+  assert.equal(cards[1].entry, approval);
+  assert.equal(cards[2].entry, question);
+  // The chat shows that sign-in already (it waits for it too): not a second card.
+  const shown = subagentAsks(session, chat, { activeTurn: { id: 't', responseParts: [{ kind: 'toolCall', toolCall: gh('m') }] } });
+  assert.deepEqual(shown.map((c) => c.kind), ['tool', 'question']);
+  assert.deepEqual(subagentAsks(undefined, chat, null), []);
+  // The name people know the server by, when the sign-in says it.
+  assert.equal(serverName({ ...gh('a'), auth: { resource: { resource_name: 'GitHub MCP Server' } } }), 'GitHub MCP Server');
+  assert.equal(signInKey(gh('a')), 'github-mcp-server');
 });

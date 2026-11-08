@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.21
+
+- **Review shows what's waiting, also in sub-agents.** The phone said *4 requests are waiting for you*, but Review did nothing. The requests were in a sub-agent: a chat the agent starts for part of its work, which the phone doesn't open. In the case reported, a research sub-agent had waited all night for a sign-in to GitHub's MCP server, and the agent with it. The sub-agents' requests now show at the end of the chat, under the sub-agent's name, and Review goes to them. You answer approvals and questions there like the agent's own.
+- **Continue without signing in.** An MCP server such as GitHub's can ask you to sign in in the middle of a task, and only your computer can do that. The sign-in card says so and offers **Continue without signing in**: the calls waiting for it are skipped, as VS Code's Cancel does, and the agent goes on without that server. This works for a sign-in in the chat itself too, where the card used to say to stop the agent.
+- A sign-in counts once, however many calls wait for it: that chat now says *The agent is waiting for you* rather than *4 requests*.
+- If Review has nothing to show, it says where the request is.
+- Tested live against VS Code 1.144: a sub-agent's GitHub search waited for a sign-in, and its shell command for approval. Skipping the sign-in and approving the command with the phone app's code let the sub-agent finish, and the agent replied 17 seconds after the start.
+- **Updating:** the phone app updates itself, and that's all this needs.
+
 ## 0.7.20
 
 - **A steering message that doesn't get through can be sent now.** VS Code 1.144 holds back steering in some turns: a message stays under *Steering* until the agent finishes the turn, then runs as the next message, like a queued one. This happens when the turn itself was started by an earlier steering message, for example one sent while the agent waited for your answer. The bug is in VS Code's agent host, which VS Code's own chat window uses too, not in Pocket Pilot. When a steering message has waited 20 seconds, the phone now says the agent hasn't picked it up yet and offers **Stop and send**. This stops the current turn and sends the message as a new one, so the agent gets it right away. Normal steering keeps working as before, and you can still wait for the turn to end.

@@ -6,7 +6,7 @@ import { rootReducer, sessionReducer, chatReducer, compareProtocolVersions } fro
 import { PROTOCOL_VERSIONS } from '../core/protocol.js';
 import { TOO_LARGE } from '../net/host-connection.js';
 import { S, has, uuid, effectiveStatus } from '../lib/format.js';
-import { waitingOn } from '../lib/asks.js';
+import { waitingOn, signInKey, serverName } from '../lib/asks.js';
 
 const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
@@ -649,6 +649,33 @@ export class HostStore extends EventTarget {
 
   answerInput(chat, requestId, response, answers) {
     this._dispatch(chat, { type: 'chat/inputCompleted', requestId, response, ...(answers ? { answers } : {}) });
+  }
+
+  /**
+   * Lets the agent go on without an MCP server that waits for a sign-in only the computer can do. Every
+   * call waiting on it, in any of the session's chats (sub-agents too), ends as skipped, like VS Code's
+   * Cancel: that releases the sign-in the agent waits on. Returns how many calls it ended.
+   */
+  skipSignIn(sessionUri, key) {
+    const calls = new Map();
+    const add = (chat, turnId, tc) => {
+      if (tc?.status === 'auth-required' && signInKey(tc) === key) calls.set(`${chat}\0${tc.toolCallId}`, { chat, turnId, tc });
+    };
+    for (const r of this.sessionState.get(sessionUri)?.inputNeeded || []) if (r.kind === 'toolAuthentication') add(r.chat, r.turnId, r.toolCall);
+    const chat = this.chatFor(sessionUri);
+    const turn = chat ? this.chatState.get(chat)?.activeTurn : null;
+    for (const p of turn?.responseParts || []) if (p.kind === 'toolCall') add(chat, turn.id, p.toolCall);
+    if (!calls.size) throw new Error('Nothing is waiting for that sign-in anymore');
+    for (const { chat: c, turnId, tc } of calls.values()) {
+      const name = tc.displayName || tc.toolName;
+      this._dispatch(c, {
+        type: 'chat/toolCallComplete',
+        turnId,
+        toolCallId: tc.toolCallId,
+        result: { success: false, pastTenseMessage: `Skipped ${name}`, error: { message: `The user chose to continue without signing in to ${serverName(tc)}, so ${name} didn't run.`, code: 'cancelled' } },
+      });
+    }
+    return calls.size;
   }
 
   cancelTurn(chat) {

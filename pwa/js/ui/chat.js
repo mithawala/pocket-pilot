@@ -1,10 +1,10 @@
 import { html, useState, useEffect, useRef, useLayoutEffect, useChange } from '../lib/ui.js';
 import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
-import { Turn, PendingTurn } from './parts.js';
+import { Turn, PendingTurn, SubagentRequests } from './parts.js';
 import { Composer } from './composer.js';
 import { ConnectionBanner } from './sessions.js';
 import { statusOf, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
-import { waitingOn } from '../lib/asks.js';
+import { waitingOn, subagentAsks } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
 import { openPictures } from './viewer.js';
@@ -99,6 +99,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const ctx = {
     store,
     chat,
+    sessionUri: uri,
     provider,
     host: hostApp(conn?.record),
     readImage: (u) => store.readImage(u),
@@ -138,7 +139,8 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const turns = chatState?.turns || [];
   const active = chatState?.activeTurn;
   const localPending = [...store.localTurns.values()].filter((t) => t.chat === chat && !(active && active.message.text === t.message.text));
-  const signature = `${turns.length}:${active ? active.responseParts.length : 0}:${JSON.stringify(active?.responseParts?.[active.responseParts.length - 1] || '').length}:${localPending.length}`;
+  const subAsks = chatState ? subagentAsks(sessionState, chat, chatState) : [];
+  const signature = `${turns.length}:${active ? active.responseParts.length : 0}:${JSON.stringify(active?.responseParts?.[active.responseParts.length - 1] || '').length}:${localPending.length}:${subAsks.length}`;
 
   useLayoutEffect(() => {
     if (!chatState) return;
@@ -185,6 +187,13 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
 
   const status = statusOf(store.statusFor(session));
   const waiting = waitingOn(sessionState, chat, chatState);
+  // To the first request in the chat (the sub-agents' come at the end).
+  const review = () => {
+    const card = scrollRef.current?.querySelector('.confirm');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    else toast(chatState ? `It isn't shown here: open this session in ${hostApp(conn?.record)} on your computer.` : 'The conversation is still loading.');
+  };
+  const titles = new Map((sessionState?.chats || []).map((c) => [c.resource, c.title]));
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;
   const title = session?.title || chatState?.title || 'Session';
@@ -201,7 +210,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
       <button class="icon-btn" onClick=${() => setMenu(true)} aria-label="Session options"><${Icon} name="more" /></button>
       ${embedded && html`<button class="icon-btn" onClick=${onBack} aria-label="Close"><${Icon} name="x" /></button>`}
     </div>
-    ${waiting > 0 && html`<button class="banner warn" onClick=${() => scrollRef.current?.querySelector('.confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+    ${waiting > 0 && html`<button class="banner warn" onClick=${review}>
       <${Icon} name="alert-circle" /><span>${waiting === 1 ? 'The agent is waiting for you' : `${waiting} requests are waiting for you`}</span><span class="go">Review</span>
     </button>`}
     <${ConnectionBanner} conn=${conn} store=${store} onRepair=${onRepair} onScan=${onScan} />
@@ -221,6 +230,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
           ${visible.map((t) => html`<${Turn} key=${t.id} turn=${t} active=${false} isLast=${!active && t.id === lastTurnId} ctx=${ctx} />`)}
           ${active && html`<${Turn} key=${active.id} turn=${active} active=${true} activity=${chatState.activity || session?.activity} ctx=${ctx} />`}
           ${localPending.map((t, i) => html`<${PendingTurn} key=${`p${i}`} message=${t.message} read=${ctx.readImage} />`)}
+          <${SubagentRequests} cards=${subAsks} titles=${titles} ctx=${ctx} />
           ${empty && html`<div class="chat-empty">
             <div class="big"><${Icon} name="sparkle" /></div>
             <h2>${providerLabel(provider)} is ready</h2>

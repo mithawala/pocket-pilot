@@ -12,12 +12,12 @@ const CHAT = 'ahp-chat://default/s1';
  * request with an error instead; `listReply(n, answer)` decides when the n-th listSessions is answered
  * (VS Code sometimes takes minutes).
  */
-function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig, chatExtra } = {}) {
+function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig, chatExtra, sessionExtra } = {}) {
   let seq = 100;
   const received = [];
   const subscriptions = new Set();
   const send = (m) => transport.send(m);
-  const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT, ...(sessionConfig ? { config: sessionConfig } : {}) };
+  const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT, ...(sessionConfig ? { config: sessionConfig } : {}), ...sessionExtra };
   const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [], ...(chatConfig ? { config: chatConfig } : {}), ...chatExtra };
   let lists = 0;
   (async () => {
@@ -368,5 +368,40 @@ test('Stop and send for a steering message the agent never took: removed, the tu
   assert.deepEqual(sent, ['chat/pendingMessageRemoved:steering:s1', 'chat/turnCancelled', 'chat/turnStarted'], 'removed first, so VS Code does not run it a second time');
   assert.deepEqual(store.pendingMessages(CHAT).map((m) => m.id), ['s0', 'q1'], 'the others stay');
   await assert.rejects(() => Promise.resolve().then(() => store.deliverSteeringNow(SESSION, CHAT, 's1')), /already sent/);
+  stop();
+});
+
+// A sub-agent waits for a GitHub MCP sign-in that only the computer can do (seen live: 4 searches, for
+// 10 hours). Continue without signing in ends every call waiting on that server, in every chat, as
+// VS Code's Cancel does, which releases the sign-in; other servers' sign-ins stay.
+test('Continue without signing in skips every call waiting on that MCP server, in the sub-agents too', async () => {
+  const SUB = 'ahp-chat:/sub1';
+  const mcpCall = (id, server = 'github-mcp-server') => ({ toolCallId: id, toolName: `${server}-search_repositories`, displayName: 'Search repositories', status: 'auth-required', contributor: { kind: 'mcp', customizationId: `mcp-top-level:copilotcli:s1:${server}` }, _meta: { mcpServerName: server }, auth: { reason: 'insufficientScope', resource: { resource: 'https://example.test/mcp', resource_name: 'GitHub MCP Server' } } });
+  const signIn = (chat, turnId, tc) => ({ id: `toolAuthentication:${chat}:${turnId}:${tc.toolCallId}`, kind: 'toolAuthentication', chat, turnId, toolCall: tc });
+  const sessionExtra = {
+    chats: [{ resource: CHAT, title: '', status: 8, modifiedAt: '' }, { resource: SUB, title: 'Research Wan2GP', status: 24, modifiedAt: '', origin: { kind: 'tool', chat: CHAT, toolCallId: 'task1' }, interactivity: 'read-only' }],
+    inputNeeded: [
+      ...['a', 'b', 'c', 'd'].map((id) => signIn(SUB, 'st', mcpCall(id))),
+      signIn(SUB, 'st', mcpCall('e', 'other-server')),
+      { id: 'toolConfirmation:sub', kind: 'toolConfirmation', chat: SUB, turnId: 'st', toolCall: { toolCallId: 'f', toolName: 'powershell', status: 'pending-confirmation' } },
+    ],
+  };
+  const chatExtra = { activeTurn: { id: 't1', startedAt: new Date().toISOString(), message: msg('go'), responseParts: [{ kind: 'toolCall', toolCall: mcpCall('m') }] } };
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { protocolVersion: '1.1.0', sessionExtra, chatExtra });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT) && store.sessionState.get(SESSION));
+  assert.equal(store.skipSignIn(SESSION, 'github-mcp-server'), 5, 'the 4 in the sub-agent and the 1 in the chat');
+  await until(() => dispatched(host).length === 5);
+  const sent = dispatched(host);
+  assert.deepEqual(sent.map((a) => `${a.channel === SUB ? 'sub' : 'chat'}:${a.turnId}:${a.toolCallId}`), ['sub:st:a', 'sub:st:b', 'sub:st:c', 'sub:st:d', 'chat:t1:m']);
+  for (const a of sent) {
+    assert.equal(a.type, 'chat/toolCallComplete');
+    assert.equal(a.result.success, false, 'only a failed result is allowed from auth-required');
+    assert.equal(a.result.error.code, 'cancelled');
+    assert.equal(a.result.pastTenseMessage, 'Skipped Search repositories');
+    assert.match(a.result.error.message, /continue without signing in to GitHub MCP Server/);
+  }
+  assert.throws(() => store.skipSignIn(SESSION, 'no-such-server'), /Nothing is waiting/);
   stop();
 });
