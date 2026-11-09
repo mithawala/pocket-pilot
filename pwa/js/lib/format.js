@@ -1,5 +1,11 @@
 export const S = { Idle: 1, Error: 2, InProgress: 8, Input: 16, IsRead: 32, IsArchived: 64 };
 export const has = (s, bit) => ((s || 0) & bit) === bit;
+export function isCompleted(summary) {
+  if (summary?.archived === true || has(summary?.status, S.IsArchived)) return true;
+  // VS Code reports finished tool chats as idle without archiving them.
+  return summary?.origin?.kind === 'tool' && has(summary.status, S.Idle)
+    && !(summary.status & (S.InProgress | S.Input | S.Error));
+}
 
 export function statusOf(status) {
   if (has(status, S.Input)) return { key: 'input', label: 'Needs you', tone: 'warn' };

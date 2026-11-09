@@ -3,9 +3,20 @@ import assert from 'node:assert/strict';
 import { InMemoryTransport } from '../pwa/vendor/ahp/client/index.js';
 import { HostStore } from '../pwa/js/model/host-store.js';
 import { TOO_LARGE } from '../pwa/js/net/host-connection.js';
+import { isCompleted, S } from '../pwa/js/lib/format.js';
 
 const SESSION = 'copilotcli:/s1';
 const CHAT = 'ahp-chat://default/s1';
+
+test('completed includes idle tool chats and archived chats, but preserves active and idle user chats', () => {
+  const tool = { origin: { kind: 'tool' } };
+  assert.equal(isCompleted({ ...tool, status: S.Idle | S.IsRead }), true);
+  for (const status of [S.InProgress, S.Input, S.Error]) {
+    assert.equal(isCompleted({ ...tool, status: S.Idle | status }), false);
+  }
+  assert.equal(isCompleted({ origin: { kind: 'user' }, status: S.Idle }), false);
+  assert.equal(isCompleted({ status: S.IsArchived }), true);
+});
 
 /**
  * Scripted AHP server on one half of an in-memory transport pair. `errorFor(request)` may answer a
@@ -105,6 +116,50 @@ test('loads sessions, subscribes session + default chat, applies live actions af
   host.push(CHAT, { type: 'chat/responsePart', turnId: 't1', part: { kind: 'markdown', id: 'p1', content: 'Hel' } });
   host.push(CHAT, { type: 'chat/delta', turnId: 't1', partId: 'p1', content: 'lo' });
   await until(() => store.chatState.get(CHAT).activeTurn?.responseParts?.[0]?.content === 'Hello');
+  stop();
+});
+
+test('nested chats can be opened and replied to, and removal returns to the main chat', async () => {
+  const nested = 'ahp-chat://side/s1';
+  const tool = 'ahp-chat://tool/s1';
+  const completed = 'ahp-chat://completed/s1';
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { sessionExtra: { chats: [
+    { resource: CHAT, title: 'Main', status: 1 },
+    { resource: nested, title: 'Review', status: 1, origin: { kind: 'sideChat' } },
+    { resource: tool, title: 'Worker', status: 1, origin: { kind: 'tool' }, interactivity: 'read-only' },
+    { resource: completed, title: 'Done', status: 97, origin: { kind: 'sideChat' } },
+    { resource: 'ahp-chat://hidden/s1', title: 'Internal', status: 1, origin: { kind: 'tool' }, interactivity: 'hidden' },
+  ] } });
+  await until(() => store.sessionsLoaded);
+  const closeCatalog = store.watchSessionCatalog(SESSION);
+  await until(() => store.sessionState.has(SESSION));
+  assert.deepEqual([...host.subscriptions], [SESSION]);
+  assert.deepEqual(store.sessionChats(SESSION).map((chat) => chat.resource), [CHAT, nested, tool, completed]);
+
+  let stop = store.watchSession(SESSION);
+  await until(() => store.chatState.has(CHAT));
+  closeCatalog();
+  assert.ok(host.subscriptions.has(SESSION));
+
+  stop();
+  stop = store.watchSession(SESSION, completed);
+  await until(() => store.chatState.has(completed));
+
+  stop();
+  stop = store.watchSession(SESSION, tool);
+  await until(() => store.chatState.has(tool));
+
+  stop();
+  stop = store.watchSession(SESSION, nested);
+  await until(() => store.chatState.has(nested));
+  assert.ok(!host.subscriptions.has(CHAT));
+  store.sendMessage(SESSION, { text: 'Review this change' });
+  await until(() => host.received.some((m) => m.method === 'dispatchAction'
+    && m.params.channel === nested && m.params.action.type === 'chat/turnStarted'));
+
+  host.push(SESSION, { type: 'session/chatRemoved', chat: nested });
+  await until(() => store.chatFor(SESSION) === CHAT && store.chatState.has(CHAT));
+  assert.ok(!host.subscriptions.has(nested));
   stop();
 });
 
@@ -266,6 +321,7 @@ test('a conversation that was opening when the agent host stopped is not opened 
   await until(() => store.sessionsLoaded && host2.received.some((m) => m.method === 'listSessions'));
   const opened = (h) => h.received.filter((m) => [SESSION, CHAT].includes(m.params?.channel) || (m.params?.subscriptions || m.params?.initialSubscriptions || []).some((c) => c === SESSION || c === CHAT));
   assert.deepEqual(opened(host2), []);
+  const closeCatalog = store.watchSessionCatalog(SESSION);
   // ...nor when its chat is shown again (the person goes back and opens it from the list).
   stop();
   const again = store.watchSession(SESSION);
@@ -278,6 +334,7 @@ test('a conversation that was opening when the agent host stopped is not opened 
   await until(() => store.chatState.get(CHAT));
   assert.equal(store.isStalled(SESSION), false);
   assert.equal(store.stalledText(SESSION), null);
+  closeCatalog();
   again();
 });
 

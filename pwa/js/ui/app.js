@@ -18,7 +18,10 @@ import { hostLabel, defaultHostLabel, cleanHostLabel } from '../lib/format.js';
 
 function parseRoute() {
   const h = location.hash.replace(/^#/, '');
-  if (h.startsWith('/s/')) return { name: 'chat', uri: decodeURIComponent(h.slice(3)) };
+  if (h.startsWith('/s/')) {
+    const [uri, chat] = h.slice(3).split('/');
+    return { name: 'chat', uri: decodeURIComponent(uri), chat: chat ? decodeURIComponent(chat) : null };
+  }
   if (h.startsWith('/open/')) {
     const [hostId, ...rest] = h.slice(6).split('/');
     return { name: 'open', hostId: decodeURIComponent(hostId), uri: decodeURIComponent(rest.join('/')) };
@@ -429,6 +432,9 @@ export function App({ app }) {
   const [scanning, setScanning] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const wide = useWide();
+  const openChat = (uri, chat) => {
+    location.hash = `#/s/${encodeURIComponent(uri)}${chat ? `/${encodeURIComponent(chat)}` : ''}`;
+  };
   // A scanned QR code or an opened pairing link: from a computer this device is paired with already, it
   // only tells the computer's address (connect there, no new pairing); otherwise pair.
   const startPairing = async (frag) => {
@@ -482,13 +488,13 @@ export function App({ app }) {
     // Desktop: the sessions list is a sidebar and the chat (or settings) fills the rest, like VS Code.
     const list = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
       pushPrompt=${app.pushPrompt()}
-      selected=${route.name === 'chat' ? route.uri : null} newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
-      onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
+      selected=${route.name === 'chat' ? route.uri : null} selectedChat=${route.chat} newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
+      onOpen=${openChat}
       onSettings=${() => { location.hash = '#/settings'; }}
       onSwitchHost=${() => setSwitcher(true)} onScan=${() => setScanning(true)} />`;
     let main;
     if (route.name === 'chat') {
-      main = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} embedded=${true} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => { location.hash = '#/'; }} />`;
+      main = html`<${ChatScreen} key=${route.chat || route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} requestedChat=${route.chat} embedded=${true} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => { location.hash = '#/'; }} />`;
     } else if (route.name === 'settings') {
       main = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => { location.hash = '#/'; }} onPairNew=${() => setScanning(true)} />`;
     } else {
@@ -498,12 +504,12 @@ export function App({ app }) {
   } else if (route.name === 'settings') {
     screen = html`<${SettingsScreen} app=${app} hosts=${app.hosts} current=${app.current} onBack=${() => history.length > 1 ? history.back() : (location.hash = '#/')} onPairNew=${() => setScanning(true)} />`;
   } else if (route.name === 'chat' && app.active) {
-    screen = html`<${ChatScreen} key=${route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => (history.length > 1 ? history.back() : (location.hash = '#/'))} />`;
+    screen = html`<${ChatScreen} key=${route.chat || route.uri} store=${app.active.store} conn=${app.active.conn} uri=${route.uri} requestedChat=${route.chat} onRepair=${() => app.repair(app.current)} onScan=${() => setScanning(true)} onBack=${() => (history.length > 1 ? history.back() : (location.hash = '#/'))} />`;
   } else if (app.active) {
     screen = html`<${SessionsScreen} app=${app} host=${app.current} store=${app.active.store} conn=${app.active.conn}
       pushPrompt=${app.pushPrompt()}
       newOpen=${newOpen} onNew=${() => setNewOpen(true)} onNewClose=${() => setNewOpen(false)}
-      onOpen=${(uri) => { location.hash = `#/s/${encodeURIComponent(uri)}`; }}
+      onOpen=${openChat}
       onSettings=${() => { location.hash = '#/settings'; }}
       onSwitchHost=${() => setSwitcher(true)} onScan=${() => setScanning(true)} />`;
   }

@@ -167,17 +167,19 @@ const CHANGES = {
 
 function sessionsData() {
   const list = [];
-  const add = (id, title, provider, dir, status, minutesAgo, activity, chat) => {
+  const add = (id, title, provider, dir, status, minutesAgo, activity, chat, children = []) => {
     const resource = `${provider}:/demo-${id}`;
     const chatUri = `ahp-chat://default/demo-${id}`;
+    const main = { resource: chatUri, title: '', status, modifiedAt: ago(minutesAgo) };
+    const nested = children.map(({ turns, activeTurn, ...summary }) => summary);
     list.push({
       summary: {
         resource, provider, title, status, createdAt: ago(minutesAgo + 30), modifiedAt: ago(minutesAgo), workingDirectories: [folder(dir)], activity,
         project: { uri: folder(dir), displayName: dir }, ...(CHANGES[id] ? { changes: CHANGES[id] } : {}),
+        ...(nested.length ? { defaultChat: chatUri, chats: [main, ...nested.filter((entry) => entry.origin.kind !== 'tool')] } : {}),
       },
-      session: { provider, title, status, lifecycle: 'ready', chats: [{ resource: chatUri, title: '', status, modifiedAt: ago(minutesAgo) }], defaultChat: chatUri, workingDirectories: [folder(dir)], config: { ...CONFIG, values: { mode: 'interactive', autoApprove: 'default' } } },
-      chat: { resource: chatUri, title: '', status, modifiedAt: ago(minutesAgo), turns: [], ...chat },
-      chatUri,
+      session: { provider, title, status, lifecycle: 'ready', chats: [main, ...nested], defaultChat: chatUri, workingDirectories: [folder(dir)], config: { ...CONFIG, values: { mode: 'interactive', autoApprove: 'default' } } },
+      chats: [{ ...main, turns: [], ...chat }, ...children],
     });
   };
 
@@ -238,7 +240,8 @@ function sessionsData() {
     },
   });
 
-  // 2. Working right now.
+  // 2. Working right now, with a running and a finished subagent.
+  const darkChat = 'ahp-chat://default/demo-dark';
   add('dark', 'Add dark mode to the settings page', 'copilotcli', 'acme-web', S.InProgress | S.IsRead, 0, 'Editing ThemeToggle.tsx', {
     activeTurn: {
       id: 'demo-dark-t1', startedAt: ago(2), usage: undefined,
@@ -250,7 +253,27 @@ function sessionsData() {
         { kind: 'toolCall', toolCall: { status: 'running', toolCallId: 'd3', toolName: 'edit', displayName: 'Edit File', _meta: { toolKind: 'edit' }, invocationMessage: md('Edit [settings/Page.tsx](file:///c%3A/Users/you/code/acme-web/src/settings/Page.tsx)'), toolInput: JSON.stringify({ path: 'src/settings/Page.tsx' }), confirmed: 'not-needed' } },
       ],
     },
-  });
+  }, [
+    {
+      resource: 'ahp-chat://tool/demo-dark-contrast', title: 'Review dark mode contrast',
+      status: S.InProgress, modifiedAt: ago(0), interactivity: 'read-only',
+      origin: { kind: 'tool', chat: darkChat, toolCallId: 'demo-contrast' }, turns: [],
+      activeTurn: {
+        id: 'demo-contrast-t1', startedAt: ago(1), message: userMsg('Check contrast in the new dark theme.'),
+        responseParts: [{ kind: 'markdown', id: 'demo-contrast-progress', content: 'I’m checking the contrast of labels, buttons, and focus outlines.' }],
+      },
+    },
+    {
+      resource: 'ahp-chat://tool/demo-dark-tests', title: 'Check theme preference tests',
+      status: S.Idle | S.IsRead, modifiedAt: ago(3), interactivity: 'read-only',
+      origin: { kind: 'tool', chat: darkChat, toolCallId: 'demo-theme-tests' },
+      turns: [{
+        id: 'demo-theme-tests-t1', startedAt: ago(5), state: 'complete',
+        message: userMsg('Check how the theme preference is stored.'),
+        responseParts: [{ kind: 'markdown', id: 'demo-theme-tests-result', content: 'The saved preference survives a reload. Both preference tests pass.' }],
+      }],
+    },
+  ]);
 
   // 3. Finished.
   add('flaky', 'Fix flaky checkout e2e test', 'copilotcli', 'acme-web', S.Idle, 38, undefined, {
@@ -321,11 +344,13 @@ class DemoStore extends HostStore {
     for (const d of sessionsData()) {
       this.sessions.set(d.summary.resource, d.summary);
       this.sessionState.set(d.summary.resource, d.session);
-      this.chatState.set(d.chatUri, d.chat);
       this.snapshotSeq.set(d.summary.resource, 0);
-      this.snapshotSeq.set(d.chatUri, 0);
-      this.kinds.set(d.chatUri, 'chat');
       this.kinds.set(d.summary.resource, 'session');
+      for (const chat of d.chats) {
+        this.chatState.set(chat.resource, chat);
+        this.snapshotSeq.set(chat.resource, 0);
+        this.kinds.set(chat.resource, 'chat');
+      }
     }
     this._tick = setInterval(() => this._advanceBackground(), 2500);
   }
