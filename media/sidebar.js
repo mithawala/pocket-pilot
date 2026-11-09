@@ -149,7 +149,7 @@
       return `<div class="update"><span class="spin" aria-hidden="true"></span><span>Updating Pocket Pilot to <b>${esc(r.installing)}</b>…</span></div>`;
     }
     if (r.pending && !r.available) {
-      return `<div class="update"><span>Pocket Pilot <b>${esc(r.pending)}</b> is installed. Restart extensions to start using it. Your agent sessions keep running, and your devices reconnect by themselves.</span><button class="primary" data-a="restartExtensions" title="Restarts the extensions of this VS Code window (Developer: Restart Extension Host)">Restart extensions</button></div>`;
+      return `<div class="update"><span>Pocket Pilot <b>${esc(r.pending)}</b> is installed. To start it, click <b>Restart Extensions</b> on its page in VS Code's Extensions view. Your agent sessions keep running, and your devices reconnect by themselves.</span><button class="primary" data-a="restartExtensions" title="Opens Pocket Pilot in the Extensions view, where VS Code's Restart Extensions starts the new version">Restart extensions…</button></div>`;
     }
     if (r.available) {
       return `<div class="update"><span>Pocket Pilot <b>${esc(r.available)}</b> is available. You have ${esc(r.current)}.</span><button class="primary" data-a="installUpdate">Update</button><button class="link" data-a="updateNotes">What's new</button>${r.installError ? `<div class="uerr">The update failed: ${esc(r.installError)}</div>` : ''}</div>`;

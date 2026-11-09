@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+- **Restart extensions starts the new version.** In the VS Code panel, Restart extensions restarted the extensions but kept running the version you had, so the panel offered it again after every restart. VS Code switches to an installed update only with its own Restart Extensions; a plain restart of the extension host starts the version it started with.
+  - **Update** now installs the way VS Code's "Install Extension VSIX" does. VS Code then shows *Please restart extensions to enable it* with a **Restart Extensions** button, and one click starts the new version.
+  - With an update already installed, the panel's **Restart extensions…** opens Pocket Pilot's page in the Extensions view, where VS Code shows that button.
+- **Updating:** in VS Code, open the Extensions view and click **Restart Extensions** on Pocket Pilot (the panel's button in the version you run can't start it). Your agent sessions keep running.
+
 ## 0.8.0
 
 - **Your session's files on your phone.** In a chat, tap **⋯** and then **Files**:

@@ -25,6 +25,9 @@ const STATE_UPDATE_NOTIFIED = 'pocketPilot.updateNotified';
 const STATE_INTRODUCED = 'pocketPilot.introduced';
 const PUSH_SUBJECT = 'mailto:pocket-pilot@users.noreply.github.com';
 const EXTENSION_ID = 'mithawala.pocket-pilot';
+// VS Code's "Install Extension VSIX": it installs and then offers Restart Extensions, which starts the
+// new version (a plain extension host restart keeps running the version VS Code started with).
+const INSTALL_VSIX_COMMAND = 'workbench.extensions.command.installFromVSIX';
 const REPO = 'mithawala/pocket-pilot';
 const DEFAULT_PWA_URL = 'https://mithawala.github.io/pocket-pilot/app/';
 
@@ -1088,8 +1091,9 @@ class PocketPilotService {
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length < 1000 || buf.length > 100 * 1024 * 1024 || buf[0] !== 0x50 || buf[1] !== 0x4b) throw new Error('The download is not a VSIX package');
       fs.writeFileSync(file, buf);
-      await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(file));
+      vscodeOffersRestart = await this._installVsix(file);
     };
+    let vscodeOffersRestart = false;
     this._installing = version;
     this._installError = null;
     this.changed();
@@ -1106,17 +1110,37 @@ class PocketPilotService {
       this._installing = null;
       this.changed();
     }
-    if (fromPanel) return;
+    if (fromPanel || vscodeOffersRestart) return;
     const pick = await vscode.window.showInformationMessage(`Pocket Pilot ${version} is installed. Restart extensions to use it.`, 'Restart extensions');
     if (pick) await this.restartExtensions();
   }
 
   /**
-   * Starts the new version: restarts this window's extensions (VS Code's agent host and its sessions keep
-   * running, and the tunnel keeps its address), so paired devices reconnect within seconds.
+   * Installs a VSIX the way VS Code's own "Install Extension VSIX" does: VS Code then offers Restart
+   * Extensions, which starts the new version. Resolves to whether VS Code made that offer (older
+   * versions install without it).
    */
-  restartExtensions() {
-    return vscode.commands.executeCommand('workbench.action.restartExtensionHost');
+  async _installVsix(file) {
+    const uri = vscode.Uri.file(file);
+    const known = await Promise.resolve(vscode.commands.getCommands?.(true)).catch(() => null);
+    if (known?.includes(INSTALL_VSIX_COMMAND)) {
+      await vscode.commands.executeCommand(INSTALL_VSIX_COMMAND, [uri]);
+      return true;
+    }
+    await vscode.commands.executeCommand('workbench.extensions.installExtension', uri);
+    return false;
+  }
+
+  /**
+   * Starts an installed update. Restarting the extension host runs the version VS Code started with:
+   * only VS Code's own Restart Extensions switches to an installed update. With one waiting, this opens
+   * Pocket Pilot's page in the Extensions view, where VS Code shows that button.
+   */
+  async restartExtensions() {
+    const pending = this._pendingVersion();
+    if (!pending) return vscode.commands.executeCommand('workbench.action.restartExtensionHost');
+    await vscode.commands.executeCommand('extension.open', EXTENSION_ID);
+    vscode.window.showInformationMessage(`To start Pocket Pilot ${pending}, click Restart Extensions on its page. Your agent sessions keep running.`);
   }
 }
 

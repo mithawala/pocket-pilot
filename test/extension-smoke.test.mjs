@@ -54,6 +54,7 @@ function createVscodeMock(settings, answers) {
       },
       commands: {
         registerCommand: (id, fn) => { commands.set(id, fn); return { dispose() {} }; },
+        getCommands: async () => [...commands.keys()],
         executeCommand: async (id, ...args) => {
           if (id === 'setContext') calls.context.push(args);
           const fn = commands.get(id);
@@ -211,6 +212,39 @@ test('updates: a VSIX install is offered a newer GitHub release and installs it 
   }
 });
 
+test('updates: with VS Code\'s "Install Extension VSIX", VS Code itself offers the restart that starts the new version', async () => {
+  const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-upd-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
+  const mock = createVscodeMock({}, { info: (msg) => (/is available/.test(msg) ? 'Update' : undefined) });
+  const viaVsix = [];
+  const viaApi = [];
+  mock.commands.set('workbench.extensions.command.installFromVSIX', (uris) => viaVsix.push(uris));
+  mock.commands.set('workbench.extensions.installExtension', (uri) => viaApi.push(uri));
+  const uninstall = installMock(mock.api);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith('/releases/latest')) {
+      return new Response(JSON.stringify({ tag_name: 'v99.0.0', html_url: 'https://github.com/mithawala/pocket-pilot/releases/tag/v99.0.0', assets: [{ name: 'pocket-pilot.vsix', browser_download_url: 'https://github.com/mithawala/pocket-pilot/releases/download/v99.0.0/pocket-pilot.vsix' }] }), { status: 200 });
+    }
+    return new Response(Buffer.concat([Buffer.from('PK\u0003\u0004'), Buffer.alloc(4000)]), { status: 200 });
+  };
+  let service;
+  try {
+    delete require.cache[require.resolve('../extension/extension.js')];
+    const ext = require('../extension/extension.js');
+    ({ service } = await ext.activate(makeContext(storage)));
+    await service.checkForUpdate({ quiet: false });
+    assert.equal(viaVsix.length, 1, 'installed like "Install Extension VSIX"');
+    assert.equal(viaVsix[0].length, 1);
+    assert.match(viaVsix[0][0].fsPath, /pocket-pilot-99\.0\.0\.vsix$/);
+    assert.equal(viaApi.length, 0);
+    assert.ok(!mock.calls.infos.some((m) => /99\.0\.0 is installed/.test(m)), 'VS Code offers Restart Extensions itself: no second notification');
+  } finally {
+    globalThis.fetch = realFetch;
+    await service?.dispose();
+    uninstall();
+  }
+});
+
 /** The extension as installed by VS Code: extensions.json next to its folder says how and which version. */
 function installedContext(storage, { source = 'vsix', onDisk } = {}) {
   const extDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-extdir-'));
@@ -228,9 +262,12 @@ test('updates from the panel: version, check (even when the GitHub API is rate-l
   const storage = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-upd-')), 'User', 'globalStorage', 'mithawala.pocket-pilot');
   const mock = createVscodeMock({}, {});
   const installed = [];
-  mock.commands.set('workbench.extensions.installExtension', (uri) => installed.push(uri.fsPath));
+  // VS Code's "Install Extension VSIX", which then offers its own Restart Extensions.
+  mock.commands.set('workbench.extensions.command.installFromVSIX', (uris) => installed.push(...uris.map((u) => u.fsPath)));
   const restarts = [];
   mock.commands.set('workbench.action.restartExtensionHost', () => restarts.push(Date.now()));
+  const pages = [];
+  mock.commands.set('extension.open', (id) => pages.push(id));
   const uninstall = installMock(mock.api);
   const realFetch = globalThis.fetch;
   const fetched = [];
@@ -282,7 +319,7 @@ test('updates from the panel: version, check (even when the GitHub API is rate-l
     assert.equal(installed.length, 0);
     vsixStatus = 200;
 
-    // Update: installs through VS Code; the panel then offers Restart extensions.
+    // Update: installs the way VS Code's "Install Extension VSIX" does; the panel then offers Restart extensions.
     const done = onMessage({ type: 'installUpdate' });
     assert.equal(release().installing, '99.1.0', 'the panel shows the update under way');
     await done;
@@ -290,8 +327,13 @@ test('updates from the panel: version, check (even when the GitHub API is rate-l
     assert.match(installed[0], /pocket-pilot-99\.1\.0\.vsix$/);
     assert.deepEqual(release(), { ...release(), installing: null, installError: null, pending: '99.1.0', available: null });
     assert.deepEqual(mock.calls.infos, [], 'the panel says it, not a notification');
+    // A plain extension host restart would start the old version again: Pocket Pilot's page in the
+    // Extensions view has VS Code's own Restart Extensions, which starts the new one.
     await onMessage({ type: 'restartExtensions' });
-    assert.equal(restarts.length, 1, 'Restart extensions restarts the extension host (not the window)');
+    assert.equal(restarts.length, 0, 'not Developer: Restart Extension Host');
+    assert.deepEqual(pages, ['mithawala.pocket-pilot'], 'opens Pocket Pilot in the Extensions view');
+    assert.match(mock.calls.infos.at(-1), /To start Pocket Pilot 99\.1\.0, click Restart Extensions on its page/);
+    mock.calls.infos.length = 0;
 
     // Already installed: a later background check doesn't offer it again.
     await service.checkForUpdate();
