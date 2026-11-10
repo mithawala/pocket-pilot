@@ -97,7 +97,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const sessionState = store.sessionState.get(uri);
   const chat = store.chatFor(uri);
   const chatState = chat ? store.chatState.get(chat) : null;
-  const failed = chat && !chatState ? store.failedChats.get(chat) : null;
+  const failed = !chatState ? store.stalledText(uri) || (chat ? store.failedChats.get(chat) : null) : null;
   const provider = session?.provider || sessionState?.provider;
   const models = store.models(provider);
   const lastTurnId = chatState?.turns?.[chatState.turns.length - 1]?.id;

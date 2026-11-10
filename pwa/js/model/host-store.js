@@ -1,7 +1,7 @@
 // Live mirror of one PC's agent host: session list, subscribed sessions and chats, and the
 // user actions the phone can take. State is reduced with the official AHP reducers, so the
 // phone renders exactly what VS Code renders.
-import { AhpClient, RpcError, RpcTimeoutError } from '../../vendor/ahp/client/index.js';
+import { AhpClient, RpcError, RpcTimeoutError, TransportError, ClientClosedError } from '../../vendor/ahp/client/index.js';
 import { rootReducer, sessionReducer, chatReducer, compareProtocolVersions } from '../../vendor/ahp/types/index.js';
 import { PROTOCOL_VERSIONS } from '../core/protocol.js';
 import { TOO_LARGE } from '../net/host-connection.js';
@@ -10,8 +10,13 @@ import { waitingOn, signInKey, serverName } from '../lib/asks.js';
 
 const ROOT = 'ahp-root://';
 const DEFAULT_UNSUB_DELAY = 45000;
+// A conversation that was loading when the computer's agent host stopped isn't opened again by itself
+// for this long (see _hostStopped).
+const STALL_MS = 15 * 60 * 1000;
 
 const errorText = (err) => (err instanceof RpcError ? String(err.message).replace(/^RPC error -?\d+: /, '') : err?.message || String(err));
+// The connection went away (it is made again by itself): not something to show as an error.
+const dropped = (err) => err instanceof TransportError || err instanceof ClientClosedError;
 
 // A chat's own settings (AHP 1.1.0): mode and approvals set for one chat, over the session's.
 const CHAT_CONFIG_SINCE = '1.1.0';
@@ -96,6 +101,12 @@ export class HostStore extends EventTarget {
     this._seenPending = new Map();
     // Chats the computer could not open for the phone (e.g. too large): shown with a Try again button.
     this.failedChats = new Map();
+    // Sessions that were loading when the computer's agent host stopped (uri -> when): not opened again
+    // until Try again, since opening a very large one again can stop it again.
+    this.stalled = new Map();
+    this._loadStalled();
+    // Channels being opened right now (uri -> kind).
+    this.loads = new Map();
     // Bytes received so far of a large message on its way (a long chat), 0 when none.
     this.incoming = 0;
     // VS Code is taking long to list the sessions (the phone keeps asking).
@@ -103,12 +114,22 @@ export class HostStore extends EventTarget {
     this.errors = [];
     this.ahpConnected = false;
     this.ahpReason = '';
-    this.onReady = (e) => this._onReady(e.detail).catch((err) => this._error(`Could not load sessions: ${errorText(err)}`));
+    // The agent host isn't running and the computer can start it again (see HostConnection.restartAgent).
+    this.ahpRestartable = false;
+    this.ahpRestarting = false;
+    this.onReady = (e) => this._onReady(e.detail).catch((err) => {
+      if (!dropped(err)) this._error(`Could not load sessions: ${errorText(err)}`);
+    });
     this.onControl = (e) => {
       const m = e.detail.message;
       if (m.t === 'ahp.status') {
+        // The agent host went away under an open connection (old computers say "connection closed").
+        const stopped = !m.connected && this.ahpConnected && (m.stopped || /connection closed/i.test(m.reason || ''));
         this.ahpConnected = !!m.connected;
         this.ahpReason = m.reason || '';
+        this.ahpRestartable = !m.connected && !!m.restartable;
+        this.ahpRestarting = !m.connected && !!m.restarting;
+        if (stopped) this._hostStopped(m.loading);
         this._emit('status');
       }
     };
@@ -157,7 +178,26 @@ export class HostStore extends EventTarget {
     client.connect();
     const events = client.events();
     this._pump(client, events);
-    const subs = [ROOT, ...[...this.subscribed].filter((uri) => !this.failedChats.has(uri))];
+    const subs = [ROOT, ...[...this.subscribed].filter((uri) => !this.failedChats.has(uri) && !this._stalledChannel(uri))];
+    // What this connection opens again, in case the agent host stops while it does.
+    for (const uri of subs) if (uri !== ROOT) this.loads.set(uri, this._kind(uri));
+    let ok;
+    try {
+      ok = await this._connectAhp(client, subs);
+    } finally {
+      for (const uri of subs) this.loads.delete(uri);
+    }
+    if (!ok || client !== this.client) return;
+    this.ahpConnected = true;
+    await this._loadSessions(client);
+    this._emit('status');
+  }
+
+  /**
+   * `reconnect` (replaying what was missed), or else `initialize`, with the channels to open. False when
+   * an open chat made the reply too large (it connects again without it, see _tooLarge).
+   */
+  async _connectAhp(client, subs) {
     let done = false;
     if (this.initialized) {
       try {
@@ -176,7 +216,8 @@ export class HostStore extends EventTarget {
         }
         done = true;
       } catch (err) {
-        if (this._tooLarge(err, client, subs)) return;
+        if (dropped(err)) throw err;
+        if (this._tooLarge(err, client, subs)) return false;
         this.clientId = `pocket-pilot-${uuid().slice(0, 13)}`;
       }
     }
@@ -190,7 +231,7 @@ export class HostStore extends EventTarget {
           locale: navigator.language,
         });
       } catch (err) {
-        if (this._tooLarge(err, client, subs)) return;
+        if (this._tooLarge(err, client, subs)) return false;
         throw err;
       }
       this.lastSeq = init.serverSeq || 0;
@@ -199,9 +240,7 @@ export class HostStore extends EventTarget {
       for (const snap of init.snapshots || []) this._applySnapshot(snap);
       this.initialized = true;
     }
-    this.ahpConnected = true;
-    await this._loadSessions(client);
-    this._emit('status');
+    return true;
   }
 
   /** Lists the sessions, asking again while VS Code is slow to answer (it can take minutes when busy). */
@@ -361,10 +400,15 @@ export class HostStore extends EventTarget {
     this.subscribed.add(uri);
     if (this.client) {
       const client = this.client;
+      this.loads.set(uri, kind);
       client.subscribe(uri).then(({ result, subscription }) => {
+        this.loads.delete(uri);
         subscription.close();
         if (client === this.client && result?.snapshot) this._applySnapshot(result.snapshot);
       }).catch((err) => {
+        this.loads.delete(uri);
+        // The connection went away: it subscribes again when it's back (see _onReady).
+        if (client !== this.client || dropped(err)) return;
         this.subscribed.delete(uri);
         if (kind === 'chat' && err instanceof RpcError) {
           // The computer answered (e.g. too large): show it on the chat instead of asking again by itself.
@@ -374,6 +418,94 @@ export class HostStore extends EventTarget {
         }
         this._error(`Could not open ${kind}: ${errorText(err)}`);
       });
+    }
+  }
+
+  // ------------------------------------------------------------------ an agent host that stopped
+
+  /**
+   * The computer's agent host stopped (VS Code's crashes when it runs out of memory, which opening a very
+   * large conversation can do). The sessions that were opening then aren't opened again by themselves:
+   * their chat says why, with Try again (retryChat). `relayLoading`: what the computer saw opening.
+   */
+  _hostStopped(relayLoading) {
+    const channels = new Set([...this.loads.keys(), ...(Array.isArray(relayLoading) ? relayLoading.filter((c) => typeof c === 'string') : [])]);
+    const sessions = new Set();
+    for (const uri of channels) {
+      if (uri === ROOT || !this.kinds.has(uri)) continue;
+      const session = this._kind(uri) === 'chat' ? this._sessionOfChat(uri) : uri;
+      if (session) sessions.add(session);
+    }
+    if (!sessions.size) return;
+    for (const s of sessions) {
+      this.stalled.set(s, Date.now());
+      this.subscribed.delete(s);
+      const chat = this._chatFor.get(s);
+      // Not live anymore: its chat shows why (with Try again) rather than a copy that no longer changes.
+      this._drop(s);
+      if (chat) {
+        this.subscribed.delete(chat);
+        this._drop(chat);
+        this._emit('chat', chat);
+      }
+      this._emit('session', s);
+    }
+    this._saveStalled();
+  }
+
+  _sessionOfChat(chat) {
+    for (const [s, c] of this._chatFor) if (c === chat) return s;
+    for (const [s, st] of this.sessionState) if (st?.defaultChat === chat || st?.chats?.some((c) => c.resource === chat)) return s;
+    return null;
+  }
+
+  /** Whether a session was opening when the agent host stopped, not long ago (see _hostStopped). */
+  isStalled(sessionUri) {
+    const at = this.stalled.get(sessionUri);
+    if (at === undefined) return false;
+    if (Date.now() - at < STALL_MS) return true;
+    this.stalled.delete(sessionUri);
+    this._saveStalled();
+    return false;
+  }
+
+  _stalledChannel(uri) {
+    if (this._kind(uri) !== 'chat') return this.isStalled(uri);
+    const s = this._sessionOfChat(uri);
+    return !!s && this.isStalled(s);
+  }
+
+  /** Why a stalled session isn't open, for its chat. */
+  stalledText(sessionUri) {
+    if (!this.isStalled(sessionUri)) return null;
+    const who = this.conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app' : 'VS Code’s agent';
+    return `${who} stopped on your computer while this conversation was opening. Very long conversations can make it run out of memory, so it isn’t opened again by itself.`;
+  }
+
+  _stalledKey() {
+    const id = this.conn?.record?.hostId;
+    return id ? `pp:stalled:${id}` : null;
+  }
+
+  _loadStalled() {
+    const key = this._stalledKey();
+    if (!key) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || '{}');
+      for (const [uri, at] of Object.entries(saved)) if (typeof at === 'number' && Date.now() - at < STALL_MS) this.stalled.set(uri, at);
+    } catch {
+      /* none */
+    }
+  }
+
+  _saveStalled() {
+    const key = this._stalledKey();
+    if (!key) return;
+    try {
+      if (this.stalled.size) localStorage.setItem(key, JSON.stringify(Object.fromEntries(this.stalled)));
+      else localStorage.removeItem(key);
+    } catch {
+      /* private mode */
     }
   }
 
@@ -393,8 +525,10 @@ export class HostStore extends EventTarget {
     // Opening the chat again tries again.
     if (!this.watchers.get(sessionUri)) this.failedChats.delete(this.chatFor(sessionUri));
     this.watchers.set(sessionUri, (this.watchers.get(sessionUri) || 0) + 1);
-    this._subscribe(sessionUri, 'session');
-    this._ensureChat(sessionUri);
+    if (!this.isStalled(sessionUri)) {
+      this._subscribe(sessionUri, 'session');
+      this._ensureChat(sessionUri);
+    }
     let released = false;
     return () => {
       if (released) return;
@@ -415,7 +549,7 @@ export class HostStore extends EventTarget {
   }
 
   _ensureChat(sessionUri) {
-    if (!this.watchers.has(sessionUri)) return;
+    if (!this.watchers.has(sessionUri) || this.isStalled(sessionUri)) return;
     const st = this.sessionState.get(sessionUri);
     const chat = st?.defaultChat || st?.chats?.[0]?.resource;
     if (!chat) return;
@@ -426,8 +560,17 @@ export class HostStore extends EventTarget {
     this._subscribe(chat, 'chat');
   }
 
-  /** Tries again to open a session's chat the computer could not open before. */
+  /** Tries again to open a session's chat the computer could not open before (or was opening when it stopped). */
   retryChat(sessionUri) {
+    if (this.stalled.delete(sessionUri)) {
+      this._saveStalled();
+      if (this.watchers.get(sessionUri) > 0) {
+        this._subscribe(sessionUri, 'session');
+        this._ensureChat(sessionUri);
+      }
+      this._emit('session', sessionUri);
+      return;
+    }
     const chat = this.chatFor(sessionUri);
     if (!chat || !this.failedChats.delete(chat)) return;
     this._ensureChat(sessionUri);

@@ -68,6 +68,13 @@ const MIME = {
 // What the phone tells VS Code to show for a tool call it ends ("Skipped Search repositories"): text.
 const plainText = (s, max) => (typeof s === 'string' ? s.replace(/\]\s*\(/g, '] (').slice(0, max) : undefined);
 
+/** The channels a request opens (their state comes back in its reply), the root left out. */
+function channelsOpenedBy(msg) {
+  const p = msg.params || {};
+  const list = msg.method === 'subscribe' ? [p.channel] : msg.method === 'initialize' ? p.initialSubscriptions : msg.method === 'reconnect' ? p.subscriptions : null;
+  return Array.isArray(list) ? list.filter((c) => typeof c === 'string' && c !== 'ahp-root://').slice(0, 20) : [];
+}
+
 /**
  * A device ends a tool call only to skip a sign-in (Continue without signing in): as a failure, in plain
  * text. Anything else is dropped, and the text can't hold a link, which the relay would then let devices
@@ -163,6 +170,7 @@ class RelayServer extends EventEmitter {
    * @param {object} o.identity         host identity from identity.loadHostIdentity
    * @param {import('./store').DeviceStore} o.store
    * @param {() => object|null} o.getAgentEndpoint
+   * @param {() => Promise<void>} [o.restartAgentHost]  starts the agent host again after it stopped (a device may ask)
    * @param {(info: object) => Promise<boolean>} o.approveDevice
    * @param {() => string[]} o.allowedOrigins
    * @param {() => {requireApproval:boolean, passkey:'required'|'optional'|'off', passkeyGraceHours:number, allowTotp?:boolean}} o.policy
@@ -424,6 +432,8 @@ class DeviceConnection extends EventEmitter {
     this.frames = new FrameQueue();
     this.ahp = null;
     this.listIds = new Set();
+    // Requests on their way to the agent host that open channels (request id -> channels).
+    this.loading = new Map();
     conn.on('message', (data, isBinary) => {
       this.lastPong = Date.now();
       this.frames.push({ data, isBinary });
@@ -514,6 +524,8 @@ class DeviceConnection extends EventEmitter {
     }
     if (auth.t !== 'auth') throw new RelayError('bad-handshake', 'Expected auth');
     this.visible = !!auth.visible;
+    // The device asks to start the agent host again if it isn't running (see _startBridge).
+    this.wantsRestart = auth.restartAgent === true;
     if (hello.mode === 'resume' && !device) {
       this.relay._recordFailure(this.meta.ip);
       await this.sendControl({ t: 'error', code: 'unknown-device', message: 'This device is not paired with this PC anymore. Scan a new QR code on your PC.' });
@@ -537,6 +549,8 @@ class DeviceConnection extends EventEmitter {
       factor: fresh.passkey ? 'passkey' : fresh.totp ? 'totp' : null,
       // Browsing and downloading files (version of the `files` messages; 2: also what agents link to).
       ...(o.isReadAllowed ? { files: 2 } : {}),
+      // The device may ask to start the agent host again when it has stopped.
+      ...(o.restartAgentHost ? { restartAgent: 1 } : {}),
       ...extras,
     });
     this.log('info', `Device "${fresh.name}" connected from ${this.meta.ip}`);
@@ -777,14 +791,16 @@ class DeviceConnection extends EventEmitter {
   // ---------------------------------------------------------- AHP bridge
 
   async _startBridge() {
-    const ep = this.relay.o.getAgentEndpoint();
-    const hostLabel = this.relay.o.agentHostLabel || 'The VS Code agent host';
+    const { o } = this.relay;
+    const hostLabel = o.agentHostLabel || 'The VS Code agent host';
+    let ep = o.getAgentEndpoint();
+    if (!ep && this.wantsRestart && o.restartAgentHost) ep = await this._restartAgentHost(hostLabel);
     if (!ep) {
-      await this.sendControl({ t: 'ahp.status', connected: false, reason: `${hostLabel} is not running.` });
+      await this.sendControl({ t: 'ahp.status', connected: false, reason: `${hostLabel} is not running.`, ...(o.restartAgentHost ? { restartable: true } : {}) });
       throw new RelayError('no-agent-host', 'Agent host not available', { quiet: true, closeCode: 4503 });
     }
     try {
-      this.ahp = await (this.relay.o.openAgentConnection ? this.relay.o.openAgentConnection(ep) : agentHost.openConnection(ep));
+      this.ahp = await (o.openAgentConnection ? o.openAgentConnection(ep) : agentHost.openConnection(ep));
     } catch (err) {
       await this.sendControl({ t: 'ahp.status', connected: false, reason: err.message });
       throw new RelayError('no-agent-host', err.message, { quiet: true, closeCode: 4503 });
@@ -800,10 +816,45 @@ class DeviceConnection extends EventEmitter {
     });
     this.ahp.on('close', () => {
       if (this.state === 'closed' || this.revoked) return;
-      this.sendControl({ t: 'ahp.status', connected: false, reason: `${hostLabel} connection closed.` }).finally(() => this.close(4503, 'Agent host disconnected'));
+      // What the device was still waiting for: opening a very large conversation can be what made the
+      // agent host run out of memory, so the device doesn't open it again by itself.
+      const loading = [...new Set([...this.loading.values()].flat())];
+      if (loading.length) this.log('warn', `${hostLabel} stopped while "${this.device?.name}" was opening ${loading.join(', ')}`);
+      this.sendControl({ t: 'ahp.status', connected: false, stopped: true, reason: `${hostLabel} stopped.`, ...(loading.length ? { loading } : {}) }).finally(() => this.close(4503, 'Agent host disconnected'));
     });
     this.ahp.on('error', () => {});
     await this.sendControl({ t: 'ahp.status', connected: true, protocolVersion: ep.protocolVersion });
+  }
+
+  /**
+   * Starts the agent host again for a device that asked to (VS Code stops restarting it after it crashes
+   * 5 times in a row). One restart at a time for all devices; resolves with its endpoint, or null.
+   */
+  async _restartAgentHost(hostLabel) {
+    const relay = this.relay;
+    this.wantsRestart = false;
+    if (!relay._restarting) {
+      this.log('info', `Device "${this.device?.name}" is starting ${hostLabel.replace(/^The /, 'the ')} again`);
+      relay._restarting = (async () => {
+        try {
+          await relay.o.restartAgentHost();
+        } catch (err) {
+          this.log('warn', `Could not restart the agent host: ${err?.message || err}`);
+          return null;
+        }
+        const end = Date.now() + (relay.o.restartWaitMs ?? 45000);
+        for (;;) {
+          const ep = relay.o.getAgentEndpoint();
+          if (ep || Date.now() > end) return ep || null;
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      })().finally(() => {
+        relay._restarting = null;
+      });
+    }
+    const wait = relay._restarting;
+    await this.sendControl({ t: 'ahp.status', connected: false, restarting: true, reason: `Starting ${hostLabel.replace(/^The /, 'the ')} again…` });
+    return wait;
   }
 
   async _loop() {
@@ -852,6 +903,8 @@ class DeviceConnection extends EventEmitter {
         text = JSON.stringify(msg);
       }
       if (isRequest && msg.method === 'listSessions') this.listIds.add(msg.id);
+      const opening = isRequest ? channelsOpenedBy(msg) : [];
+      if (opening.length && this.loading.size < 200) this.loading.set(msg.id, opening);
     }
     this.ahp.send(text);
   }
@@ -864,6 +917,7 @@ class DeviceConnection extends EventEmitter {
       return;
     }
     if (msg.id !== undefined && msg.method === undefined) {
+      this.loading.delete(msg.id);
       if (this.listIds.delete(msg.id)) text = this._adjustSummaries(msg, text);
     } else if (msg.method === 'auth/required') {
       // VS Code answers this itself (and may ask you to sign in on the PC); the phone has nothing to add.

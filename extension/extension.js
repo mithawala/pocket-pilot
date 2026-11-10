@@ -10,7 +10,7 @@ const identityLib = require('./core/identity');
 const agentHost = require('./core/agentHost');
 const { cmpVersion } = agentHost;
 const { SessionMonitor } = require('./core/monitor');
-const { isSessionAttachment, isInFolder } = require('./core/attachments');
+const { isSessionAttachment, isInFolder, sessionIdOf } = require('./core/attachments');
 const { PersistentTunnel } = require('./core/tunnel');
 const { GistRendezvous } = require('./core/rendezvous');
 const { SharedState } = require('./shared');
@@ -160,7 +160,7 @@ class PocketPilotService {
     // several windows activating at once must never race to create different identities.
     this.identity = null;
     this.rendezvous = null;
-    this.monitor = new SessionMonitor({ getEndpoint: () => this.endpoint(), log: (l, m) => this.logLine(l, m) });
+    this.monitor = new SessionMonitor({ getEndpoint: () => this.endpoint(), storeSize: (uri) => this._sessionStoreSize(uri), log: (l, m) => this.logLine(l, m) });
     this.monitor.on('sessions', () => this.changed());
     this.monitor.on('status', () => this.changed());
     this.monitor.on('effective', ({ uri, status }) => this.relay?.pushSummaryChange(uri, { status }));
@@ -213,6 +213,28 @@ class PocketPilotService {
 
   endpoint() {
     return agentHost.selectEndpoint(this.userData);
+  }
+
+  /** What VS Code keeps on disk for a session (its history and the files its edits changed), or null. */
+  _sessionStoreSize(sessionUri) {
+    const id = sessionIdOf(sessionUri);
+    if (!id || !this.userData) return null;
+    const db = path.join(this.userData, 'agentSessionData', id, 'session.db');
+    let total = null;
+    for (const f of [db, `${db}-wal`]) {
+      try {
+        total = (total || 0) + fs.statSync(f).size;
+      } catch {
+        /* not there */
+      }
+    }
+    return total;
+  }
+
+  /** Restarts VS Code's agent host after it stopped (VS Code gives up after it crashes 5 times in a row). */
+  async _restartAgentHost() {
+    this.logLine('info', 'A device asked to restart the VS Code agent host');
+    await vscode.commands.executeCommand('workbench.action.chat.restartLocalAgentHost');
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -406,6 +428,7 @@ class PocketPilotService {
       identity: this.identity,
       store: this.store,
       getAgentEndpoint: () => this.endpoint(),
+      restartAgentHost: () => this._restartAgentHost(),
       approveDevice: (info) => this._approve(info),
       allowedOrigins: () => this.allowedOrigins(),
       policy: () => {

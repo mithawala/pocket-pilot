@@ -307,7 +307,13 @@ function NewSession({ store, conn, open, onClose, onCreated, copilotHost = false
 export function ConnectionBanner({ conn, store, onRepair, onScan }) {
   const st = conn.state;
   if (st === 'online' && store.ahpConnected) return null;
-  if (st === 'online' && !store.ahpConnected) return html`<div class="banner warn"><${Icon} name="alert" size="18" />${store.ahpReason || (conn.record?.hostKind === 'copilot' ? 'The GitHub Copilot app is not available on your computer.' : 'VS Code agent host is not available on your computer.')}</div>`;
+  const copilotHost = conn.record?.hostKind === 'copilot';
+  // VS Code stops restarting its agent host after it crashes 5 times in a row: the computer can start it again.
+  const restart = store.ahpRestartable && conn.canRestartAgent && html`<button onClick=${() => conn.restartAgent()}>Restart</button>`;
+  if (st === 'online' && !store.ahpConnected) {
+    if (store.ahpRestarting) return html`<div class="banner"><${Spinner} />${store.ahpReason || 'Starting it again…'}</div>`;
+    return html`<div class="banner warn"><${Icon} name="alert" size="18" /><span>${store.ahpReason || (copilotHost ? 'The GitHub Copilot app is not available on your computer.' : 'VS Code agent host is not available on your computer.')}</span>${restart}</div>`;
+  }
   if (st === 'connecting' || st === 'authenticating' || st === 'idle') return html`<div class="banner"><${Spinner} />Connecting securely to your computer…</div>`;
   if (st === 'passkey') return html`<div class="banner"><${Icon} name="lock" size="18" />Confirm it's you (Face ID / fingerprint)…</div>`;
   if (st === 'code') return html`<div class="banner"><${Icon} name="lock" size="18" />Enter the code from your authenticator app…</div>`;
@@ -315,6 +321,12 @@ export function ConnectionBanner({ conn, store, onRepair, onScan }) {
   if (st === 'setup') return html`<div class="banner"><${Icon} name="key" size="18" />Setting up this device again…</div>`;
   if (st === 'unpaired') return html`<div class="banner err"><${Icon} name="alert" size="18" /><span>${conn.detail || 'This device is no longer paired.'}</span><button onClick=${onRepair}>Fix</button></div>`;
   if (st === 'locked') return html`<div class="banner err"><${Icon} name="lock" size="18" /><span>${conn.detail || 'Verification failed.'}</span><button onClick=${() => { conn.stopped = false; conn.poke(); }}>Retry</button></div>`;
+  // The computer answers, but its agent host doesn't run.
+  if (st === 'offline' && conn.hostDown > 0) {
+    const text = store.ahpReason || (copilotHost ? 'The GitHub Copilot app is not available on your computer.' : 'VS Code agent host is not available on your computer.');
+    const hint = !restart && !copilotHost ? ' In VS Code, run Developer: Restart Local Agent Host, or restart VS Code.' : '';
+    return html`<div class="banner warn"><${Icon} name="alert" size="18" /><span>${text}${hint}</span>${restart || html`<button onClick=${() => conn.poke()}>Retry</button>`}</div>`;
+  }
   // Without auto-reconnect, a computer at a new address (a new tunnel) is only found again through its QR code.
   const rescan = onScan && !conn.record?.rendezvous && conn.failures >= 2;
   return html`<div class="banner warn"><${Spinner} /><span>Computer offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}${rescan ? ' New address? Scan its QR code again: you stay paired.' : ''}</span>${rescan && html`<button onClick=${onScan}>Scan</button>`}<button onClick=${() => conn.poke()}>Retry</button></div>`;

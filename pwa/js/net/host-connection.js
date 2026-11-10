@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.9.1';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 // A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and
@@ -201,6 +201,9 @@ export class HostConnection extends EventTarget {
     this.stopped = true;
     this.attempt = 0;
     this.failures = 0;
+    // Connections in a row that found the computer but not its agent host (VS Code's, or the Copilot app).
+    this.hostDown = 0;
+    this._restartAgent = false;
     this._timer = null;
     this._pending = new Map();
     this._seq = 0;
@@ -234,7 +237,24 @@ export class HostConnection extends EventTarget {
     if (this.stopped) return;
     if (['online', 'connecting', 'authenticating', 'passkey', 'code', 'approval', 'setup'].includes(this.state)) return;
     this.attempt = 0;
+    this.hostDown = 0;
     this._schedule(0);
+  }
+
+  /** Whether the computer can start its agent host again when it has stopped (see restartAgent). */
+  get canRestartAgent() {
+    return !!this.welcome?.restartAgent;
+  }
+
+  /**
+   * Asks the computer to start its agent host again (VS Code stops restarting it after it crashes 5 times
+   * in a row). It goes along with the next connection, which is made now.
+   */
+  restartAgent() {
+    if (this.stopped) return;
+    this._restartAgent = true;
+    if (this.state === 'online') this.sock?.close(1000, 'restart agent host');
+    else this.poke();
   }
 
   /**
@@ -282,7 +302,9 @@ export class HostConnection extends EventTarget {
       // while the person was reading it in their authenticator app.
       const code = this._code && Date.now() - this._code.at < CODE_REUSE_MS ? this._code.code : null;
       this._code = null;
-      await ch.sendControl({ t: 'auth', appVersion: APP_VERSION, visible: this.isVisible(), ...(code ? { totpCode: code } : {}) });
+      const restartAgent = this._restartAgent;
+      this._restartAgent = false;
+      await ch.sendControl({ t: 'auth', appVersion: APP_VERSION, visible: this.isVisible(), ...(code ? { totpCode: code } : {}), ...(restartAgent ? { restartAgent: true } : {}) });
       let welcome;
       for (;;) {
         const m = await ch.recvControl(12 * 60 * 1000);
@@ -410,6 +432,7 @@ export class HostConnection extends EventTarget {
       this.stopped = true;
       this._setState('unpaired', 'This device was removed on your computer.');
     }
+    if (m.t === 'ahp.status' && m.connected) this.hostDown = 0;
     if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong' || m.t === 'files.result') {
       const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t === 'files.result' ? `files:${m.id}` : m.t;
       const p = this._pending.get(key);
@@ -431,6 +454,10 @@ export class HostConnection extends EventTarget {
     this._pending.clear();
     if (this.stopped) return;
     // A close code is not authenticated; genuine revocations arrive as an encrypted 'revoked' message.
+    // 4503: the computer is there but its agent host isn't: ask again less and less often, not every
+    // couple of seconds (each try is a whole secure handshake).
+    if (e.code === 4503) this.hostDown++;
+    else this.hostDown = 0;
     this._retry(e.code === 4503 ? (this.record.hostKind === 'copilot' ? 'The GitHub Copilot app is not available' : 'VS Code agent host is not available') : 'Connection lost');
   }
 
@@ -451,7 +478,8 @@ export class HostConnection extends EventTarget {
         /* ignore */
       }
     }
-    const delay = Math.min(30000, 800 * 2 ** Math.min(this.attempt, 6)) * (0.75 + Math.random() * 0.5);
+    const n = Math.max(this.attempt, this.hostDown);
+    const delay = Math.min(30000, 800 * 2 ** Math.min(n, 6)) * (0.75 + Math.random() * 0.5);
     this._schedule(this.isVisible() ? delay : Math.max(delay, 15000));
   }
 

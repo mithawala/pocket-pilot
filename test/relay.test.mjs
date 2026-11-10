@@ -32,7 +32,7 @@ const sha256 = (d) => crypto.createHash('sha256').update(d).digest();
 
 /** Minimal fake agent host speaking just enough AHP for the relay tests. */
 function startFakeAgentHost() {
-  const state = { tokens: [], received: [], connections: 0 };
+  const state = { tokens: [], received: [], connections: 0, conns: [] };
   const server = http.createServer();
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://x');
@@ -42,9 +42,12 @@ function startFakeAgentHost() {
     }
     const c = ws.acceptUpgrade(req, socket, head);
     state.connections++;
+    state.conns.push(c);
     c.on('message', (text) => {
       const m = JSON.parse(text);
       state.received.push(m);
+      // Left unanswered (a very large chat the host never finishes sending).
+      if (m.id !== undefined && state.hang?.(m)) return;
       const reply = (result) => c.send(JSON.stringify({ jsonrpc: '2.0', id: m.id, result }));
       if (m.method === 'initialize') {
         reply({
@@ -1054,6 +1057,92 @@ test('links: a device cannot plant a link the computer would trust (it ends tool
     assert.ok(![sent[1].result.pastTenseMessage, sent[1].result.error.message].some((s) => /\]\(/.test(s)), 'no link left');
     await assert.rejects(conn.files('stat', { uri: secret }), (e) => e.code === 'denied');
     await client.shutdown().catch(() => {});
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
+test('agent host: when it stops while a phone is opening a chat, the phone is told what was opening, and the computer logs it', async () => {
+  const logs = [];
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { log: (l, m) => logs.push(`${l} ${m}`) } });
+  env.fake.state.hang = (m) => m.method === 'subscribe' && m.params.channel === 'ahp-chat:/huge';
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const statuses = [];
+    conn.addEventListener('control', (e) => {
+      if (e.detail.message.t === 'ahp.status') statuses.push(e.detail.message);
+    });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { transport } = await ready;
+    const client = new AhpClient(transport, { requestTimeoutMs: 10000 });
+    client.connect();
+    await client.initialize({ clientId: 'phone-huge', protocolVersions: ['0.9.0'], initialSubscriptions: [] });
+    const opening = client.subscribe('ahp-chat:/huge').catch((e) => e);
+    await waitUntil(() => env.fake.state.received.some((m) => m.method === 'subscribe'));
+    // VS Code's agent host runs out of memory and stops.
+    const down = waitEvent(conn, 'state', (d) => d.state === 'offline');
+    env.fake.state.conns.at(-1).close();
+    assert.match((await down).detail, /agent host is not available/);
+    const stopped = statuses.find((s) => s.stopped);
+    assert.equal(stopped.connected, false);
+    assert.deepEqual(stopped.loading, ['ahp-chat:/huge']);
+    assert.equal(conn.hostDown, 1, 'it asks again less and less often');
+    assert.ok(logs.some((l) => /stopped while "Phone" was opening ahp-chat:\/huge/.test(l)), logs.join('\n'));
+    await opening;
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
+test('agent host: a phone can start it again after VS Code gave up on it, and only then', async () => {
+  let running = false;
+  let endpoint = null;
+  let restarts = 0;
+  const env = await setupRelay({
+    policy: { requireApproval: false, passkey: 'off' },
+    relayOptions: {
+      getAgentEndpoint: () => (running ? endpoint : null),
+      restartAgentHost: async () => {
+        restarts++;
+        setTimeout(() => { running = true; }, 300);
+      },
+      restartWaitMs: 5000,
+    },
+  });
+  endpoint = env.fake.endpoint;
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const statuses = [];
+    conn.addEventListener('control', (e) => {
+      if (e.detail.message.t === 'ahp.status') statuses.push(e.detail.message);
+    });
+    const down = waitEvent(conn, 'state', (d) => d.state === 'offline');
+    conn.start();
+    await down;
+    assert.equal(conn.canRestartAgent, true);
+    assert.deepEqual(statuses.at(-1), { t: 'ahp.status', connected: false, reason: 'The VS Code agent host is not running.', restartable: true });
+    assert.equal(restarts, 0, 'not without the person asking');
+
+    // The person taps Restart: the computer starts it, waits for it, and connects the phone to it.
+    let up = waitEvent(conn, 'control', (d) => d.message.t === 'ahp.status' && d.message.connected);
+    conn.restartAgent();
+    await up;
+    assert.equal(restarts, 1);
+    assert.ok(statuses.some((s) => s.restarting && /Starting the VS Code agent host again/.test(s.reason)));
+    assert.equal(conn.hostDown, 0);
+
+    // While it runs, asking again doesn't restart it.
+    up = waitEvent(conn, 'control', (d) => d.message.t === 'ahp.status' && d.message.connected);
+    conn.restartAgent();
+    await up;
+    assert.equal(restarts, 1);
   } finally {
     conn?.stop();
     await env.cleanup();

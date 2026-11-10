@@ -9,16 +9,17 @@ const CHAT = 'ahp-chat://default/s1';
 
 /**
  * Scripted AHP server on one half of an in-memory transport pair. `errorFor(request)` may answer a
- * request with an error instead; `listReply(n, answer)` decides when the n-th listSessions is answered
- * (VS Code sometimes takes minutes).
+ * request with an error instead; `hang(request)` leaves it unanswered; `listReply(n, answer)` decides
+ * when the n-th listSessions is answered (VS Code sometimes takes minutes).
  */
-function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig, chatExtra, sessionExtra } = {}) {
+function fakeHost(transport, { errorFor, hang, listReply, protocolVersion = '0.9.0', sessionConfig, chatConfig, chatExtra, sessionExtra } = {}) {
   let seq = 100;
   const received = [];
   const subscriptions = new Set();
   const send = (m) => transport.send(m);
   const sessionState = { provider: 'copilotcli', title: 'Test', status: 33, lifecycle: 'ready', chats: [{ resource: CHAT, title: '', status: 1, modifiedAt: '' }], defaultChat: CHAT, ...(sessionConfig ? { config: sessionConfig } : {}), ...sessionExtra };
   const chatState = { resource: CHAT, title: '', status: 1, modifiedAt: '', turns: [], ...(chatConfig ? { config: chatConfig } : {}), ...chatExtra };
+  const rootSnapshot = () => ({ resource: 'ahp-root://', state: { agents: [{ provider: 'copilotcli', displayName: 'Copilot', description: '', models: [{ id: 'm1', name: 'Model 1', provider: 'copilotcli' }] }] }, fromSeq: seq });
   let lists = 0;
   (async () => {
     for (;;) {
@@ -32,8 +33,14 @@ function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', s
         send({ jsonrpc: '2.0', id: m.id, error });
         continue;
       }
+      if (m.id !== undefined && hang?.(m)) continue;
       if (m.method === 'initialize') {
-        reply({ protocolVersion, serverSeq: seq, snapshots: [{ resource: 'ahp-root://', state: { agents: [{ provider: 'copilotcli', displayName: 'Copilot', description: '', models: [{ id: 'm1', name: 'Model 1', provider: 'copilotcli' }] }] }, fromSeq: seq }] });
+        reply({ protocolVersion, serverSeq: seq, snapshots: [rootSnapshot()] });
+      } else if (m.method === 'reconnect') {
+        // A new agent host (it doesn't know this client): snapshots of what the client still has open.
+        const open = (m.params.subscriptions || []).filter((c) => c === SESSION || c === CHAT);
+        for (const c of open) subscriptions.add(c);
+        reply({ type: 'snapshot', snapshots: [rootSnapshot(), ...open.map((c) => ({ resource: c, state: structuredClone(c === SESSION ? sessionState : chatState), fromSeq: seq }))] });
       } else if (m.method === 'listSessions') {
         const answer = () => reply({ items: [{ resource: SESSION, provider: 'copilotcli', title: 'Test', status: 33, createdAt: '', modifiedAt: '2026-01-01T00:00:00Z', workingDirectories: ['file:///c%3A/work'] }] });
         if (listReply) listReply(++lists, answer);
@@ -57,6 +64,7 @@ function fakeHost(transport, { errorFor, listReply, protocolVersion = '0.9.0', s
   return {
     received,
     subscriptions,
+    transport,
     push(channel, action) {
       seq++;
       send({ jsonrpc: '2.0', method: 'action', params: { channel, action, serverSeq: seq } });
@@ -230,6 +238,86 @@ test('a reconnect too large for the phone starts over without the open chats', a
   await until(() => host3.received.some((m) => m.method === 'listSessions'));
   assert.equal(host3.received.some((m) => JSON.stringify(m.params || {}).includes(CHAT)), false);
   assert.ok(host2.received.length > 0);
+  stop();
+});
+
+const hostStopped = (conn, loading) => conn.dispatchEvent(new CustomEvent('control', { detail: { message: { t: 'ahp.status', connected: false, stopped: true, reason: 'The VS Code agent host stopped.', ...(loading ? { loading } : {}) } } }));
+const reconnect = (conn, hostOpts) => {
+  const [clientSide, serverSide] = InMemoryTransport.pair();
+  const host = fakeHost(serverSide, hostOpts);
+  conn.dispatchEvent(new CustomEvent('ready', { detail: { transport: clientSide } }));
+  return host;
+};
+
+test('a conversation that was opening when the agent host stopped is not opened again by itself, until Try again', async () => {
+  // VS Code's agent host runs out of memory while it sends a very long chat: it stops before answering.
+  const { store, host, conn } = setup({ unsubscribeDelayMs: 30 }, { hang: (m) => m.method === 'subscribe' && m.params.channel === CHAT });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => host.received.some((m) => m.method === 'subscribe' && m.params.channel === CHAT));
+  hostStopped(conn, [CHAT]);
+  assert.ok(store.isStalled(SESSION));
+  assert.match(store.stalledText(SESSION), /stopped on your computer while this conversation was opening/);
+  assert.equal(store.subscribed.has(SESSION) || store.subscribed.has(CHAT), false);
+  assert.equal(store.sessionState.has(SESSION), false, 'not shown as if it were live');
+
+  // VS Code starts it again and the phone connects again: the conversation is not asked for again...
+  const host2 = reconnect(conn);
+  await until(() => store.sessionsLoaded && host2.received.some((m) => m.method === 'listSessions'));
+  const opened = (h) => h.received.filter((m) => [SESSION, CHAT].includes(m.params?.channel) || (m.params?.subscriptions || m.params?.initialSubscriptions || []).some((c) => c === SESSION || c === CHAT));
+  assert.deepEqual(opened(host2), []);
+  // ...nor when its chat is shown again (the person goes back and opens it from the list).
+  stop();
+  const again = store.watchSession(SESSION);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.deepEqual(opened(host2), []);
+  assert.equal(store.errors.length, 0, 'no "transport closed" error');
+
+  // Try again opens it.
+  store.retryChat(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  assert.equal(store.isStalled(SESSION), false);
+  assert.equal(store.stalledText(SESSION), null);
+  again();
+});
+
+test('what the computer saw opening counts too, and stalled sessions stay closed for a while only', async () => {
+  const { store, conn } = setup({ unsubscribeDelayMs: 30 });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => store.chatState.get(CHAT));
+  // The phone has the chat, but the computer was sending it again (a reconnect) when its agent host stopped.
+  hostStopped(conn, [CHAT, 'ahp-chat:/unknown', 42]);
+  assert.ok(store.isStalled(SESSION));
+  assert.equal(store.stalled.size, 1, 'only what this phone has open');
+  // After a while it opens by itself again.
+  store.stalled.set(SESSION, Date.now() - 16 * 60 * 1000);
+  assert.equal(store.isStalled(SESSION), false);
+  assert.equal(store.stalled.size, 0);
+  // Without a word from the computer, a dropped connection marks nothing.
+  const { store: s2, host: h2, conn: c2 } = setup({ unsubscribeDelayMs: 30 });
+  await until(() => s2.sessionsLoaded);
+  c2.dispatchEvent(new CustomEvent('control', { detail: { message: { t: 'ahp.status', connected: false, reason: 'The VS Code agent host is not running.', restartable: true } } }));
+  assert.equal(s2.stalled.size, 0);
+  assert.equal(s2.ahpRestartable, true);
+  assert.ok(h2.received.length > 0);
+  stop();
+});
+
+test('a dropped connection is not an error: what was open opens again when the connection is back', async () => {
+  const { store, host } = setup({ unsubscribeDelayMs: 30 }, { hang: (m) => m.method === 'subscribe' && m.params.channel === CHAT });
+  await until(() => store.sessionsLoaded);
+  const stop = store.watchSession(SESSION);
+  await until(() => host.received.some((m) => m.method === 'subscribe' && m.params.channel === CHAT));
+  // The phone's connection drops (the computer said nothing about its agent host).
+  host.transport.close();
+  await until(() => !store.loads.has(CHAT));
+  assert.equal(store.errors.length, 0, 'no "Could not open chat: transport closed"');
+  assert.ok(store.subscribed.has(CHAT));
+  assert.equal(store.isStalled(SESSION), false);
+  const host2 = reconnect(store.conn);
+  await until(() => store.chatState.get(CHAT));
+  assert.ok(host2.received.find((m) => m.method === 'reconnect').params.subscriptions.includes(CHAT));
   stop();
 });
 

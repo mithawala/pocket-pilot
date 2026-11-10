@@ -54,8 +54,17 @@ function plain(v, max = 200) {
 
 const has = (s, bit) => (s & bit) === bit;
 
+// A notification's text never loads a whole chat whose session keeps more than this on disk: the host
+// sends a chat all at once, and for a very long session that is enough to make it run out of memory.
+const MAX_PEEK_STORE_BYTES = 100 * 1024 * 1024;
+
 class SessionMonitor extends EventEmitter {
-  /** @param {{getEndpoint: () => object|null, log?: (l:string,m:string)=>void}} o */
+  /**
+   * @param {object} o
+   * @param {() => object|null} o.getEndpoint
+   * @param {(sessionUri: string) => number|null} [o.storeSize]  bytes a session keeps on disk, if known
+   * @param {(l: string, m: string) => void} [o.log]
+   */
   constructor(o) {
     super();
     this.o = o;
@@ -306,11 +315,22 @@ class SessionMonitor extends EventEmitter {
     }
   }
 
+  /** Whether a session's chat is small enough to load just for a notification's text. */
+  _canPeekChat(sessionUri) {
+    let size = null;
+    try {
+      size = this.o.storeSize?.(sessionUri);
+    } catch {
+      /* unknown */
+    }
+    return !(size > MAX_PEEK_STORE_BYTES);
+  }
+
   /** Human text describing why a session is blocked. */
   async describeInput(sessionUri) {
     const st = await this._peek(sessionUri);
     let req = st?.inputNeeded?.[0];
-    if (!req) {
+    if (!req && this._canPeekChat(sessionUri)) {
       // Some hosts do not maintain the session-level roll-up: look at the default chat's active turn.
       const chat = st?.defaultChat || st?.chats?.[0]?.resource;
       const cs = chat ? await this._peek(chat) : null;
@@ -337,7 +357,7 @@ class SessionMonitor extends EventEmitter {
   async describeDone(sessionUri) {
     const st = await this._peek(sessionUri);
     const chat = st?.defaultChat || st?.chats?.[0]?.resource;
-    if (!chat) return { text: 'Finished.' };
+    if (!chat || !this._canPeekChat(sessionUri)) return { text: 'Finished.', chat };
     const cs = await this._peek(chat);
     const turn = cs?.turns?.[cs.turns.length - 1];
     const md = turn ? [...turn.responseParts].reverse().find((p) => p.kind === 'markdown' && p.content?.trim()) : null;
@@ -364,4 +384,4 @@ class SessionMonitor extends EventEmitter {
   }
 }
 
-module.exports = { SessionMonitor, plain, BIT, effectiveStatus };
+module.exports = { SessionMonitor, plain, BIT, effectiveStatus, MAX_PEEK_STORE_BYTES };

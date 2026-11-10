@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.1
+
+- **When VS Code's agent runs out of memory, the phone no longer makes it worse.** VS Code runs every agent session in one background process, its agent host, and sends a conversation all at once when it's opened. A very long conversation (hundreds of megabytes, mostly screenshots) can make it run out of memory and stop. VS Code then starts it again, and after 5 crashes in a row it gives up. On one computer it crashed 11 times in just over an hour, on VS Code 1.145.2 and 1.145.3 alike.
+  - A conversation that was opening when the agent host stopped isn't opened again by itself: its chat says why, with **Try again**. Before, the phone asked for it again after every reconnect and could stop the agent host again each time.
+  - When VS Code has given up, the banner says the agent host isn't running (not "Computer offline") and offers **Restart**. Your computer then runs VS Code's *Developer: Restart Local Agent Host* and connects the phone once it's up. It only does this when the agent host isn't running.
+  - While the agent host isn't running, the phone asks again less and less often (up to every 30 seconds), not every 2 seconds.
+  - A dropped connection no longer shows "Could not open chat: transport closed" or "Could not load sessions: client shut down". What was open opens again when the connection is back.
+  - Notifications don't load a whole conversation to show its last sentence when VS Code keeps more than 100 MB for that session. They say "Finished." instead.
+  - The Pocket Pilot log notes which conversations were opening when the agent host stopped.
+- **Updating:** the phone app updates itself, and with it come Try again, the slower retries and the end of those errors. **Restart** and the lighter notifications need the new extension: click **Update** in the Pocket Pilot panel, then **Restart Extensions** where VS Code asks.
+
 ## 0.9.0
 
 - **Links in the chat open in the app.** Tap a file or folder the agent links to:
