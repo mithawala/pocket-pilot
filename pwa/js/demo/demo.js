@@ -55,18 +55,23 @@ const userMsg = (text, model = 'claude-opus-5.5', config = { thinkingLevel: 'max
 const DEMO_PICTURE = 'file:///c%3A/Users/you/AppData/Roaming/Code/agentSessionData/demo-dark/attachments/demo/Pasted%20Image.png';
 const pictureOf = (uri, label) => ({ type: 'resource', uri, label, displayKind: 'image', _meta: { 'vscode.agentHost.snapshotAttachment': { isSnapshot: true, contentType: 'image/png' } } });
 
-// The settings page before dark mode, drawn as an SVG.
-function settingsScreenshot() {
-  const row = (y, label, value) => `<rect x="24" y="${y}" width="342" height="52" rx="10" fill="#fff" stroke="#e3e6ea"/><text x="42" y="${y + 32}" font-size="16" fill="#1f2328">${label}</text><text x="348" y="${y + 32}" font-size="15" fill="#6e7781" text-anchor="end">${value}</text>`;
+// The settings page before dark mode (and after, `dark`), drawn as an SVG.
+function settingsScreenshot(dark = false) {
+  const c = dark
+    ? { bg: '#0d1117', bar: '#161b22', line: '#30363d', card: '#161b22', text: '#e6edf3', muted: '#8b949e', avatar: '#1f3a5f', initials: '#79c0ff' }
+    : { bg: '#f6f8fa', bar: '#fff', line: '#e3e6ea', card: '#fff', text: '#1f2328', muted: '#6e7781', avatar: '#dbe9ff', initials: '#2f6feb' };
+  const row = (y, label, value) => `<rect x="24" y="${y}" width="342" height="52" rx="10" fill="${c.card}" stroke="${c.line}"/><text x="42" y="${y + 32}" font-size="16" fill="${c.text}">${label}</text><text x="348" y="${y + 32}" font-size="15" fill="${c.muted}" text-anchor="end">${value}</text>`;
+  const note = dark
+    ? '<rect x="24" y="482" width="342" height="92" rx="10" fill="#12261e" stroke="#2ea043"/><text x="42" y="514" font-size="15" font-weight="600" fill="#3fb950">Dark mode is on</text><text x="42" y="540" font-size="14" fill="#7ee2a8">Your choice is remembered on</text><text x="42" y="560" font-size="14" fill="#7ee2a8">this device.</text>'
+    : '<rect x="24" y="482" width="342" height="92" rx="10" fill="#fff8c5" stroke="#eac54f"/><text x="42" y="514" font-size="15" font-weight="600" fill="#7d4e00">No dark mode yet</text><text x="42" y="540" font-size="14" fill="#7d4e00">Add a toggle here that remembers</text><text x="42" y="560" font-size="14" fill="#7d4e00">the choice.</text>';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="390" height="640" viewBox="0 0 390 640" font-family="Segoe UI, -apple-system, sans-serif">
-<rect width="390" height="640" fill="#f6f8fa"/><rect width="390" height="64" fill="#fff"/><rect y="63" width="390" height="1" fill="#e3e6ea"/>
-<text x="24" y="41" font-size="21" font-weight="700" fill="#1f2328">Settings</text><circle cx="356" cy="32" r="15" fill="#dbe9ff"/><text x="356" y="38" font-size="14" font-weight="700" fill="#2f6feb" text-anchor="middle">AK</text>
-<text x="28" y="104" font-size="12" font-weight="700" fill="#6e7781" letter-spacing="1">ACCOUNT</text>
+<rect width="390" height="640" fill="${c.bg}"/><rect width="390" height="64" fill="${c.bar}"/><rect y="63" width="390" height="1" fill="${c.line}"/>
+<text x="24" y="41" font-size="21" font-weight="700" fill="${c.text}">Settings</text><circle cx="356" cy="32" r="15" fill="${c.avatar}"/><text x="356" y="38" font-size="14" font-weight="700" fill="${c.initials}" text-anchor="middle">AK</text>
+<text x="28" y="104" font-size="12" font-weight="700" fill="${c.muted}" letter-spacing="1">ACCOUNT</text>
 ${row(116, 'Profile', 'Ada K.')}${row(176, 'Notifications', 'On')}${row(236, 'Language', 'English')}
-<text x="28" y="330" font-size="12" font-weight="700" fill="#6e7781" letter-spacing="1">APPEARANCE</text>
-${row(342, 'Theme', 'Light only')}${row(402, 'Text size', 'Default')}
-<rect x="24" y="482" width="342" height="92" rx="10" fill="#fff8c5" stroke="#eac54f"/><text x="42" y="514" font-size="15" font-weight="600" fill="#7d4e00">No dark mode yet</text>
-<text x="42" y="540" font-size="14" fill="#7d4e00">Add a toggle here that remembers</text><text x="42" y="560" font-size="14" fill="#7d4e00">the choice.</text>
+<text x="28" y="330" font-size="12" font-weight="700" fill="${c.muted}" letter-spacing="1">APPEARANCE</text>
+${row(342, 'Theme', dark ? 'Dark' : 'Light only')}${row(402, 'Text size', 'Default')}
+${note}
 </svg>`;
 }
 
@@ -94,14 +99,24 @@ function demoFilm() {
 const DEMO_FILES = {
   renders: { min: 4 },
   'renders/launch-film.mp4': { min: 4, bytes: demoFilm },
-  screenshots: { min: 11 },
+  screenshots: { min: 9 },
+  'screenshots/settings-after.svg': { min: 9, bytes: async () => encode(settingsScreenshot(true)) },
   'screenshots/settings-before.svg': { min: 11, bytes: async () => encode(settingsScreenshot()) },
   src: { min: 14 },
   'src/settings': { min: 14 },
   'src/settings/ThemeToggle.tsx': { min: 14, bytes: async () => encode("import { useEffect, useState } from 'react';\n\nexport function ThemeToggle() {\n  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');\n  useEffect(() => {\n    document.documentElement.dataset.theme = dark ? 'dark' : 'light';\n    localStorage.setItem('theme', dark ? 'dark' : 'light');\n  }, [dark]);\n  return <Switch label=\"Dark mode\" checked={dark} onChange={setDark} />;\n}\n") },
   'README.md': { min: 60 * 50, bytes: async () => encode('# acme-web\n\nThe Acme storefront.\n\n- `npm run dev` starts it on http://localhost:5173\n- `npm test` runs the unit tests\n') },
 };
-const demoPath = (uri) => /^file:\/\/\/c%3A\/Users\/you\/code\/[^/]+(?:\/(.*))?$/.exec(String(uri).replace(/\/+$/, ''));
+// A demo project's address, as the app writes it (c%3A) or as a chat link gives it (C:): the path in it.
+const demoPath = (uri) => {
+  let s = String(uri).replace(/\/+$/, '');
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    /* as written */
+  }
+  return /^file:\/\/\/c:\/Users\/you\/code\/[^/]+(?:\/(.*))?$/i.exec(s);
+};
 const toBase64 = (bytes) => {
   if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
   let s = '';
@@ -112,8 +127,8 @@ const toBase64 = (bytes) => {
 /** The demo's answers to `files` requests (see HostConnection.files). */
 async function demoFiles(op, { uri, offset = 0, length = 0, limit = 100 } = {}) {
   const m = demoPath(uri);
-  if (!m) throw Object.assign(new Error('Only the files in your session folders can be opened'), { code: 'denied' });
-  const rel = m[1] ? decodeURIComponent(m[1]) : '';
+  if (!m) throw Object.assign(new Error('Only the files in your session folders, and the files and folders an agent links to, can be opened'), { code: 'denied' });
+  const rel = m[1] || '';
   const mtime = (min) => now - min * 60000;
   // Files the demo chats link to but Files doesn't list: some code, as before.
   if (rel && !DEMO_FILES[rel] && /\.\w+$/.test(rel) && op !== 'list') {
@@ -257,7 +272,7 @@ function sessionsData() {
     turns: [{ id: 'demo-node-t1', startedAt: ago(200), duration: 240000, state: 'complete', usage: undefined, message: userMsg('Upgrade our CI images and engines field to Node 24.'), responseParts: [{ kind: 'markdown', id: 'nm1', content: 'Done — CI images, `.nvmrc` and `engines` now target **Node 24**. All pipelines are green.' }] }],
   });
   add('notes', 'Write release notes for v2.3', 'copilotcli', 'acme-web', S.Idle | S.IsRead, 60 * 26, undefined, {
-    turns: [{ id: 'demo-notes-t1', startedAt: ago(60 * 26 + 5), duration: 41000, state: 'complete', usage: undefined, message: userMsg('Draft release notes for v2.3 from the merged PRs.'), responseParts: [{ kind: 'markdown', id: 'rm1', content: '## v2.3\n- Dark mode for settings\n- Faster checkout (−38% p95)\n- 14 bug fixes' }] }],
+    turns: [{ id: 'demo-notes-t1', startedAt: ago(60 * 26 + 5), duration: 41000, state: 'complete', usage: undefined, message: userMsg('Draft release notes for v2.3 from the merged PRs.'), responseParts: [{ kind: 'markdown', id: 'rm1', content: '## v2.3\n- Dark mode for settings\n- Faster checkout (−38% p95)\n- 14 bug fixes\n\nThe before and after screenshots are in [screenshots](C:/Users/you/code/acme-web/screenshots), and the launch film is [launch-film.mp4](C:/Users/you/code/acme-web/renders/launch-film.mp4).' }] }],
   });
   return list;
 }
@@ -278,6 +293,9 @@ class DemoConnection extends EventTarget {
     return { ok: true, path: `C:\\Users\\you\\code\\.pocket-pilot\\uploads\\${name}` };
   }
   get canBrowseFiles() {
+    return true;
+  }
+  get canOpenLinks() {
     return true;
   }
   files(op, params) {

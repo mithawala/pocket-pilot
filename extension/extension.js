@@ -414,6 +414,7 @@ class PocketPilotService {
       },
       welcomeExtras: (device) => ({ vapidPublicKey: this.vapid.publicKey, rendezvous: this._rendezvousFor(device), pwaUrl: settings().pwaUrl || null }),
       isReadAllowed: (uri) => this._isReadAllowed(uri),
+      linkedPathsFile: path.join(this.storageDir, 'linked-paths.json'),
       adjustSummary: (s) => this.monitor.adjustSummary(s),
       saveUpload: (req) => this._saveUpload(req),
       pwaDir: fs.existsSync(pwaDir) ? pwaDir : undefined,

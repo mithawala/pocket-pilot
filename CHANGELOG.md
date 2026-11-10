@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.0
+
+- **Links in the chat open in the app.** Tap a file or folder the agent links to:
+  - A file opens on its page: pictures and text show right away, and anything can be downloaded and saved to your phone.
+  - A folder opens with what's inside it. Tap a picture, then tap it again to see it full screen and swipe through the folder's other pictures.
+  - Links written as `C:/…`, `C:\…`, `file:///…`, or relative to the session's folder (`docs/notes.md`) all work, and so do reference-style links (`[1]: C:/…`). Before, only `file:` links could be tapped, and only inside the session's folder. A local picture the agent embeds (`![shot](C:/…)`) becomes a link to it; the same text inside code stays as written.
+- **Also outside the session's folder, but only what the agent linked.** A link opens even outside the session's folder, as long as the agent linked it in a chat your phone was shown. The computer notes those links as the chat passes through it, and remembers them across restarts. Everything else outside your session folders stays closed.
+  - A link never opens your home folder or a whole drive. A link to a folder that holds your apps' data and sign-ins (`.ssh`, `AppData`, `Library`, …) shows its list but doesn't open what's inside; a link to one file in there does open it.
+  - These are checked where a link really leads: a shortcut in a linked folder can't lead anywhere else, and another name for your home folder (a junction, or a Windows short name like `C:\Users\ABC~1`) is still your home folder.
+  - Network shares (`\\server\share`) never open through a link, and the computer doesn't contact them to check.
+  - Only what the agent wrote counts. Not what your phone or VS Code sends, and not what VS Code shows back from your own messages: it answers `/rename <title>` and runs `!<command>` itself, so nothing in a `!` turn counts, nor a link copied from your message. The phone ends tool calls only as plain-text failures (when it skips a sign-in).
+- **Folders list files by name.** Screenshots numbered 1–5 come in that order. Recent still shows the newest first.
+- A link that opens nothing here (an e-mail address, a heading) no longer looks like one.
+- Tested:
+  - Live against VS Code 1.145: the *CAIP SE Manager App* chat loaded as on a phone, and its link to `caip-se-manager-1.17.0-highlights` in Downloads opened with its 5 screenshots. One downloaded byte for byte. A file next to the folder that was never linked, and the home folder, stayed closed.
+  - On a simulated iPhone and in Edge: folder and file links (also with backslashes), a picture full screen and the next one swiped to, relative and reference-style links, web links in a new tab, and the reason shown for a link that can't open.
+- **Updating:** links outside the session's folder need the new version on your computer. In VS Code, click **Update** in the Pocket Pilot panel, then **Restart Extensions** where VS Code asks. In the GitHub Copilot app, update the plugin on the Plugins page. The phone app updates itself.
+
 ## 0.8.1
 
 - **Restart extensions starts the new version.** In the VS Code panel, Restart extensions restarted the extensions but kept running the version you had, so the panel offered it again after every restart. VS Code switches to an installed update only with its own Restart Extensions; a plain restart of the extension host starts the version it started with.

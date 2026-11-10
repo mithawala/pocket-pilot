@@ -19,6 +19,8 @@ export const FILES = {
   lock: path.join(HOME, 'hub.lock'),
   tunnel: path.join(HOME, 'tunnel'),
   uploads: path.join(HOME, 'uploads'),
+  // The files and folders agents linked in chats, which paired devices may open (extension/core/links.js).
+  links: path.join(HOME, 'linked-paths.json'),
   // Sessions started from a paired device (lib/phone-runtime.mjs): the list, and a marker per new
   // session so its extension attaches before the first message.
   phoneSessions: path.join(HOME, 'phone-sessions.json'),

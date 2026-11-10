@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.8.1';
+export const APP_VERSION = '0.9.0';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 // A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and
@@ -516,6 +516,11 @@ export class HostConnection extends EventTarget {
   /** Whether the PC lets this device browse and download the files in its session folders. */
   get canBrowseFiles() {
     return !!this.welcome?.files;
+  }
+
+  /** Whether the PC also opens the files and folders agents link to, outside the session folders. */
+  get canOpenLinks() {
+    return (this.welcome?.files || 0) >= 2;
   }
 
   /**

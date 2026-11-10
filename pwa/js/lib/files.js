@@ -78,6 +78,21 @@ export function underUri(root, rel) {
   return String(rel).split('/').filter(Boolean).reduce(childUri, root);
 }
 
+/** The address of a link relative to the folder `base` (`docs/a.md`, `./x`, `../y`), never above its drive. */
+export function resolveUri(base, rel) {
+  let uri = String(base).replace(/\/+$/, '');
+  const top = /^file:\/\/[^/]*\/[^/]+/.exec(uri)?.[0] || uri;
+  for (const part of String(rel).replace(/\\/g, '/').split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (uri.length > top.length) uri = uri.slice(0, uri.lastIndexOf('/'));
+      continue;
+    }
+    uri = childUri(uri, part);
+  }
+  return uri;
+}
+
 /** The last part of an address, decoded ("promo final.mp4"). */
 export function baseName(uri) {
   const last = String(uri || '').replace(/\/+$/, '').split('/').pop() || '';
@@ -282,8 +297,9 @@ function keepWithin(conn) {
 }
 
 /**
- * The download of `uri` from this connection's PC, made if needed. One that finished for an older version
- * of the file (another size or last change than `known`) is dropped first.
+ * The download of `uri` from this connection's PC, made if needed. One for an older version of the file
+ * (another size or last change than `known`) starts over, unless it is going on or can go on where it
+ * stopped.
  */
 export function downloadFor(conn, uri, known = {}) {
   let all = registry.get(conn);
@@ -295,8 +311,8 @@ export function downloadFor(conn, uri, known = {}) {
     });
   }
   let d = all.get(uri);
-  const stale = d && d.state === 'done' && ((known.size !== undefined && known.size !== d.size) || (known.mtime && d.mtime && known.mtime !== d.mtime));
-  if (stale) {
+  const older = d && ((known.size !== undefined && known.size !== d.size) || (known.mtime && d.mtime && known.mtime !== d.mtime));
+  if (older && d.state !== 'running' && !d.resumable) {
     d.release();
     all.delete(uri);
     d = null;
@@ -307,6 +323,30 @@ export function downloadFor(conn, uri, known = {}) {
   }
   d.usedAt = Date.now();
   return d;
+}
+
+/**
+ * A picture on the computer for the full-screen viewer (see loadPicture): it downloads when the viewer
+ * shows it, once, so swiping through a folder of screenshots loads each as it comes.
+ */
+export function pictureAtt(conn, f) {
+  const name = f.name || baseName(f.uri);
+  const load = () => {
+    const d = downloadFor(conn, f.uri, { name, size: f.size, mtime: f.mtime });
+    const ready = () => ({ url: d.url, type: d.type, size: d.size });
+    if (d.state === 'done') return Promise.resolve(ready());
+    return new Promise((resolve, reject) => {
+      const on = () => {
+        if (d.state === 'done') resolve(ready());
+        else if (d.state === 'failed' || d.state === 'cancelled') reject(d.error || new Error('The picture could not be loaded'));
+        else return;
+        d.removeEventListener('change', on);
+      };
+      d.addEventListener('change', on);
+      if (d.state !== 'running') d.start();
+    });
+  };
+  return { type: 'lazy', label: name, load };
 }
 
 /** Whether saving goes through the share sheet (phones and tablets) rather than a download. */

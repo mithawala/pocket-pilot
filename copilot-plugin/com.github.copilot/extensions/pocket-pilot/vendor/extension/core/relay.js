@@ -13,6 +13,8 @@ const { slimForPhone } = require('./slim');
 const { deviceIdFor } = require('./store');
 const { loadSecureChannel, loadTotp } = require('./identity');
 const files = require('./files');
+const { LinkedPaths, loadLinkParser } = require('./links');
+const { isInside } = require('./attachments');
 const { fileURLToPath, pathToFileURL } = require('url');
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
@@ -62,6 +64,26 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
 };
+
+// What the phone tells VS Code to show for a tool call it ends ("Skipped Search repositories"): text.
+const plainText = (s, max) => (typeof s === 'string' ? s.replace(/\]\s*\(/g, '] (').slice(0, max) : undefined);
+
+/**
+ * A device ends a tool call only to skip a sign-in (Continue without signing in): as a failure, in plain
+ * text. Anything else is dropped, and the text can't hold a link, which the relay would then let devices
+ * open (see LinkedPaths). Returns the action to pass on, or null.
+ */
+function deviceToolCallComplete(action) {
+  const r = action.result;
+  if (!r || typeof r !== 'object' || r.success !== false) return null;
+  const error = r.error && typeof r.error === 'object' ? { message: plainText(r.error.message, 2000) || '', ...(typeof r.error.code === 'string' ? { code: r.error.code.slice(0, 40) } : {}) } : undefined;
+  return {
+    type: action.type,
+    turnId: action.turnId,
+    toolCallId: action.toolCallId,
+    result: { success: false, ...(typeof r.pastTenseMessage === 'string' ? { pastTenseMessage: plainText(r.pastTenseMessage, 500) } : {}), ...(error ? { error } : {}) },
+  };
+}
 
 class RelayError extends Error {
   constructor(code, message, { quiet = false, closeCode = 4400 } = {}) {
@@ -146,6 +168,8 @@ class RelayServer extends EventEmitter {
    * @param {() => {requireApproval:boolean, passkey:'required'|'optional'|'off', passkeyGraceHours:number, allowTotp?:boolean}} o.policy
    * @param {(device: object) => Promise<object>|object} o.welcomeExtras
    * @param {(uri: string) => boolean} [o.isReadAllowed]
+   * @param {string} [o.linkedPathsFile]  where to keep the files and folders agents linked (see LinkedPaths)
+   * @param {string} [o.homeDir]  the home folder, which a link never opens (the user's, if not given)
    * @param {(req: object) => Promise<{uri:string, path:string}>} [o.saveUpload]
    * @param {string} [o.pwaDir]
    * @param {(level: string, msg: string) => void} [o.log]
@@ -164,6 +188,16 @@ class RelayServer extends EventEmitter {
   async listen(port = 0, host = '127.0.0.1') {
     this.sc = await loadSecureChannel();
     this.totp = await loadTotp();
+    if (this.o.isReadAllowed && !this.links) {
+      const covered = (p) => {
+        try {
+          return !!this.o.isReadAllowed(pathToFileURL(p).href);
+        } catch {
+          return false;
+        }
+      };
+      this.links = new LinkedPaths({ parser: await loadLinkParser(), file: this.o.linkedPathsFile || null, covered, home: this.o.homeDir, log: this.log });
+    }
     this.server = http.createServer((req, res) => this._http(req, res));
     this.server.on('upgrade', (req, socket, head) => this._upgrade(req, socket, head));
     this.server.on('clientError', (err, socket) => socket.destroy());
@@ -185,6 +219,7 @@ class RelayServer extends EventEmitter {
     for (const c of [...this.connections]) c.close(1001, 'Pocket Pilot stopped');
     if (this.server) await new Promise((resolve) => this.server.close(() => resolve()));
     this.server = null;
+    this.links?.flush();
   }
 
   /** Active phone connections that completed authentication. */
@@ -500,8 +535,8 @@ class DeviceConnection extends EventEmitter {
       host: { id: o.identity.hostId, name: o.identity.name },
       passkey: !!fresh.passkey,
       factor: fresh.passkey ? 'passkey' : fresh.totp ? 'totp' : null,
-      // Browsing and downloading the files in session folders (version of the `files` messages).
-      ...(o.isReadAllowed ? { files: 1 } : {}),
+      // Browsing and downloading files (version of the `files` messages; 2: also what agents link to).
+      ...(o.isReadAllowed ? { files: 2 } : {}),
       ...extras,
     });
     this.log('info', `Device "${fresh.name}" connected from ${this.meta.ip}`);
@@ -810,6 +845,12 @@ class DeviceConnection extends EventEmitter {
         this._sendAhp(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: 'Reading files outside your session folders is not allowed' } }));
         return;
       }
+      if (msg.method === 'dispatchAction' && msg.params?.action?.type === 'chat/toolCallComplete') {
+        const action = deviceToolCallComplete(msg.params.action);
+        if (!action) return;
+        msg.params.action = action;
+        text = JSON.stringify(msg);
+      }
       if (isRequest && msg.method === 'listSessions') this.listIds.add(msg.id);
     }
     this.ahp.send(text);
@@ -830,6 +871,8 @@ class DeviceConnection extends EventEmitter {
     } else if (msg.method === 'root/sessionAdded' || msg.method === 'root/sessionSummaryChanged') {
       text = this._adjustSummaries(msg, text);
     }
+    // The files and folders the agent links to, which the device may then open (see _files).
+    this.relay.links?.scanMessage(msg);
     this._sendAhp(slimForPhone(msg, text));
   }
 
@@ -930,16 +973,29 @@ class DeviceConnection extends EventEmitter {
     } catch {
       return fail('invalid', 'Not a file on this computer');
     }
-    // The address as read (`..` resolved), not as sent.
-    if (!o.isReadAllowed(pathToFileURL(p).href)) return fail('denied', 'Only the files in your session folders can be opened');
-    // A link in a session folder may point anywhere: where it leads must be allowed too.
-    let real = null;
-    try {
-      real = await fs.promises.realpath(p);
-    } catch {
-      /* not there: the request says so itself */
-    }
-    if (real && real !== p && !o.isReadAllowed(pathToFileURL(real).href)) return fail('denied', 'Only the files in your session folders can be opened');
+    // Inside a session folder, or in what an agent linked in a chat (a file, or a folder and what's in it).
+    // Checked on the address as read (`..` resolved), not as sent, before anything looks at the disk.
+    const links = this.relay.links;
+    const inSession = (q) => {
+      try {
+        return !!o.isReadAllowed(pathToFileURL(q).href);
+      } catch {
+        return false;
+      }
+    };
+    const NOT_ALLOWED = 'Only the files in your session folders, and the files and folders an agent links to, can be opened';
+    const TOO_MUCH = "Your home folder, whole drives, and the folders that hold your apps' data and sign-ins can't be opened from your phone. Ask the agent to link the file itself.";
+    const session = inSession(p);
+    const link = session ? null : links?.grantFor(p) || null;
+    if (!session && !link) return fail('denied', links?.blockedBy(p) ? TOO_MUCH : NOT_ALLOWED);
+    // Where things really are must be allowed too: a linked address may be another name for a place a link
+    // never opens (a junction, a short name like C:\Users\ABC~1), and a link (shortcut) in a folder may lead
+    // anywhere. Looked up without holding anything else up.
+    const realOf = (q) => fs.promises.realpath(q).catch(() => null);
+    const realLink = link ? await realOf(link) : null;
+    if (realLink && realLink !== link && (path.relative(link, p) === '' ? links.broad(realLink) : links.sensitive(realLink))) return fail('denied', TOO_MUCH);
+    const real = await realOf(p);
+    if (real && real !== p && !inSession(real) && !links?.grantFor(real) && !(realLink && isInside(real, realLink))) return fail('denied', NOT_ALLOWED);
     await this._fileSlot();
     if (this.state === 'closed') return this._fileDone();
     try {

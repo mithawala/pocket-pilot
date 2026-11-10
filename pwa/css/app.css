@@ -345,6 +345,8 @@ a.btn { text-decoration: none; }
 .md h1 { font-size: 1.3em; } .md h2 { font-size: 1.17em; } .md h3 { font-size: 1.05em; } .md h4 { font-size: 1em; }
 .md a { color: var(--accent); text-decoration: none; }
 .md a.file-link, .md .file-link { color: var(--accent); cursor: pointer; }
+/* A link that opens nothing here (an e-mail address, a heading on a page) reads as text. */
+.md a:not([href]):not(.file-link) { color: inherit; }
 .md code { font-family: var(--mono); font-size: 0.86em; color: var(--strong); background: var(--surface); border-radius: 4px; padding: 0.12em 0.36em; }
 .md pre { margin: 0.7em 0; padding: 10px 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; background: var(--code-bg); border: 1px solid var(--line-2); border-radius: 8px; }
 .md pre code { padding: 0; font-size: inherit; color: var(--text); background: none; border-radius: 0; }

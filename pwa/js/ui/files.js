@@ -3,7 +3,7 @@
 // through the share sheet: "Save Video" keeps a video in Photos, "Save to Files" keeps anything.
 import { html, useState, useEffect, useRef } from '../lib/ui.js';
 import { Icon, Sheet, Spinner, toast } from './common.js';
-import { fileKind, kindIcon, formatSize, fileTime, childUri, underUri, baseName, partsUnder, downloadFor, saveFile, saveLabel, savesByShare, MAX_DOWNLOAD } from '../lib/files.js';
+import { fileKind, kindIcon, formatSize, fileTime, childUri, underUri, baseName, partsUnder, downloadFor, pictureAtt, saveFile, saveLabel, savesByShare, MAX_DOWNLOAD } from '../lib/files.js';
 import { filePath, folderName } from '../lib/format.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { openPictures } from './viewer.js';
@@ -32,11 +32,12 @@ function useChanges(target) {
   }, [target]);
 }
 
-/** What to tell the person when a file can't be listed, read or downloaded. */
-export function fileError(err) {
+/** What to tell the person when a file can't be listed, read or downloaded (`conn`: from this computer). */
+export function fileError(err, conn) {
   switch (err?.code) {
     case 'denied':
-      return "Only the files in this session's folder can be opened.";
+      if (conn && !conn.canOpenLinks) return "Only the files in this session's folder can be opened. Update Pocket Pilot on your computer to open the files and folders the agent links to, wherever they are.";
+      return err.message ? err.message.replace(/([^.])$/, '$1.') : "This can't be opened from your phone.";
     case 'not-found':
       return 'This is no longer on your computer.';
     case 'offline':
@@ -87,9 +88,10 @@ function saveHint(kind) {
 
 /**
  * One file: its details, a preview once it's downloaded, and Download, then Save. `file` holds the
- * `uri`, and the `size` and `mtime` when a listing gave them (otherwise they're asked for).
+ * `uri`, and the `size` and `mtime` when a listing gave them (otherwise they're asked for). A picture
+ * opens full screen with the other `pictures` of its list, to swipe through.
  */
-export function FileDetail({ conn, file, root, onBack }) {
+export function FileDetail({ conn, file, root, onBack, backLabel = 'Files', pictures = [] }) {
   const { uri } = file;
   const name = file.name || baseName(uri);
   const kind = fileKind(name);
@@ -121,7 +123,12 @@ export function FileDetail({ conn, file, root, onBack }) {
       if (how === 'downloaded' && savesByShare()) toast(`Downloaded ${name}`);
     }, (err) => toast(err.message, 'err'));
   };
-  const openFull = () => openPictures([{ att: { type: 'url', url: d.url, label: name }, read: null }], 0);
+  const openFull = () => {
+    const here = { att: { type: 'url', url: d.url, label: name }, read: null };
+    const at = pictures.findIndex((p) => p.uri === uri);
+    if (at < 0) return openPictures([here], 0);
+    openPictures(pictures.map((p, i) => (i === at ? here : { att: pictureAtt(conn, p), read: null })), at);
+  };
   let preview;
   if (d.state === 'done' && kind === 'image') preview = html`<button type="button" class="file-img" onClick=${openFull} aria-label=${`View ${name} full screen`}><img src=${d.url} alt=${name} /></button>`;
   else if (d.state === 'done' && kind === 'video') preview = html`<video class="file-video" src=${d.url} controls playsinline preload="metadata"></video>`;
@@ -130,7 +137,7 @@ export function FileDetail({ conn, file, root, onBack }) {
   else preview = html`<div class=${`file-hero ${kind}`}><${Icon} name=${kindIcon(kind)} /></div>`;
   const pct = size ? Math.min(100, Math.round((d.received / size) * 100)) : 0;
   let actions;
-  if (infoError) actions = html`<div class="errpart">${fileError(infoError)}</div>`;
+  if (infoError) actions = html`<div class="errpart">${fileError(infoError, conn)}</div>`;
   else if (!info && d.state === 'idle') actions = html`<div class="file-wait"><${Spinner} /></div>`;
   else if (tooLarge) actions = html`<div class="errpart">At ${formatSize(size)}, this file is too large to download to your phone (up to ${formatSize(MAX_DOWNLOAD)}).</div>`;
   else if (d.state === 'running') {
@@ -147,12 +154,12 @@ export function FileDetail({ conn, file, root, onBack }) {
   } else {
     const failed = d.state === 'failed';
     actions = html`<div class="file-actions">
-      ${failed && html`<div class="errpart">${fileError(d.error)}</div>`}
+      ${failed && html`<div class="errpart">${fileError(d.error, conn)}</div>`}
       <button class="btn primary block" onClick=${() => d.start()}><${Icon} name=${d.resumable ? 'refresh' : 'download'} /> ${d.resumable ? `Resume · ${formatSize(d.received)} of ${formatSize(size)}` : `${failed ? 'Try again' : 'Download'} · ${formatSize(size)}`}</button>
     </div>`;
   }
   return html`<div class="file-detail">
-    ${onBack && html`<button class="btn sm file-back" onClick=${onBack}><${Icon} name="back" size="16" /> Files</button>`}
+    ${onBack && html`<button class="btn sm file-back" onClick=${onBack}><${Icon} name="back" size="16" /> ${backLabel}</button>`}
     <div class="file-head">
       <div class="file-name">${name}</div>
       <div class="muted small">${[size || info ? formatSize(size) : '', fileTime(mtime)].filter(Boolean).join(' · ')}</div>
@@ -192,18 +199,23 @@ function RecentList({ conn, root, onFile, refresh }) {
     return () => { stop = true; };
   }, [root, refresh]);
   if (state.loading) return html`<div class="empty"><${Spinner} /><p>Looking for the newest files…</p></div>`;
-  if (state.error) return html`<div class="errpart">${fileError(state.error)}</div>`;
+  if (state.error) return html`<div class="errpart">${fileError(state.error, conn)}</div>`;
   if (!state.files.length) return html`<div class="empty">No files in this folder yet.</div>`;
+  const listed = state.files.map((f) => ({ uri: underUri(root, f.path), name: f.name, size: f.size, mtime: f.mtime }));
+  const pictures = listed.filter((f) => fileKind(f.name) === 'image');
   return html`<div class="file-list">
-    ${state.files.map((f) => {
+    ${state.files.map((f, i) => {
       const where = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')).replace(/\//g, ' / ') : '';
-      return html`<${FileRow} key=${f.path} entry=${{ name: f.name, type: 'file' }} meta=${[where, formatSize(f.size), fileTime(f.mtime)].filter(Boolean).join(' · ')} onOpen=${() => onFile({ uri: underUri(root, f.path), name: f.name, size: f.size, mtime: f.mtime })} />`;
+      return html`<${FileRow} key=${f.path} entry=${{ name: f.name, type: 'file' }} meta=${[where, formatSize(f.size), fileTime(f.mtime)].filter(Boolean).join(' · ')} onOpen=${() => onFile(listed[i], pictures)} />`;
     })}
     ${state.truncated && html`<div class="muted small file-note">This folder is large, so not all of it was searched. Look in Folders for the rest.</div>`}
   </div>`;
 }
 
-/** One folder: its folders by name, then its files, newest first. */
+// Names as people sort them: "shot 2" before "shot 10".
+const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+
+/** One folder: its folders, then its files, by name. */
 function FolderList({ conn, root, dir, onDir, onFile, refresh }) {
   const [state, setState] = useState({ loading: true });
   useEffect(() => {
@@ -212,8 +224,8 @@ function FolderList({ conn, root, dir, onDir, onFile, refresh }) {
     conn.files('list', { uri: dir }).then((r) => {
       if (stop) return;
       const entries = r.entries.filter(visible);
-      const folders = entries.filter((e) => e.type === 'directory').sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-      const rest = entries.filter((e) => e.type !== 'directory').sort((a, b) => b.mtime - a.mtime || a.name.localeCompare(b.name));
+      const folders = entries.filter((e) => e.type === 'directory').sort(byName);
+      const rest = entries.filter((e) => e.type !== 'directory').sort(byName);
       setState({ dir, entries: [...folders, ...rest], truncated: r.truncated });
     }, (err) => !stop && setState({ dir, error: err }));
     return () => { stop = true; };
@@ -221,6 +233,7 @@ function FolderList({ conn, root, dir, onDir, onFile, refresh }) {
   // Only what was listed for this folder: not the previous folder's list while this one loads.
   const current = state.dir === dir ? state : { loading: true };
   const parts = partsUnder(root, dir) || [];
+  const pictures = (current.entries || []).filter((e) => e.type === 'file' && fileKind(e.name) === 'image').map((e) => ({ uri: childUri(dir, e.name), name: e.name, size: e.size, mtime: e.mtime }));
   return html`<div>
     <div class="crumbs" aria-label="Folder">
       ${[folderName(root), ...parts].map((p, i, all) => html`<span key=${i} class="crumb">
@@ -229,19 +242,22 @@ function FolderList({ conn, root, dir, onDir, onFile, refresh }) {
       </span>`)}
     </div>
     ${current.loading && html`<div class="empty"><${Spinner} /></div>`}
-    ${current.error && html`<div class="errpart">${fileError(current.error)}</div>`}
+    ${current.error && html`<div class="errpart">${fileError(current.error, conn)}</div>`}
     ${current.entries && !current.entries.length && html`<div class="empty">This folder is empty.</div>`}
     ${current.entries && html`<div class="file-list">
       ${current.entries.map((e) => html`<${FileRow} key=${e.name} entry=${e} meta=${e.type === 'file' ? `${formatSize(e.size)} · ${fileTime(e.mtime)}` : ''}
-        onOpen=${() => (e.type === 'directory' ? onDir(childUri(dir, e.name)) : onFile({ uri: childUri(dir, e.name), name: e.name, size: e.size, mtime: e.mtime }))} />`)}
+        onOpen=${() => (e.type === 'directory' ? onDir(childUri(dir, e.name)) : onFile({ uri: childUri(dir, e.name), name: e.name, size: e.size, mtime: e.mtime }, pictures))} />`)}
       ${current.truncated && html`<div class="muted small file-note">Only the first ${current.entries.length} entries are shown.</div>`}
     </div>`}
   </div>`;
 }
 
-/** Recent and Folders, and a file's page in place of the list (Files goes back to where you were). */
-function FilesBrowser({ conn, root }) {
-  const [tab, setTab] = useState(() => (localStorage.getItem('pp:filesTab') === 'folders' ? 'folders' : 'recent'));
+/**
+ * Recent and Folders under `root`, and a file's page in place of the list (its back button goes back to
+ * where you were). `remember` keeps the chosen tab for next time (the session's Files).
+ */
+function FilesBrowser({ conn, root, initialTab = null, remember = true }) {
+  const [tab, setTab] = useState(() => initialTab || (localStorage.getItem('pp:filesTab') === 'folders' ? 'folders' : 'recent'));
   const [dir, setDir] = useState(root);
   const [file, setFile] = useState(null);
   const [refresh, setRefresh] = useState(0);
@@ -250,15 +266,16 @@ function FilesBrowser({ conn, root }) {
   const sheet = () => box.current?.closest('.sheet');
   const pick = (t) => {
     setTab(t);
+    if (!remember) return;
     try {
       localStorage.setItem('pp:filesTab', t);
     } catch {
       /* private mode */
     }
   };
-  const open = (f) => {
+  const open = (f, pictures = []) => {
     scrollTop.current = sheet()?.scrollTop || 0;
-    setFile(f);
+    setFile({ ...f, pictures });
     if (sheet()) sheet().scrollTop = 0;
   };
   const back = () => {
@@ -267,7 +284,7 @@ function FilesBrowser({ conn, root }) {
       if (sheet()) sheet().scrollTop = scrollTop.current;
     });
   };
-  if (file) return html`<div ref=${box}><${FileDetail} key=${file.uri} conn=${conn} file=${file} root=${root} onBack=${back} /></div>`;
+  if (file) return html`<div ref=${box}><${FileDetail} key=${file.uri} conn=${conn} file=${file} root=${root} onBack=${back} backLabel=${remember ? 'Files' : 'Back'} pictures=${file.pictures} /></div>`;
   return html`<div ref=${box} class="files">
     <div class="row files-bar">
       <div class="seg grow" role="tablist">
@@ -291,9 +308,27 @@ export function FilesSheet({ open, onClose, conn, root, host }) {
   return html`<${Sheet} open=${open} onClose=${onClose} title="Files" wide=${true}>${body}</${Sheet}>`;
 }
 
-/** A file the agent links to in the chat. */
-export function FileSheet({ conn, uri, root, onClose }) {
-  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} doneLabel="Close" title="File">
-    ${uri && html`<${FileDetail} key=${uri} conn=${conn} file=${{ uri }} root=${root} />`}
-  </${Sheet}>`;
+/**
+ * What a link in the chat points to: a file opens on its page, a folder with what's in it (its folders,
+ * then its files; pictures to swipe through full screen). `root` is the session's folder.
+ */
+export function LinkSheet({ conn, uri, root, onClose }) {
+  // What `stat` said, and about which link: the answer for the link tapped before isn't shown for this one.
+  const [what, setWhat] = useState({ uri: null });
+  useEffect(() => {
+    if (!uri) return undefined;
+    let stop = false;
+    conn.files('stat', { uri }).then((r) => !stop && setWhat({ ...r, uri }), (err) => !stop && setWhat({ uri, error: err }));
+    return () => { stop = true; };
+  }, [uri]);
+  const ready = what.uri === uri;
+  const folder = ready && what.type === 'directory';
+  let body = null;
+  if (!uri) body = null;
+  else if (!ready) body = html`<div class="empty"><${Spinner} /></div>`;
+  else if (what.error) body = html`<div class="file-detail"><div class="file-head"><div class="file-name">${baseName(uri)}</div><div class="kv">${filePath(uri).replace(/[\\/][^\\/]*$/, '')}</div></div><div class="errpart">${fileError(what.error, conn)}</div></div>`;
+  else if (folder) body = html`<${FilesBrowser} key=${uri} conn=${conn} root=${uri} initialTab="folders" remember=${false} />`;
+  else if (what.type === 'file') body = html`<${FileDetail} key=${uri} conn=${conn} file=${{ uri, size: what.size, mtime: what.mtime }} root=${root} />`;
+  else body = html`<div class="errpart">This can't be opened here.</div>`;
+  return html`<${Sheet} open=${!!uri} onClose=${onClose} wide=${true} doneLabel="Close" title=${folder ? baseName(uri) || 'Folder' : 'File'}>${body}</${Sheet}>`;
 }

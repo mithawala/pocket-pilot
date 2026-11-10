@@ -136,6 +136,8 @@ export function isInside(child, parent) {
 // Where session folders really are on disk (links resolved), looked up at most once a minute.
 const realDirs = new Map();
 function realDir(dir) {
+  // A network share is taken at its address: looking it up could hold everything up while it answers.
+  if (/^[\\/]{2}[^\\/]/.test(dir)) return dir;
   const hit = realDirs.get(dir);
   if (hit && Date.now() - hit.at < 60000) return hit.real;
   let real = dir;

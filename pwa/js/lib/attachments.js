@@ -110,6 +110,8 @@ function cacheKey(att) {
  */
 export function loadPicture(att, read) {
   if (att?.type === 'url') return Promise.resolve({ url: att.url, type: att.contentType || '', size: att.size || 0 });
+  // A picture downloaded when it's shown (pictureAtt in lib/files.js), which keeps it itself.
+  if (att?.type === 'lazy') return att.load();
   const key = cacheKey(att);
   const hit = cache.get(key);
   if (hit) {

@@ -342,6 +342,7 @@ async function boot(log, cleanups) {
     },
     welcomeExtras: (device) => ({ vapidPublicKey: vapid.publicKey, rendezvous: rendezvousFor(device), pwaUrl: PWA_URL, hostKind: 'copilot', canCreateSessions: true }),
     isReadAllowed,
+    linkedPathsFile: FILES.links,
     adjustSummary: (s) => (monitorRef.current ? monitorRef.current.adjustSummary(s) : s),
     saveUpload,
     tunnelRedirect: () => PWA_URL,

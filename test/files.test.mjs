@@ -262,7 +262,7 @@ test('demo: Files shows a small project, newest first, and downloads from it', a
     const root = 'file:///c%3A/Users/you/code/acme-web';
     assert.equal(conn.canBrowseFiles, true);
     const recent = await conn.files('recent', { uri: root });
-    assert.deepEqual(recent.files.map((f) => f.path), ['renders/launch-film.mp4', 'screenshots/settings-before.svg', 'src/settings/ThemeToggle.tsx', 'README.md']);
+    assert.deepEqual(recent.files.map((f) => f.path), ['renders/launch-film.mp4', 'screenshots/settings-after.svg', 'screenshots/settings-before.svg', 'src/settings/ThemeToggle.tsx', 'README.md']);
     const list = await conn.files('list', { uri: root });
     assert.deepEqual(list.entries.map((e) => e.name).sort(), ['README.md', 'renders', 'screenshots', 'src']);
     const d = new Download(conn, underUri(root, 'README.md'));

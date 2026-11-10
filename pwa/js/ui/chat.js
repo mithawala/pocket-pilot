@@ -8,7 +8,8 @@ import { waitingOn, subagentAsks } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
 import { openPictures } from './viewer.js';
-import { FilesSheet, FileSheet } from './files.js';
+import { FilesSheet, LinkSheet } from './files.js';
+import { resolveUri } from '../lib/files.js';
 
 const PAGE = 25;
 
@@ -81,6 +82,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   useChange(store, (d) => !d.uri || d.uri === uri || d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || store.chatFor(uri) === d.uri);
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
+  const rootRef = useRef(null);
   const [menu, setMenu] = useState(false);
   const [files, setFiles] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
@@ -182,7 +184,16 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
         return;
       }
       const f = e.target.closest('[data-file]');
-      if (f) setFileUri(f.getAttribute('data-file'));
+      if (f) {
+        setFileUri(f.getAttribute('data-file'));
+        return;
+      }
+      // A path relative to the session's folder, as VS Code reads one.
+      const rel = e.target.closest('[data-file-rel]');
+      if (rel) {
+        if (rootRef.current) setFileUri(resolveUri(rootRef.current, rel.getAttribute('data-file-rel')));
+        else toast("This session has no folder on your computer, so this link can't be opened.");
+      }
     };
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
@@ -203,6 +214,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const folder = folderName(session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0]);
   // The session's folder on the PC, where Files starts.
   const root = session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0] || null;
+  rootRef.current = root;
   const empty = chatState && !turns.length && !active && !localPending.length;
 
   return html`<div class="screen">
@@ -247,7 +259,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
     </div>
     ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} autoFocus=${embedded} />`}
     ${conn?.canBrowseFiles
-      ? html`<${FileSheet} conn=${conn} uri=${fileUri} root=${root} onClose=${() => setFileUri(null)} />`
+      ? html`<${LinkSheet} conn=${conn} uri=${fileUri} root=${root} onClose=${() => setFileUri(null)} />`
       : html`<${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />`}
     <${FilesSheet} open=${files} onClose=${() => setFiles(false)} conn=${conn} root=${root} host=${hostApp(conn?.record)} />
     <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} onFiles=${() => setFiles(true)} />

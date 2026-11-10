@@ -67,6 +67,8 @@ function startFakeAgentHost() {
         reply({ snapshot: { resource: m.params.channel, fromSeq: 10, state: state.chats[m.params.channel] } });
       } else if (m.method === 'dispatchAction') {
         c.send(JSON.stringify({ jsonrpc: '2.0', method: 'action', params: { channel: m.params.channel, action: m.params.action, serverSeq: 11, origin: { clientId: 'x', clientSeq: m.params.clientSeq } } }));
+        // What the host itself sends next (the agent's answer, say), as VS Code does: without an origin.
+        for (const action of state.serverActions?.(m.params) || []) c.send(JSON.stringify({ jsonrpc: '2.0', method: 'action', params: { channel: m.params.channel, action, serverSeq: 12 } }));
       } else if (m.id !== undefined) {
         reply({});
       }
@@ -808,5 +810,252 @@ test('files: a session folder reached through a link works, and its links lead n
     fs.rmSync(alias, { recursive: false, force: true });
     fs.rmSync(real, { recursive: true, force: true });
     fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('links: what an agent links in a chat opens on the phone, even outside the session folders, and nothing else', async () => {
+  const { isInFolder } = require('../extension/core/attachments.js');
+  const { pathToUri } = await import('../pwa/js/core/links.js');
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-work-'));
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-dl-'));
+  const shots = path.join(elsewhere, 'caip-se-manager-1.17.0-highlights');
+  const secret = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-secret-'));
+  fs.mkdirSync(shots);
+  fs.writeFileSync(path.join(shots, '1-leaderboard.png'), crypto.randomBytes(3000));
+  fs.writeFileSync(path.join(shots, '2-encryption.png'), crypto.randomBytes(2000));
+  fs.writeFileSync(path.join(elsewhere, 'other.txt'), 'not linked');
+  fs.writeFileSync(path.join(secret, 'key.txt'), 'secret');
+  fs.symlinkSync(secret, path.join(shots, 'sneaky'), 'junction');
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-store-'));
+  const linkedPathsFile = path.join(storage, 'linked-paths.json');
+  const CHAT = 'ahp-chat:/caip';
+  const answer = `The screenshots are in [caip-se-manager-1.17.0-highlights](${shots.replace(/\\/g, '/')}), numbered 1–5. Home: [home](${pathToUri(os.homedir())}).`;
+  const isReadAllowed = (uri) => {
+    try {
+      return isInFolder(fileURLToPath(String(uri)), work);
+    } catch {
+      return false;
+    }
+  };
+  const relayOptions = { isReadAllowed, linkedPathsFile };
+  let env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions });
+  env.fake.state.chats = { [CHAT]: { turns: [{ id: 't1', message: { text: 'release notes' }, state: 'complete', responseParts: [{ kind: 'markdown', id: 'm1', content: answer }] }] } };
+  let conn;
+  const shotUri = childUri(pathToFileURL(shots).href, '1-leaderboard.png');
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    let ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { transport } = await ready;
+    assert.equal(conn.canOpenLinks, true);
+    // Before the phone has seen the chat: outside the session folder, so no.
+    await assert.rejects(conn.files('stat', { uri: shotUri }), (e) => e.code === 'denied' && /files and folders an agent links to/.test(e.message));
+
+    const client = new AhpClient(transport, { requestTimeoutMs: 10000 });
+    client.connect();
+    await client.initialize({ clientId: 'phone-links', protocolVersions: ['0.9.0'], initialSubscriptions: [] });
+    await client.subscribe(CHAT);
+    // The linked folder, with what's in it.
+    const folder = await conn.files('list', { uri: pathToFileURL(shots).href });
+    assert.deepEqual(folder.entries.map((e) => e.name).sort(), ['1-leaderboard.png', '2-encryption.png', 'sneaky']);
+    const piece = await conn.files('read', { uri: shotUri, offset: 0, length: 5000 });
+    assert.ok(Buffer.from(piece.data, 'base64').equals(fs.readFileSync(path.join(shots, '1-leaderboard.png'))));
+    // Still nothing else: a file next to it, a shortcut in it that leads elsewhere, the home folder.
+    await assert.rejects(conn.files('stat', { uri: pathToFileURL(path.join(elsewhere, 'other.txt')).href }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('read', { uri: childUri(childUri(pathToFileURL(shots).href, 'sneaky'), 'key.txt'), offset: 0, length: 10 }), (e) => e.code === 'denied');
+    await assert.rejects(conn.files('list', { uri: pathToFileURL(os.homedir()).href }), (e) => e.code === 'denied' && /home folder/.test(e.message));
+    await client.shutdown().catch(() => {});
+    conn.stop();
+
+    // After a restart (a new relay), links in chats the phone already loaded still open.
+    await env.cleanup();
+    env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions });
+    const record2 = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone 2', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record2, { webauthn: {} });
+    ready = waitEvent(conn, 'ready');
+    conn.start();
+    await ready;
+    assert.equal((await conn.files('stat', { uri: shotUri })).type, 'file');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+    for (const d of [work, elsewhere, secret, storage]) fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
+async function linkedRelay({ relayOptions, links = '' }) {
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions });
+  if (links) env.relay.links.scanText(links);
+  const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+  const conn = new HostConnection(record, { webauthn: {} });
+  const ready = waitEvent(conn, 'ready');
+  conn.start();
+  const { transport } = await ready;
+  return { env, conn, transport };
+}
+const onlyIn = (folder) => (uri) => {
+  const { isInFolder } = require('../extension/core/attachments.js');
+  try {
+    return isInFolder(fileURLToPath(String(uri)), folder);
+  } catch {
+    return false;
+  }
+};
+const tooMuch = (e) => e.code === 'denied' && /home folder/.test(e.message);
+
+test('links: another name for the home folder (a junction to it) opens no more than the home folder itself', async () => {
+  const { pathToUri } = await import('../pwa/js/core/links.js');
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-home-')));
+  const home = path.join(base, 'me');
+  const work = path.join(base, 'work');
+  const elsewhere = path.join(base, 'elsewhere');
+  for (const d of [path.join(home, 'Documents'), path.join(home, 'AppData', 'Local', 'Acme'), work, elsewhere]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(home, 'Documents', 'notes.txt'), 'notes');
+  fs.writeFileSync(path.join(home, 'AppData', 'Local', 'Acme', 'token.txt'), 'token');
+  const j = path.join(elsewhere, 'me');
+  fs.symlinkSync(home, j, 'junction');
+  const { env, conn } = await linkedRelay({
+    relayOptions: { isReadAllowed: onlyIn(work), homeDir: home },
+    links: `[me](${pathToUri(j)}) [local](${pathToUri(path.join(j, 'AppData', 'Local'))})`,
+  });
+  const at = (...p) => pathToFileURL(path.join(j, ...p)).href;
+  try {
+    await assert.rejects(conn.files('list', { uri: at() }), tooMuch, 'the home folder');
+    await assert.rejects(conn.files('read', { uri: at('Documents', 'notes.txt'), offset: 0, length: 10 }), tooMuch, 'what is in it');
+    await assert.rejects(conn.files('stat', { uri: at('Documents', 'no-such-file.txt') }), tooMuch, 'nor whether something is there');
+    await assert.rejects(conn.files('read', { uri: at('AppData', 'Local', 'Acme', 'token.txt'), offset: 0, length: 10 }), tooMuch, 'app data');
+    assert.equal((await conn.files('stat', { uri: at('AppData', 'Local') })).type, 'directory', 'a linked app-data folder shows its list');
+    // A folder in the home folder is fine, through the junction too.
+    env.relay.links.scanText(`[docs](${pathToUri(path.join(j, 'Documents'))})`);
+    const piece = await conn.files('read', { uri: at('Documents', 'notes.txt'), offset: 0, length: 10 });
+    assert.equal(Buffer.from(piece.data, 'base64').toString(), 'notes');
+  } finally {
+    conn.stop();
+    await env.cleanup();
+    fs.rmSync(j, { recursive: false, force: true });
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('links: Windows short names (C:\\Users\\AMITHA~1) are the home folder too', { skip: process.platform !== 'win32' }, async (t) => {
+  const { pathToUri } = await import('../pwa/js/core/links.js');
+  // Windows often gives the temp folder by its short name (C:\Users\AMITHA~1\AppData\Local\Temp).
+  const short = /^(.*~\d[^\\]*)\\AppData\\Local\\Temp$/i.exec(os.tmpdir())?.[1];
+  if (!short || fs.realpathSync.native(short).toLowerCase() !== os.homedir().toLowerCase()) return t.skip('no short name for the home folder here');
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-work-'));
+  const { env, conn } = await linkedRelay({
+    relayOptions: { isReadAllowed: onlyIn(work) },
+    links: `[me](${pathToUri(short)}) [local](${pathToUri(path.join(short, 'AppData', 'Local'))})`,
+  });
+  try {
+    await assert.rejects(conn.files('list', { uri: pathToFileURL(short).href }), tooMuch, `${short} is ${os.homedir()}`);
+    await assert.rejects(conn.files('list', { uri: pathToFileURL(path.join(short, 'AppData', 'Local', 'Temp')).href }), tooMuch);
+  } finally {
+    conn.stop();
+    await env.cleanup();
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+  return undefined;
+});
+
+test('links: a network share opens only as a session folder, and is not looked at otherwise', async () => {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-work-'));
+  const { env, conn } = await linkedRelay({ relayOptions: { isReadAllowed: onlyIn(work) } });
+  const realpath = fs.promises.realpath;
+  const looked = [];
+  fs.promises.realpath = (p, ...rest) => {
+    looked.push(String(p));
+    return realpath(p, ...rest);
+  };
+  try {
+    // On Windows, \\pp-nohost.invalid\share\x.txt; elsewhere not a file of this computer at all.
+    await assert.rejects(conn.files('stat', { uri: 'file://pp-nohost.invalid/share/x.txt' }), (e) => e.code === (process.platform === 'win32' ? 'denied' : 'invalid'));
+    assert.deepEqual(looked, []);
+  } finally {
+    fs.promises.realpath = realpath;
+    conn.stop();
+    await env.cleanup();
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('links: what VS Code shows back from a message (/rename, !command) does not open; a path typed in a message that the agent links does', async () => {
+  const { pathToUri } = await import('../pwa/js/core/links.js');
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-work-'));
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-links-out-'));
+  for (const n of ['promo.mp4', 'renamed.txt', 'command.txt', 'ran.txt']) fs.writeFileSync(path.join(out, n), n);
+  const at = (n) => path.join(out, n).replace(/\\/g, '/');
+  const { env, conn, transport } = await linkedRelay({ relayOptions: { isReadAllowed: onlyIn(work) } });
+  // As VS Code does: it answers `/rename <title>` and runs `!<command>` itself; the rest goes to the agent.
+  env.fake.state.serverActions = ({ action: a }) => {
+    if (a.type !== 'chat/turnStarted') return [];
+    const { text } = a.message;
+    const turnId = a.turnId;
+    if (text.startsWith('/rename ')) return [{ type: 'chat/responsePart', turnId, part: { kind: 'markdown', id: 'r', content: `Renamed: ${text.slice(8).trim()}` } }];
+    if (text.startsWith('!')) {
+      return [
+        { type: 'chat/toolCallStart', turnId, toolCallId: 'b', toolName: 'terminal', displayName: 'Terminal', intention: text.slice(1) },
+        { type: 'chat/toolCallReady', turnId, toolCallId: 'b', invocationMessage: text.slice(1), toolInput: text.slice(1), confirmed: 'not-needed' },
+        { type: 'chat/toolCallComplete', turnId, toolCallId: 'b', result: { success: true, pastTenseMessage: `Ran [ran.txt](${pathToUri(at('ran.txt'))})` } },
+      ];
+    }
+    return [{ type: 'chat/responsePart', turnId, part: { kind: 'markdown', id: 'm', content: `Done: [promo.mp4](${at('promo.mp4')})` } }];
+  };
+  const client = new AhpClient(transport, { requestTimeoutMs: 10000 });
+  client.connect();
+  try {
+    await client.initialize({ clientId: 'phone-echo', protocolVersions: ['0.9.0'], initialSubscriptions: [] });
+    const CHAT = 'ahp-chat:/echo';
+    const turn = (turnId, text) => client.dispatch(CHAT, { type: 'chat/turnStarted', turnId, startedAt: new Date().toISOString(), message: { text, origin: { kind: 'user' } } });
+    turn('t1', `/rename [renamed](${pathToUri(at('renamed.txt'))})`);
+    turn('t2', `!echo [command](${pathToUri(at('command.txt'))})`);
+    turn('t3', `Render the promo and save it to ${at('promo.mp4')}`);
+    const uri = (n) => pathToFileURL(at(n)).href;
+    let opened = false;
+    for (let i = 0; i < 100 && !opened; i++) {
+      opened = await conn.files('stat', { uri: uri('promo.mp4') }).then(() => true, () => false);
+      if (!opened) await new Promise((r) => setTimeout(r, 30));
+    }
+    assert.ok(opened, 'the file the agent linked opens, though its path was typed in the message');
+    for (const n of ['renamed.txt', 'command.txt', 'ran.txt']) await assert.rejects(conn.files('stat', { uri: uri(n) }), (e) => e.code === 'denied', n);
+  } finally {
+    await client.shutdown().catch(() => {});
+    conn.stop();
+    await env.cleanup();
+    for (const d of [work, out]) fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('links: a device cannot plant a link the computer would trust (it ends tool calls only as plain-text failures)', async () => {
+  const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' } });
+  let conn;
+  try {
+    const record = await pairWithHost({ fragment: await env.newFragment(), deviceName: 'Phone', platform: 'iOS', webauthn: {} });
+    conn = new HostConnection(record, { webauthn: {} });
+    const ready = waitEvent(conn, 'ready');
+    conn.start();
+    const { transport } = await ready;
+    const client = new AhpClient(transport, { requestTimeoutMs: 10000 });
+    client.connect();
+    await client.initialize({ clientId: 'phone-plant', protocolVersions: ['0.9.0'], initialSubscriptions: [] });
+    const secret = pathToFileURL(path.join(os.homedir(), 'Documents', 'secret.txt')).href;
+    // Continue without signing in, as the app sends it: passed on as it is.
+    client.dispatch('ahp-chat:/c1', { type: 'chat/toolCallComplete', turnId: 't1', toolCallId: 'a', result: { success: false, pastTenseMessage: 'Skipped Search repositories', error: { message: 'The user chose to continue without signing in.', code: 'cancelled' } } });
+    // A link in the text: defused. A "success", or more fields: never passed on.
+    client.dispatch('ahp-chat:/c1', { type: 'chat/toolCallComplete', turnId: 't1', toolCallId: 'b', result: { success: false, pastTenseMessage: `Read [secret](${secret})`, invocationMessage: `[secret](${secret})`, error: { message: `[x](${secret})`, code: 'x' } } });
+    client.dispatch('ahp-chat:/c1', { type: 'chat/toolCallComplete', turnId: 't1', toolCallId: 'c', result: { success: true, pastTenseMessage: 'ok' } });
+    client.dispatch('ahp-chat:/c1', { type: 'chat/toolCallComplete', turnId: 't1', toolCallId: 'd' });
+    await client.request('listSessions', { channel: 'ahp-root://' });
+    const sent = env.fake.state.received.filter((m) => m.method === 'dispatchAction').map((m) => m.params.action);
+    assert.deepEqual(sent.map((a) => a.toolCallId), ['a', 'b'], 'only failures are passed on');
+    assert.deepEqual(sent[0].result, { success: false, pastTenseMessage: 'Skipped Search repositories', error: { message: 'The user chose to continue without signing in.', code: 'cancelled' } });
+    assert.equal(sent[1].result.invocationMessage, undefined);
+    assert.ok(![sent[1].result.pastTenseMessage, sent[1].result.error.message].some((s) => /\]\(/.test(s)), 'no link left');
+    await assert.rejects(conn.files('stat', { uri: secret }), (e) => e.code === 'denied');
+    await client.shutdown().catch(() => {});
+  } finally {
+    conn?.stop();
+    await env.cleanup();
   }
 });

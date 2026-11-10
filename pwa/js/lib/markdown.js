@@ -1,31 +1,33 @@
 // Markdown -> sanitized HTML. Agent output is untrusted: everything goes through DOMPurify.
 import { marked } from '../../vendor/marked/marked.esm.js';
 import DOMPurify from '../../vendor/dompurify/purify.es.js';
+import { localLink } from '../core/links.js';
 
 marked.setOptions({ gfm: true, breaks: false });
 
-// DOMPurify drops file: URLs before afterSanitizeAttributes runs, so remember them on the way in.
-// (No DOM, e.g. in Node tests, means no hooks: this module is only imported there, never rendered.)
-const fileHrefs = new WeakMap();
+// DOMPurify drops hrefs it doesn't know (file:, C:/…) before afterSanitizeAttributes runs, so remember
+// every link's target on the way in. (No DOM, e.g. in Node tests, means no hooks: this module is only
+// imported there, never rendered.)
+const rawHrefs = new WeakMap();
 const addHook = typeof DOMPurify.addHook === 'function' ? DOMPurify.addHook.bind(DOMPurify) : () => {};
 addHook('uponSanitizeAttribute', (node, data) => {
-  if (node.tagName === 'A' && data.attrName === 'href' && /^file:/i.test(data.attrValue || '')) fileHrefs.set(node, data.attrValue);
+  if (node.tagName === 'A' && data.attrName === 'href') rawHrefs.set(node, data.attrValue || '');
 });
 
 addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
-    const file = fileHrefs.get(node);
-    const href = node.getAttribute('href') || '';
-    if (file) {
-      // Local files cannot be opened on the phone: keep the label, remember the path (opens the preview).
-      node.setAttribute('data-file', file);
-      node.removeAttribute('href');
-      node.classList.add('file-link');
-    } else if (/^https?:\/\//i.test(href)) {
+    const raw = rawHrefs.get(node) ?? node.getAttribute('href') ?? '';
+    if (/^https?:\/\//i.test(raw) && node.getAttribute('href')) {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
     } else {
+      // A file or folder on the computer (C:/…, file:…, or relative to the session's folder): it opens
+      // in the app, so keep the label and remember where it points.
+      const local = localLink(raw);
       node.removeAttribute('href');
+      if (local?.uri) node.setAttribute('data-file', local.uri);
+      else if (local?.rel) node.setAttribute('data-file-rel', local.rel);
+      if (local) node.classList.add('file-link');
     }
   }
   if (node.tagName === 'IMG') {
@@ -37,9 +39,30 @@ addHook('afterSanitizeAttributes', (node) => {
 
 const PURIFY = {
   ALLOWED_TAGS: ['a', 'b', 'blockquote', 'br', 'code', 'del', 'details', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'input', 'kbd', 'li', 'ol', 'p', 'pre', 's', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul'],
-  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'data-file', 'target', 'rel', 'loading', 'colspan', 'rowspan', 'align'],
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'data-file', 'data-file-rel', 'target', 'rel', 'loading', 'colspan', 'rowspan', 'align'],
   ALLOW_DATA_ATTR: false,
 };
+
+// A picture on the computer (![shot](C:/…/shot.png)) can't show inline: it becomes a link that opens it.
+// Done on the parsed picture, so code that shows such markdown stays as it is.
+const attr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+marked.use({
+  renderer: {
+    image({ href, title, text }) {
+      if (!localLink(href)) return false;
+      let name = String(text || '').trim();
+      if (!name) {
+        name = String(href).replace(/[?#].*$/, '').split(/[\\/]/).pop() || 'picture';
+        try {
+          name = decodeURIComponent(name);
+        } catch {
+          /* as written */
+        }
+      }
+      return `<a href="${attr(href)}"${title ? ` title="${attr(title)}"` : ''}>${attr(name)}</a>`;
+    },
+  },
+});
 
 const cache = new Map();
 

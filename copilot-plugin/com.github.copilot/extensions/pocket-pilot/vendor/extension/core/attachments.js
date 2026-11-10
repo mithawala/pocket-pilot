@@ -14,6 +14,8 @@ const realFolders = new Map();
 
 /** A folder as the disk has it, links resolved (macOS keeps /tmp in /private/tmp, say). */
 function realFolder(dir) {
+  // A network share is taken at its address: looking it up could hold everything up while it answers.
+  if (/^[\\/]{2}[^\\/]/.test(dir)) return dir;
   const hit = realFolders.get(dir);
   if (hit && Date.now() - hit.at < 60000) return hit.real;
   let real = dir;
