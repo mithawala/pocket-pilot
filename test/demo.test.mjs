@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDemo } from '../pwa/js/demo/demo.js';
 import { modelDefaults, modelSummary } from '../pwa/js/ui/model-picker.js';
+import { isCompleted } from '../pwa/js/lib/format.js';
 
 async function until(fn, ms = 15000) {
   const start = Date.now();
@@ -12,6 +13,22 @@ async function until(fn, ms = 15000) {
     await new Promise((r) => setTimeout(r, 50));
   }
 }
+
+test('demo: subagent histories exercise both states of Show Done', () => {
+  const { store } = createDemo();
+  try {
+    const session = 'copilotcli:/demo-dark';
+    const [, running, done] = store.sessionChats(session);
+    assert.equal(isCompleted(running), false);
+    assert.equal(isCompleted(done), true);
+    const stop = store.watchSession(session, done.resource);
+    assert.equal(store.chatFor(session), done.resource);
+    assert.equal(store.chatState.get(done.resource).turns.length, 1);
+    stop();
+  } finally {
+    store.dispose();
+  }
+});
 
 test('demo: approving the pending tool call completes the turn through the real reducers', async () => {
   const { store } = createDemo();

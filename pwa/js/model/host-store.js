@@ -5,7 +5,7 @@ import { AhpClient, RpcError, RpcTimeoutError, TransportError, ClientClosedError
 import { rootReducer, sessionReducer, chatReducer, compareProtocolVersions } from '../../vendor/ahp/types/index.js';
 import { PROTOCOL_VERSIONS } from '../core/protocol.js';
 import { TOO_LARGE } from '../net/host-connection.js';
-import { S, has, uuid, effectiveStatus } from '../lib/format.js';
+import { S, has, uuid, effectiveStatus, isCompleted } from '../lib/format.js';
 import { waitingOn, signInKey, serverName } from '../lib/asks.js';
 
 const ROOT = 'ahp-root://';
@@ -93,6 +93,9 @@ export class HostStore extends EventTarget {
     this.watchers = new Map();
     this.subscribed = new Set();
     this._chatFor = new Map();
+    this.selectedChats = new Map();
+    this.subscribeRequests = new Map();
+    this.catalogWatchers = new Map();
     this.kinds = new Map();
     this.unsubTimers = new Map();
     this.localTurns = new Map();
@@ -147,6 +150,8 @@ export class HostStore extends EventTarget {
   }
 
   dispose() {
+    for (const timer of this.unsubTimers.values()) clearTimeout(timer);
+    this.unsubTimers.clear();
     this.conn.removeEventListener('ready', this.onReady);
     this.conn.removeEventListener('control', this.onControl);
     this.conn.removeEventListener('state', this.onState);
@@ -335,6 +340,7 @@ export class HostStore extends EventTarget {
       this._emit('root');
       return;
     }
+    if (!this.subscribed.has(uri)) return;
     const kind = this._kind(uri);
     (kind === 'chat' ? this.chatState : this.sessionState).set(uri, snap.state);
     if (kind === 'chat') this.failedChats.delete(uri);
@@ -380,7 +386,7 @@ export class HostStore extends EventTarget {
       return;
     }
     if (kind === 'chat' && env.action.type === 'chat/turnStarted') this.localTurns.delete(env.action.turnId);
-    if (kind === 'session' && /^session\/(chatAdded|defaultChatChanged|ready)$/.test(env.action.type)) this._ensureChat(uri);
+    if (kind === 'session' && /^session\/(chatAdded|chatRemoved|chatUpdated|defaultChatChanged|ready)$/.test(env.action.type)) this._ensureChat(uri);
     this._emit(kind, uri);
   }
 
@@ -388,11 +394,14 @@ export class HostStore extends EventTarget {
     this.sessionState.delete(uri);
     this.chatState.delete(uri);
     this.snapshotSeq.delete(uri);
+    this.pending.delete(uri);
+    this.subscribeRequests.delete(uri);
+    this.loads.delete(uri);
   }
 
   // ------------------------------------------------------------------ subscriptions
   // Sessions are ref-counted by the screens watching them. A watched session owns exactly one
-  // chat subscription (its default chat); `subscribed` holds every URI subscribed on the wire.
+  // chat subscription; `subscribed` holds every URI subscribed on the wire.
 
   _subscribe(uri, kind) {
     this.kinds.set(uri, kind);
@@ -401,14 +410,14 @@ export class HostStore extends EventTarget {
     if (this.client) {
       const client = this.client;
       this.loads.set(uri, kind);
-      client.subscribe(uri).then(({ result, subscription }) => {
-        this.loads.delete(uri);
+      const request = client.subscribe(uri);
+      this.subscribeRequests.set(uri, request);
+      request.then(({ result, subscription }) => {
         subscription.close();
-        if (client === this.client && result?.snapshot) this._applySnapshot(result.snapshot);
+        if (client === this.client && this.subscribeRequests.get(uri) === request && result?.snapshot) this._applySnapshot(result.snapshot);
       }).catch((err) => {
-        this.loads.delete(uri);
         // The connection went away: it subscribes again when it's back (see _onReady).
-        if (client !== this.client || dropped(err)) return;
+        if (client !== this.client || this.subscribeRequests.get(uri) !== request || dropped(err)) return;
         this.subscribed.delete(uri);
         if (kind === 'chat' && err instanceof RpcError) {
           // The computer answered (e.g. too large): show it on the chat instead of asking again by itself.
@@ -417,6 +426,10 @@ export class HostStore extends EventTarget {
           return;
         }
         this._error(`Could not open ${kind}: ${errorText(err)}`);
+      }).finally(() => {
+        if (this.subscribeRequests.get(uri) !== request) return;
+        this.subscribeRequests.delete(uri);
+        if (client === this.client) this.loads.delete(uri);
       });
     }
   }
@@ -515,8 +528,22 @@ export class HostStore extends EventTarget {
     this._drop(uri);
   }
 
-  /** Keeps the session and its default chat subscribed until the returned function is called. */
-  watchSession(sessionUri) {
+  watchSessionCatalog(sessionUri) {
+    this.catalogWatchers.set(sessionUri, (this.catalogWatchers.get(sessionUri) || 0) + 1);
+    if (!this.isStalled(sessionUri)) this._subscribe(sessionUri, 'session');
+    return () => {
+      const remaining = this.catalogWatchers.get(sessionUri) - 1;
+      if (remaining > 0) {
+        this.catalogWatchers.set(sessionUri, remaining);
+        return;
+      }
+      this.catalogWatchers.delete(sessionUri);
+      if (!this.watchers.get(sessionUri)) this._release(sessionUri);
+    };
+  }
+
+  /** Keeps the session and the open chat subscribed until the returned function is called. */
+  watchSession(sessionUri, initialChat) {
     const t = this.unsubTimers.get(sessionUri);
     if (t) {
       clearTimeout(t);
@@ -524,11 +551,18 @@ export class HostStore extends EventTarget {
     }
     // Opening the chat again tries again.
     if (!this.watchers.get(sessionUri)) this.failedChats.delete(this.chatFor(sessionUri));
+    if (initialChat) {
+      this.selectedChats.set(sessionUri, initialChat);
+      this.failedChats.delete(initialChat);
+    } else if (initialChat === null) {
+      this.selectedChats.delete(sessionUri);
+    }
     this.watchers.set(sessionUri, (this.watchers.get(sessionUri) || 0) + 1);
     if (!this.isStalled(sessionUri)) {
       this._subscribe(sessionUri, 'session');
       this._ensureChat(sessionUri);
     }
+    if (initialChat !== undefined) this._emit('session', sessionUri);
     let released = false;
     return () => {
       if (released) return;
@@ -542,7 +576,8 @@ export class HostStore extends EventTarget {
         this.watchers.delete(sessionUri);
         const chat = this._chatFor.get(sessionUri);
         this._chatFor.delete(sessionUri);
-        this._release(sessionUri);
+        this.selectedChats.delete(sessionUri);
+        if (!this.catalogWatchers.has(sessionUri)) this._release(sessionUri);
         if (chat) this._release(chat);
       }, this.unsubDelay));
     };
@@ -550,11 +585,17 @@ export class HostStore extends EventTarget {
 
   _ensureChat(sessionUri) {
     if (!this.watchers.has(sessionUri) || this.isStalled(sessionUri)) return;
-    const st = this.sessionState.get(sessionUri);
-    const chat = st?.defaultChat || st?.chats?.[0]?.resource;
-    if (!chat) return;
+    if (!this.sessionState.has(sessionUri)) return;
+    const chats = this.sessionChats(sessionUri);
+    const selected = this.selectedChats.get(sessionUri);
+    const chat = chats.some((entry) => entry.resource === selected) ? selected : chats[0]?.resource;
+    if (chat !== selected) this.selectedChats.delete(sessionUri);
     const prev = this._chatFor.get(sessionUri);
     if (prev && prev !== chat) this._release(prev);
+    if (!chat) {
+      this._chatFor.delete(sessionUri);
+      return;
+    }
     this._chatFor.set(sessionUri, chat);
     if (this.failedChats.has(chat)) return;
     this._subscribe(chat, 'chat');
@@ -578,8 +619,20 @@ export class HostStore extends EventTarget {
   }
 
   chatFor(sessionUri) {
-    const st = this.sessionState.get(sessionUri);
-    return this._chatFor.get(sessionUri) || st?.defaultChat || st?.chats?.[0]?.resource || null;
+    return this._chatFor.get(sessionUri) || this.sessionChats(sessionUri)[0]?.resource || null;
+  }
+
+  sessionChats(sessionUri) {
+    const st = this.sessionState.get(sessionUri) || this.sessions.get(sessionUri);
+    if (!st) return [];
+    const chats = st.chats || [];
+    const visible = chats.filter((entry) => entry.interactivity !== 'hidden');
+    const primary = st.defaultChat || visible.find((entry) => !isCompleted(entry))?.resource || visible[0]?.resource;
+    if (!primary) return [];
+    return [
+      chats.find((entry) => entry.resource === primary) || { resource: primary, title: st.title },
+      ...visible.filter((entry) => entry.resource !== primary),
+    ];
   }
 
   // ------------------------------------------------------------------ queries
@@ -611,8 +664,8 @@ export class HostStore extends EventTarget {
     return status;
   }
 
-  sortedSessions() {
-    const arr = [...this.sessions.values()].filter((s) => !has(s.status, S.IsArchived)).map((s) => {
+  sortedSessions({ showCompleted = false } = {}) {
+    const arr = [...this.sessions.values()].filter((s) => showCompleted || !isCompleted(s)).map((s) => {
       const status = this.statusFor(s);
       return status === s.status ? s : { ...s, status };
     });
@@ -693,7 +746,12 @@ export class HostStore extends EventTarget {
     const chat = this.chatFor(sessionUri);
     if (!chat) throw new Error('This session is still loading');
     const turn = this.chatState.get(chat)?.activeTurn;
-    const send = () => this.sendMessage(sessionUri, { text, attachments, model });
+    const send = () => {
+      if (this.chatFor(sessionUri) !== chat || !this.chatState.has(chat)) {
+        throw new Error('The conversation changed before the message could be sent.');
+      }
+      return this.sendMessage(sessionUri, { text, attachments, model });
+    };
     if (!turn) return Promise.resolve(send());
     return new Promise((resolve, reject) => {
       let timer = null;

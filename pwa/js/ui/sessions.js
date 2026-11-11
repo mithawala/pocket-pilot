@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useRef, useChange } from '../lib/ui.js';
-import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
-import { statusOf, ago, folderName, providerLabel, filePath, hostApp, hostLabel, S, has } from '../lib/format.js';
+import { Icon, Sheet, StatusPill, Spinner, Switch, toast } from './common.js';
+import { statusOf, ago, folderName, providerLabel, filePath, hostApp, hostLabel, S, has, isCompleted } from '../lib/format.js';
 import { mdPlain } from '../lib/markdown.js';
 import { ModelSheet, ModelOptionsSheet, modelChip, optionsChip, hasOptions } from './model-picker.js';
 import { AttachmentChips, GrowButton, ATTACH_ACCEPT } from './composer.js';
@@ -28,17 +28,18 @@ export function projectOf(s) {
   return { key: uri || `provider:${s.provider}`, uri, name: s.project?.displayName || folderName(uri) || providerLabel(s.provider) };
 }
 
-function SessionRow({ s, onOpen, selected, inFolder }) {
+function SessionRow({ s, onOpen, selected, inFolder, label }) {
   const st = statusOf(s.status);
   const unread = !has(s.status, S.IsRead);
   const activity = s.activity ? mdPlain(s.activity, 100) : '';
-  const detail = st.key === 'input' ? html`<span class="st-input">${activity || 'Needs input'}</span>`
+  const detail = isCompleted(s) ? 'Done'
+    : st.key === 'input' ? html`<span class="st-input">${activity || 'Needs input'}</span>`
     : st.key === 'running' ? html`<span class="st-running">${activity || 'Working…'}</span>`
     : st.key === 'error' ? html`<span class="st-error">Error</span>`
     : null;
   const changes = s.changes && (s.changes.additions || s.changes.deletions) ? html`<${Changes} c=${s.changes} />` : null;
   const bits = [inFolder ? null : projectOf(s).name, detail || changes].filter(Boolean);
-  if (!bits.length) bits.push(providerLabel(s.provider));
+  if (!bits.length) bits.push(label || providerLabel(s.provider));
   return html`<button class=${`srow is-${st.key} ${unread ? 'unread' : ''} ${selected ? 'on' : ''}`} aria-current=${selected ? 'true' : undefined} onClick=${() => onOpen(s.resource)}>
     <span class="si"><${StatusIcon} st=${st} unread=${unread} /></span>
     <span class="sb">
@@ -46,6 +47,44 @@ function SessionRow({ s, onOpen, selected, inFolder }) {
       <span class="l2">${bits.map((b, i) => html`${i ? ' · ' : ''}${b}`)}</span>
     </span>
   </button>`;
+}
+
+function SessionBranch({ s, store, open, onToggle, onOpen, selected, selectedChat, inFolder, showCompleted }) {
+  const row = useRef(null);
+  const [inView, setInView] = useState(false);
+  const hasCatalog = Array.isArray(s.chats) && s.chats.length > 0;
+  // The session list omits tool chats. Check rows in view without loading their chat histories.
+  useEffect(() => {
+    if (!hasCatalog) return;
+    if (typeof IntersectionObserver !== 'function') {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting));
+    observer.observe(row.current);
+    return () => observer.disconnect();
+  }, [hasCatalog]);
+  const watchCatalog = hasCatalog && (open || inView);
+  useChange(watchCatalog ? store : null, (d) => d.kind === 'session' && d.uri === s.resource);
+  useEffect(() => {
+    if (watchCatalog) return store.watchSessionCatalog(s.resource);
+  }, [store, s.resource, watchCatalog]);
+  const allChildren = store.sessionChats(s.resource).slice(1);
+  const children = showCompleted ? allChildren : allChildren.filter((child) => !isCompleted(child));
+  return html`<div>
+    <div class="session-row" ref=${row}>
+      <${SessionRow} s=${s} onOpen=${onOpen} selected=${s.resource === selected && !selectedChat} inFolder=${inFolder} />
+      ${children.length > 0 && html`<button class="icon-btn session-expand" type="button" aria-expanded=${open}
+        aria-label=${`${open ? 'Hide' : 'Show'} conversations for ${s.title || 'Untitled session'}`} onClick=${onToggle}>
+        <${Icon} name=${open ? 'down' : 'right'} />
+      </button>`}
+    </div>
+    ${open && children.length > 0 && html`<div class="session-children">
+      ${children.map((child) => html`<${SessionRow} key=${child.resource} s=${child} inFolder=${true}
+        label=${child.origin?.kind === 'tool' ? 'Subagent' : 'Conversation'} selected=${child.resource === selectedChat}
+        onOpen=${(chat) => onOpen(s.resource, chat)} />`)}
+    </div>`}
+  </div>`;
 }
 
 /** Groups sessions by folder: folders that need you or are working first, then the most recently active; rows keep their status order. */
@@ -72,7 +111,7 @@ function readPref(key, fallback) {
   }
 }
 
-function FolderGroup({ g, closed, onToggle, onOpen, selected }) {
+function FolderGroup({ g, closed, onToggle, renderSession }) {
   return html`<div class="fgroup">
     <button class=${`fhead ${closed ? 'closed' : ''}`} aria-expanded=${!closed} onClick=${onToggle} title=${g.uri ? filePath(g.uri) : g.name}>
       <span class="chev"><${Icon} name="down" /></span>
@@ -82,7 +121,7 @@ function FolderGroup({ g, closed, onToggle, onOpen, selected }) {
       ${g.running > 0 && html`<span class="fbadge is-running" title=${`${g.running} working`}><span class="spinner"></span>${g.running}</span>`}
       <span class="fcount">${g.items.length}</span>
     </button>
-    ${!closed && g.items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} inFolder=${true} />`)}
+    ${!closed && g.items.map((s) => renderSession(s, true))}
   </div>`;
 }
 
@@ -332,7 +371,10 @@ export function ConnectionBanner({ conn, store, onRepair, onScan }) {
   return html`<div class="banner warn"><${Spinner} /><span>Computer offline — retrying. ${conn.detail ? `(${conn.detail})` : ''}${rescan ? ' New address? Scan its QR code again: you stay paired.' : ''}</span>${rescan && html`<button onClick=${onScan}>Scan</button>`}<button onClick=${() => conn.poke()}>Retry</button></div>`;
 }
 
-export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, onScan, pushPrompt, selected, newOpen, onNew, onNewClose }) {
+export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onSwitchHost, onScan, pushPrompt, selected, selectedChat, newOpen, onNew, onNewClose }) {
+  const [expanded, setExpanded] = useState(() => new Set(readPref('pp:expandedSessions', [])));
+  const [showCompleted, setShowCompleted] = useState(() => readPref('pp:showCompleted', false) === true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Session and chat state can correct a session's status (see HostStore.statusFor).
   const correctable = (s) => !!s && ((s.status & 31) === S.Error || has(s.status, S.Input));
   useChange(store, (d) => d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root'
@@ -351,15 +393,26 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
     setCollapsed(next);
     localStorage.setItem('pp:collapsedFolders', JSON.stringify([...next].slice(-200)));
   };
-  const list = store.sortedSessions();
+  const list = store.sortedSessions({ showCompleted });
+  const toggleSession = (uri) => {
+    const next = new Set(expanded);
+    if (!next.delete(uri)) next.add(uri);
+    setExpanded(next);
+    localStorage.setItem('pp:expandedSessions', JSON.stringify([...next].slice(-200)));
+  };
+  const renderSession = (s, inFolder) => html`<${SessionBranch} key=${s.resource} s=${s} store=${store}
+    open=${expanded.has(s.resource)} onToggle=${() => toggleSession(s.resource)} onOpen=${onOpen}
+    selected=${selected} selectedChat=${selectedChat} inFolder=${inFolder} showCompleted=${showCompleted} />`;
   const filtered = q ? list.filter((s) => `${s.title} ${projectOf(s).name} ${folderName(s.workingDirectories?.[0])}`.toLowerCase().includes(q.toLowerCase())) : list;
   const groups = [];
   if (groupBy === 'recent') {
-    const needs = filtered.filter((s) => has(s.status, S.Input));
-    const working = filtered.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress));
-    const rest = filtered.filter((s) => !has(s.status, S.Input) && !has(s.status, S.InProgress));
+    const active = filtered.filter((s) => !isCompleted(s));
+    const needs = active.filter((s) => has(s.status, S.Input));
+    const working = active.filter((s) => !has(s.status, S.Input) && has(s.status, S.InProgress));
+    const rest = active.filter((s) => !has(s.status, S.Input) && !has(s.status, S.InProgress));
     groups.push(['Needs input', needs], ['In progress', working]);
     for (const name of ['Today', 'Yesterday', 'Previous 7 days', 'Older']) groups.push([name, rest.filter((s) => bucketOf(s.modifiedAt) === name)]);
+    if (showCompleted) groups.push(['Done', filtered.filter(isCompleted)]);
   }
   const folders = groupBy === 'folder' ? folderGroups(filtered) : [];
   const online = conn.state === 'online';
@@ -381,20 +434,38 @@ export function SessionsScreen({ app, host, store, conn, onOpen, onSettings, onS
         <div class="list">
           ${pushPrompt && html`<div class="page" style="padding-bottom:0">${pushPrompt}</div>`}
           <div class="filter"><${Icon} name="search" /><input type="search" placeholder="Filter sessions" value=${q} onInput=${(e) => setQ(e.target.value)} aria-label="Filter sessions" /></div>
-          <div class="gtabs" role="tablist" aria-label="Group sessions">
-            <button role="tab" aria-selected=${groupBy === 'recent'} class=${groupBy === 'recent' ? 'on' : ''} onClick=${() => setGroupBy('recent')}><${Icon} name="clock" />Recent</button>
-            <button role="tab" aria-selected=${groupBy === 'folder'} class=${groupBy === 'folder' ? 'on' : ''} onClick=${() => setGroupBy('folder')}><${Icon} name="folder" />Folders</button>
+          <div class="session-list-controls">
+            <div class="gtabs" role="tablist" aria-label="Group sessions">
+              <button role="tab" aria-selected=${groupBy === 'recent'} class=${groupBy === 'recent' ? 'on' : ''} onClick=${() => setGroupBy('recent')}><${Icon} name="clock" />Recent</button>
+              <button role="tab" aria-selected=${groupBy === 'folder'} class=${groupBy === 'folder' ? 'on' : ''} onClick=${() => setGroupBy('folder')}><${Icon} name="folder" />Folders</button>
+            </div>
+            <button class="btn sm" aria-haspopup="dialog" aria-expanded=${filtersOpen ? 'true' : 'false'}
+              aria-label=${showCompleted ? 'Filters, 1 active' : 'Filters'} onClick=${() => setFiltersOpen(true)}>
+              <${Icon} name="filter" /> Filters
+              ${showCompleted && html`<span class="filter-count" aria-hidden="true">1</span>`}
+            </button>
           </div>
           ${!store.sessionsLoaded && online && html`<div class="empty"><${Spinner} lg />${store.slowSessions && html`<p>${copilotHost ? 'The GitHub Copilot app' : 'VS Code'} is taking a while to list your sessions. Still asking…</p>`}</div>`}
           ${groups.map(([title, items]) => items.length > 0 && html`<div key=${title}>
             <div class="group-title">${title}</div>
-            ${items.map((s) => html`<${SessionRow} key=${s.resource} s=${s} onOpen=${onOpen} selected=${s.resource === selected} />`)}
+            ${items.map((s) => renderSession(s, false))}
           </div>`)}
-          ${folders.map((g) => html`<${FolderGroup} key=${g.key} g=${g} closed=${!q && collapsed.has(g.key)} onToggle=${() => toggleFolder(g.key)} onOpen=${onOpen} selected=${selected} />`)}
+          ${folders.map((g) => html`<${FolderGroup} key=${g.key} g=${g} closed=${!q && collapsed.has(g.key)} onToggle=${() => toggleFolder(g.key)} renderSession=${renderSession} />`)}
           ${store.sessionsLoaded && !filtered.length && html`<div class="empty">${q ? 'No matching sessions.' : copilotHost ? `No open chats yet. Chats you use in the GitHub Copilot app or CLI on this computer show up here${canCreate ? ', or start one below.' : '.'}` : 'No sessions yet. Start one below.'}</div>`}
         </div>
       </div>
     </div>
+    <${Sheet} open=${filtersOpen} onClose=${() => setFiltersOpen(false)} title="Filters">
+      <div class="set-group">
+        <div class="set-row">
+          <div class="grow">Show Done</div>
+          <${Switch} label="Show Done" on=${showCompleted} onChange=${(enabled) => {
+            setShowCompleted(enabled);
+            localStorage.setItem('pp:showCompleted', JSON.stringify(enabled));
+          }} />
+        </div>
+      </div>
+    </${Sheet}>
     ${store.online && (!canCreate
       ? html`<div class="bottom-bar"><div class="newhint"><${Icon} name="info" /><span>Start new chats in the GitHub Copilot app or CLI on your computer — they appear here after the first message. Update Pocket Pilot on your computer to start them from here.</span></div></div>`
       : html`<div class="bottom-bar">

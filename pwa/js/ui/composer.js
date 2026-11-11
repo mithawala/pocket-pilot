@@ -239,8 +239,8 @@ function useDictation(getText, setText) {
   return { supported: !!SpeechRecognition, listening, toggle: () => (listening ? stop() : start()), stop, cancel };
 }
 
-export function Composer({ store, conn, sessionUri, session, chat, chatState, autoFocus = false }) {
-  const draftKey = `draft:${sessionUri}`;
+export function Composer({ store, conn, sessionUri, session, chat, chatState, draftResource = sessionUri, autoFocus = false }) {
+  const draftKey = `draft:${draftResource}`;
   const [text, setText] = useState(() => sessionStorage.getItem(draftKey) || '');
   const [attachments, setAttachments] = useState([]);
   const readImage = (u) => store.readImage(u);

@@ -3,7 +3,7 @@ import { Icon, Sheet, StatusPill, Spinner, toast } from './common.js';
 import { Turn, PendingTurn, SubagentRequests } from './parts.js';
 import { Composer } from './composer.js';
 import { ConnectionBanner } from './sessions.js';
-import { statusOf, folderName, providerLabel, filePath, hostApp, S, has } from '../lib/format.js';
+import { statusOf, folderName, providerLabel, filePath, hostApp, S, has, isCompleted } from '../lib/format.js';
 import { waitingOn, subagentAsks } from '../lib/asks.js';
 import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
@@ -78,7 +78,7 @@ function SessionMenu({ open, onClose, store, uri, session, onDeleted, onFiles })
   </${Sheet}>`;
 }
 
-export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedded = false }) {
+export function ChatScreen({ store, conn, uri, requestedChat = null, onBack, onRepair, onScan, embedded = false }) {
   useChange(store, (d) => !d.uri || d.uri === uri || d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || store.chatFor(uri) === d.uri);
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
@@ -92,11 +92,16 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const stick = useRef(true);
   const first = useRef(true);
 
-  useEffect(() => store.watchSession(uri), [uri, store]);
+  useEffect(() => store.watchSession(uri, requestedChat), [uri, requestedChat, store]);
   const session = store.sessions.get(uri);
   const sessionState = store.sessionState.get(uri);
   const chat = store.chatFor(uri);
+  const chats = store.sessionChats(uri);
+  const selectedChat = chats.find((entry) => entry.resource === chat);
+  const nested = chat && chat !== chats[0]?.resource;
   const chatState = chat ? store.chatState.get(chat) : null;
+  const readOnly = isCompleted(session) || isCompleted(selectedChat) || selectedChat?.origin?.kind === 'tool'
+    || (chatState?.interactivity || selectedChat?.interactivity) === 'read-only';
   const failed = !chatState ? store.stalledText(uri) || (chat ? store.failedChats.get(chat) : null) : null;
   const provider = session?.provider || sessionState?.provider;
   const models = store.models(provider);
@@ -110,7 +115,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
     readImage: (u) => store.readImage(u),
     modelName: (id) => models.find((m) => m.id === id)?.name || id,
     // A failed last turn can be sent again as it was, with the model now selected.
-    retry: (turn) => () => {
+    retry: readOnly ? undefined : (turn) => () => {
       try {
         store.sendMessage(uri, { text: turn.message.text, attachments: turn.message.attachments, model: store.modelFor(chat) || undefined });
       } catch (err) {
@@ -155,7 +160,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
       return;
     }
     if (stick.current) pin(false);
-  }, [signature, !!chatState]);
+  }, [chat, signature, !!chatState]);
 
   // Stay pinned when the view shrinks (keyboard) or content reflows (highlighting, images).
   useEffect(() => {
@@ -167,7 +172,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
     ro.observe(el);
     if (contentRef.current) ro.observe(contentRef.current);
     return () => ro.disconnect();
-  }, [!!chatState]);
+  }, [chat, !!chatState]);
 
   useEffect(() => {
     const onClick = async (e) => {
@@ -210,7 +215,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   const titles = new Map((sessionState?.chats || []).map((c) => [c.resource, c.title]));
   const visible = turns.slice(Math.max(0, turns.length - shown));
   const hidden = turns.length - visible.length;
-  const title = session?.title || chatState?.title || 'Session';
+  const title = (nested && selectedChat?.title) || session?.title || chatState?.title || 'Session';
   const folder = folderName(session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0]);
   // The session's folder on the PC, where Files starts.
   const root = session?.workingDirectories?.[0] || sessionState?.workingDirectories?.[0] || null;
@@ -257,7 +262,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
       </div>
       ${!atBottom && chatState && html`<button class="jump" onClick=${() => { stick.current = true; pin(true); }} aria-label="Scroll to the latest message"><${Icon} name="arrow-down" /></button>`}
     </div>
-    ${chatState && html`<${Composer} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} autoFocus=${embedded} />`}
+    ${chatState && !readOnly && html`<${Composer} key=${chat} store=${store} conn=${conn} sessionUri=${uri} session=${session} chat=${chat} chatState=${chatState} draftResource=${nested ? chat : uri} autoFocus=${embedded} />`}
     ${conn?.canBrowseFiles
       ? html`<${LinkSheet} conn=${conn} uri=${fileUri} root=${root} onClose=${() => setFileUri(null)} />`
       : html`<${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />`}
