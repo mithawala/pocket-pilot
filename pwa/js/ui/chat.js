@@ -9,6 +9,7 @@ import { canonicalLanguage, highlightElement } from '../lib/highlight.js';
 import { loadPicture, mimeFromName, pictureError } from '../lib/attachments.js';
 import { openPictures } from './viewer.js';
 import { FilesSheet, LinkSheet } from './files.js';
+import { PageSheet } from './preview.js';
 import { resolveUri } from '../lib/files.js';
 
 const PAGE = 25;
@@ -82,6 +83,8 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
   useChange(store, (d) => !d.uri || d.uri === uri || d.kind === 'sessions' || d.kind === 'status' || d.kind === 'root' || store.chatFor(uri) === d.uri);
   const [shown, setShown] = useState(PAGE);
   const [fileUri, setFileUri] = useState(null);
+  // A page on the computer a link in the chat points to (http://localhost:5173).
+  const [pageUrl, setPageUrl] = useState(null);
   const rootRef = useRef(null);
   const [menu, setMenu] = useState(false);
   const [files, setFiles] = useState(false);
@@ -183,6 +186,12 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
         }
         return;
       }
+      const page = e.target.closest('[data-local-url]');
+      if (page) {
+        e.preventDefault();
+        setPageUrl(page.getAttribute('data-local-url'));
+        return;
+      }
       const f = e.target.closest('[data-file]');
       if (f) {
         setFileUri(f.getAttribute('data-file'));
@@ -262,6 +271,7 @@ export function ChatScreen({ store, conn, uri, onBack, onRepair, onScan, embedde
       ? html`<${LinkSheet} conn=${conn} uri=${fileUri} root=${root} onClose=${() => setFileUri(null)} />`
       : html`<${FileViewer} store=${store} uri=${fileUri} onClose=${() => setFileUri(null)} />`}
     <${FilesSheet} open=${files} onClose=${() => setFiles(false)} conn=${conn} root=${root} host=${hostApp(conn?.record)} />
+    <${PageSheet} conn=${conn} url=${pageUrl} host=${hostApp(conn?.record)} onClose=${() => setPageUrl(null)} />
     <${SessionMenu} open=${menu} onClose=${() => setMenu(false)} store=${store} uri=${uri} session=${session} onDeleted=${onBack} onFiles=${() => setFiles(true)} />
   </div>`;
 }

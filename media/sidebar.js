@@ -130,6 +130,20 @@
       }
       body += '</section>';
 
+      // Pages the sessions run, opened on a device: each has its own tunnel until it's closed (30 minutes unused).
+      const pages = st.previews || [];
+      if (pages.length) {
+        body += `<section class="card"><h2>Pages open on your devices <span class="count">${pages.length}</span></h2>`;
+        for (const p of pages) {
+          body += `<div class="device">
+          <div class="dicon">🌐</div>
+          <div class="dmain"><div class="dname">${esc(p.address)}</div><div class="dmeta"><span class="muted small">used ${ago(p.lastUsed)} · closes after 30 minutes unused</span></div></div>
+          <button class="icon" title="Close this page: its link stops working" data-a="closePreview" data-key="${esc(p.key)}">✕</button>
+        </div>`;
+        }
+        body += '</section>';
+      }
+
       body += `<div class="footer">
         <button class="secondary" data-a="stop">Stop</button>
         <button class="secondary" data-a="restartTunnel" ${t.mode !== 'quick' ? 'disabled' : ''} title="Get a new tunnel address. Paired devices find it through auto-reconnect.">New tunnel</button>
@@ -202,7 +216,7 @@
       return render();
     }
     if (a === 'openUrl') return send('openUrl', { url: el.dataset.url });
-    send(a, { id: el.dataset.id });
+    send(a, { id: el.dataset.id, key: el.dataset.key });
   });
 
   window.addEventListener('message', (e) => {

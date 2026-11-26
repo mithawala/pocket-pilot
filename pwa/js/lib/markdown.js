@@ -1,7 +1,7 @@
 // Markdown -> sanitized HTML. Agent output is untrusted: everything goes through DOMPurify.
 import { marked } from '../../vendor/marked/marked.esm.js';
 import DOMPurify from '../../vendor/dompurify/purify.es.js';
-import { localLink } from '../core/links.js';
+import { localLink, localWebUrl } from '../core/links.js';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -17,7 +17,13 @@ addHook('uponSanitizeAttribute', (node, data) => {
 addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const raw = rawHrefs.get(node) ?? node.getAttribute('href') ?? '';
-    if (/^https?:\/\//i.test(raw) && node.getAttribute('href')) {
+    const page = /^https?:\/\//i.test(raw) ? localWebUrl(raw) : null;
+    if (page) {
+      // A page running on the computer (http://localhost:5173): it opens through the computer, in the app.
+      node.removeAttribute('href');
+      node.setAttribute('data-local-url', page.url);
+      node.classList.add('file-link');
+    } else if (/^https?:\/\//i.test(raw) && node.getAttribute('href')) {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
     } else {
@@ -39,7 +45,7 @@ addHook('afterSanitizeAttributes', (node) => {
 
 const PURIFY = {
   ALLOWED_TAGS: ['a', 'b', 'blockquote', 'br', 'code', 'del', 'details', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'input', 'kbd', 'li', 'ol', 'p', 'pre', 's', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul'],
-  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'data-file', 'data-file-rel', 'target', 'rel', 'loading', 'colspan', 'rowspan', 'align'],
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'type', 'checked', 'disabled', 'data-file', 'data-file-rel', 'data-local-url', 'target', 'rel', 'loading', 'colspan', 'rowspan', 'align'],
   ALLOW_DATA_ATTR: false,
 };
 

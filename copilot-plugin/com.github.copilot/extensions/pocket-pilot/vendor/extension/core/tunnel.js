@@ -74,7 +74,9 @@ function freePort() {
 
 class TunnelManager extends EventEmitter {
   /**
-   * @param {{storageDir:string, log?:(l:string,m:string)=>void, fetchImpl?:typeof fetch, configuredPath?:()=>string}} o
+   * @param {{storageDir:string, log?:(l:string,m:string)=>void, fetchImpl?:typeof fetch, configuredPath?:()=>string, restart?:boolean, metrics?:boolean}} o
+   *   restart: start cloudflared again when it ends (default); false: the tunnel just stops (a page's).
+   *   metrics: serve cloudflared's metrics, so `ready()` can tell whether it's connected to Cloudflare.
    */
   constructor(o) {
     super();
@@ -162,7 +164,13 @@ class TunnelManager extends EventEmitter {
     this.binary = binary;
     this.stopping = false;
     await this._killStale();
+    this.metricsPort = this.o.metrics ? await freePort() : null;
     return this._spawn();
+  }
+
+  _spawnAttached(args) {
+    // Its own folder as working directory: it must never hold another folder (e.g. an install) in use.
+    return spawn(this.binary, args, { cwd: this.o.storageDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   }
 
   _spawn() {
@@ -176,11 +184,10 @@ class TunnelManager extends EventEmitter {
       } catch {
         /* ignore */
       }
-      const args = ['tunnel', '--no-autoupdate', '--config', emptyConfig, '--url', `http://127.0.0.1:${this.port}`];
+      const args = ['tunnel', '--no-autoupdate', '--config', emptyConfig, ...(this.metricsPort ? ['--metrics', `127.0.0.1:${this.metricsPort}`] : []), '--url', `http://127.0.0.1:${this.port}`];
       let proc;
       try {
-        // Its own folder as working directory: it must never hold another folder (e.g. an install) in use.
-        proc = spawn(this.binary, args, { cwd: this.o.storageDir, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        proc = this._spawnAttached(args);
       } catch (err) {
         this._setState('error', err.message);
         reject(err);
@@ -255,13 +262,44 @@ class TunnelManager extends EventEmitter {
           this._setState('stopped');
           return;
         }
+        if (this.o.restart === false) {
+          this.log('warn', `cloudflared exited (${code})`);
+          this._setState('error', 'The tunnel stopped');
+          return;
+        }
         this.restarts++;
         const delay = Math.min(60000, 2000 * 2 ** Math.min(this.restarts, 5));
         this.log('warn', `cloudflared exited (${code}); restarting in ${Math.round(delay / 1000)}s`);
+        // Set before anyone hears of it: stopping the tunnel then (a listener may) clears it.
+        this._restartTimer = setTimeout(() => {
+          if (!this.stopping) this._spawn().catch((err) => this.log('error', err.message));
+        }, delay);
         this._setState('error', 'Tunnel dropped, reconnecting…');
-        this._restartTimer = setTimeout(() => this._spawn().catch((err) => this.log('error', err.message)), delay);
       });
     });
+  }
+
+  /** Whether cloudflared is connected to Cloudflare (known with `metrics`; otherwise: it runs). */
+  async ready() {
+    if (!this.proc) return false;
+    if (!this.metricsPort) return true;
+    try {
+      const res = await this.fetch(`http://127.0.0.1:${this.metricsPort}/ready`, { signal: AbortSignal.timeout(2500) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Ends cloudflared at once, without waiting for it (this process is exiting). */
+  killNow() {
+    this.stopping = true;
+    clearTimeout(this._restartTimer);
+    try {
+      this.proc?.kill();
+    } catch {
+      /* already gone */
+    }
   }
 
   /** Polls the public URL until the relay answers through Cloudflare. */
@@ -539,7 +577,9 @@ class PersistentTunnel extends TunnelManager {
       }
       if (!(await this._alive(s))) {
         this.running = null;
-        if (this.saved()?.pid === s.pid) fs.rmSync(this.stateFile, { force: true });
+        // It may still run without answering (just after the PC woke up): ended, so it doesn't stay on
+        // next to the new one as a tunnel of its own.
+        await this._end(s);
         this.restarts++;
         this.log('warn', 'The tunnel stopped; opening a new one');
         this._setState('error', 'The tunnel stopped. Opening a new one…');

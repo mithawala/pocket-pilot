@@ -293,6 +293,16 @@ a.btn { text-decoration: none; }
 .file-text pre { margin: 0; max-height: 55vh; }
 .file-actions { display: grid; gap: 8px; }
 .file-actions .errpart { margin: 0; }
+/* A page on the computer, opened through a link of its own (ui/preview.js). */
+.page-detail .errpart { margin: 0; }
+.page-wait { display: flex; align-items: center; gap: 10px; padding: 12px 2px; line-height: 1.45; color: var(--muted); }
+.page-open { height: 46px; font-size: 16px; }
+.page-open.busy { opacity: 0.75; pointer-events: none; }
+.page-notice { display: grid; gap: 6px; padding: 12px 14px; font-size: 14px; line-height: 1.45; background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; }
+.page-notice p { margin: 0; color: var(--text); }
+.page-notice-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--strong); }
+.page-notice-title svg { width: 17px; height: 17px; flex: none; color: var(--accent); }
+.page-detail .new-note svg { width: 15px; height: 15px; }
 .file-hint { text-align: center; line-height: 1.4; }
 .file-wait { display: grid; place-items: center; min-height: 44px; }
 .dl { display: grid; gap: 8px; }

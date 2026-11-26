@@ -3,8 +3,9 @@
 Control the chats you run in the GitHub Copilot app and the Copilot CLI from your phone: the same
 history, live replies, chat, tool approvals, questions, plan approval, model / mode / approval
 switches, the files in each chat's folder (and the files the agent links to) to browse and download,
-and push notifications — end-to-end encrypted through a free Cloudflare quick tunnel, with pairing you
-approve on your PC and a passkey or authenticator code on the phone.
+the pages a chat runs on your computer (`http://localhost:5173`, opened through a private link of
+their own), and push notifications — end-to-end encrypted through a free Cloudflare quick tunnel, with
+pairing you approve on your PC and a passkey or authenticator code on the phone.
 
 ## Install
 

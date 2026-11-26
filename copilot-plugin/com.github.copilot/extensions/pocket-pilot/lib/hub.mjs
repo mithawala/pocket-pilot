@@ -220,6 +220,7 @@ async function boot(log, cleanups) {
   const identityLib = core('identity');
   const { SessionMonitor } = core('monitor');
   const { PersistentTunnel } = core('tunnel');
+  const { PreviewManager } = core('preview');
   const { GistRendezvous } = core('rendezvous');
   const push = core('push');
   const ahpTypes = await import(pathToFileURL(path.join(vendor, 'pwa', 'vendor', 'ahp', 'types', 'index.js')).href);
@@ -328,6 +329,12 @@ async function boot(log, cleanups) {
   }
 
   const monitorRef = { current: null };
+  // The pages sessions run (a dev server, a review page), each opened on a device through a quick tunnel
+  // of its own. The hub's own servers are never one of them.
+  const tunnelRef = { current: null };
+  const ownPorts = new Set();
+  const previews = settings().tunnel === 'quick' ? new PreviewManager({ storageDir: FILES.previews, findBinary: () => tunnelRef.current?.findBinary() || null, log }) : null;
+  if (previews) cleanups.push(() => previews.closeAll());
   const relay = new RelayServer({
     identity,
     store,
@@ -335,6 +342,8 @@ async function boot(log, cleanups) {
     openAgentConnection: async () => host.openConnection(),
     agentHostLabel: 'The GitHub Copilot app',
     approveDevice,
+    previews,
+    blockedPorts: () => [...ownPorts, page.server?.address()?.port].filter(Boolean),
     allowedOrigins: () => [...new Set([new URL(PWA_URL).origin, `http://127.0.0.1:${relay.port}`, `http://localhost:${relay.port}`, ...String(process.env.POCKET_PILOT_ORIGINS || '').split(',').filter(Boolean)])],
     policy: () => {
       const s = settings();
@@ -357,6 +366,7 @@ async function boot(log, cleanups) {
   // The same local port as the previous hub: the running tunnel forwards there, and devices on a
   // direct connection keep their address too.
   const tunnel = new PersistentTunnel({ storageDir: FILES.tunnel, log });
+  tunnelRef.current = tunnel;
   const lastPort = (settings().tunnel === 'quick' && (await tunnel.adoptablePort())) || readJson(FILES.relay, {})?.port || 0;
   await relay.listen(lastPort, '127.0.0.1').catch(() => relay.listen(0, '127.0.0.1'));
   writeJson(FILES.relay, { port: relay.port });
@@ -579,6 +589,7 @@ async function boot(log, cleanups) {
   }
 
   const ipcServer = await serve(ipcToken, onChannel);
+  ownPorts.add(ipcServer.address().port);
   cleanups.push(() => {
     for (const p of channels) p.ch.close();
     ipcServer.close();
@@ -654,6 +665,8 @@ async function boot(log, cleanups) {
   const onExit = () => {
     releaseFiles();
     phone.kill();
+    // The pages' tunnels end with this process: a new hub ends any it couldn't (their pid files).
+    previews?.killNow();
   };
   process.on('exit', onExit);
   const onSignal = () => {

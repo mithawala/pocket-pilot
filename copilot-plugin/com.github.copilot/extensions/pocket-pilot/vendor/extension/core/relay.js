@@ -178,6 +178,8 @@ class RelayServer extends EventEmitter {
    * @param {(uri: string) => boolean} [o.isReadAllowed]
    * @param {string} [o.linkedPathsFile]  where to keep the files and folders agents linked (see LinkedPaths)
    * @param {string} [o.homeDir]  the home folder, which a link never opens (the user's, if not given)
+   * @param {import('./preview').PreviewManager|null} [o.previews]  opens the pages the agent links to (none: not offered)
+   * @param {() => number[]} [o.blockedPorts]  more ports on this computer that are never opened as pages
    * @param {(req: object) => Promise<{uri:string, path:string}>} [o.saveUpload]
    * @param {string} [o.pwaDir]
    * @param {(level: string, msg: string) => void} [o.log]
@@ -273,6 +275,19 @@ class RelayServer extends EventEmitter {
     for (const c of [...this.connections]) {
       if (c.deviceId === deviceId || (c.device && c.device.id === deviceId)) c.revoke();
     }
+    // And the pages it opened on this computer.
+    this.o.previews?.forgetDevice(deviceId);
+  }
+
+  /**
+   * A port on this computer that no device may open as a page: this relay, the agent host, a debugger,
+   * the page proxies themselves, or what the host adds (its own servers).
+   */
+  blockedPort(port) {
+    if (port === this.port || this.o.previews?.isBlocked(port)) return true;
+    const ep = this.o.getAgentEndpoint?.();
+    if (ep?.endpoint?.type === 'tcp' && Number(ep.endpoint.port) === port) return true;
+    return (this.o.blockedPorts?.() || []).includes(port);
   }
 
   broadcastControl(msg, filter = () => true) {
@@ -551,6 +566,8 @@ class DeviceConnection extends EventEmitter {
       ...(o.isReadAllowed ? { files: 2 } : {}),
       // The device may ask to start the agent host again when it has stopped.
       ...(o.restartAgentHost ? { restartAgent: 1 } : {}),
+      // Opening the pages that run on this computer (preview.js); 0: not with this tunnel.
+      previews: o.previews && this.relay.links ? 1 : 0,
       ...extras,
     });
     this.log('info', `Device "${fresh.name}" connected from ${this.meta.ip}`);
@@ -996,6 +1013,7 @@ class DeviceConnection extends EventEmitter {
       }
       case 'forget':
         o.store.remove(this.device.id);
+        o.previews?.forgetDevice(this.device.id);
         this.relay.emit('device-removed', this.device.id);
         this.close(4401, 'Device forgotten');
         break;
@@ -1003,8 +1021,40 @@ class DeviceConnection extends EventEmitter {
         // Not awaited: a long search or a download must not hold up the chat.
         this._files(m).catch((err) => this.log('warn', `File request failed: ${err?.message || err}`));
         break;
+      case 'preview':
+        // Not awaited either: the first time, a page's tunnel takes a few seconds to open.
+        this._preview(m).catch((err) => this.log('warn', `Page request failed: ${err?.message || err}`));
+        break;
       default:
         break;
+    }
+  }
+
+  /**
+   * Opening a page that runs on this computer (`preview` messages, from a link in a chat): only a page an
+   * agent linked to, and never this relay, the agent host or a debugger. Answers with a `preview.result`
+   * carrying the same id: a link to the page (preview.js) that lets this device in once.
+   */
+  async _preview(m) {
+    const { o } = this.relay;
+    const reply = (r) => this.sendControl({ t: 'preview.result', id: m.id, ...r }).catch(() => {});
+    const fail = (code, error) => reply({ ok: false, code, error });
+    if (typeof m.id !== 'string' || m.id.length > 80 || this.revoked) return;
+    const links = this.relay.links;
+    if (!o.previews || !links) return fail('unsupported', 'Opening pages from your phone needs the quick tunnel');
+    const web = typeof m.url === 'string' && m.url.length <= 4096 ? links.parser.localWebUrl(m.url) : null;
+    if (!web) return fail('invalid', 'Not a page on this computer');
+    if (this.relay.blockedPort(web.port)) return fail('blocked', 'This address belongs to Pocket Pilot, the agent or a debugger, so it can’t be opened from your phone.');
+    if (!links.pageLinked(web)) return fail('denied', 'Pocket Pilot only opens the pages an agent links to in a chat.');
+    try {
+      const r = await o.previews.open(web, { deviceId: this.device.id, first: !!m.first });
+      // Removed meanwhile: the link made for it is taken back, and never sent.
+      if (this.revoked) return o.previews.forgetDevice(this.device.id);
+      if (this.state === 'closed') return;
+      if (m.first) this.log('info', `Device "${this.device?.name}" is opening ${web.scheme}://${r.address}`);
+      await reply({ ok: true, url: r.url, expiresIn: r.expiresIn, address: r.address });
+    } catch (err) {
+      await fail(err?.code || 'error', err?.message || 'Could not open this page');
     }
   }
 

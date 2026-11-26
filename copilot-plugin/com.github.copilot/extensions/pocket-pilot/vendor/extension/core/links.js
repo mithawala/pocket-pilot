@@ -3,13 +3,15 @@
 // paired device may open them too, besides the session folders. The relay notes every local link in the
 // chat content it passes to a device, so only what the agent showed can be opened, and a linked folder
 // opens with what's inside it. Kept on disk, so the links in chats a device already loaded keep working
-// after a restart.
+// after a restart. Pages running on this computer that the agent mentions (`http://localhost:5173`, linked
+// or not) are noted the same way, by port: a device may open those (see preview.js).
 //
 // Only what the agent wrote counts. Not what a client sent (a device, VS Code's window), and not what
 // VS Code shows back from a message: it runs `!<command>` itself and shows the command, and answers
 // `/rename <title>` with "Renamed: <title>". So nothing in a `!` turn counts, nor a link that is already
-// in the turn's message. Network shares are never noted. No check here touches the disk: the relay looks
-// up where a path really is (shortcuts, Windows short names) without blocking (RelayServer._files).
+// in the turn's message (for a page: in a slash command's message). Network shares are never noted. No
+// check here touches the disk: the relay looks up where a path really is (shortcuts, Windows short
+// names) without blocking (RelayServer._files).
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -26,6 +28,8 @@ function loadLinkParser() {
 }
 
 const MAX_PATHS = 20000;
+// Pages on this computer (by port).
+const MAX_PAGES = 500;
 // Streamed answers: the end of each part so far, so a link split across two pieces is still seen.
 const MAX_TAILS = 300;
 const TAIL_CHARS = 2000;
@@ -36,6 +40,9 @@ const SAVE_AFTER_MS = 2000;
 const isNetworkPath = (p) => /^[\\/]{2}[^\\/]/.test(p);
 // A terminal command VS Code runs itself: nothing in its turn is the agent's.
 const isCommand = (typed) => /^\s*!/.test(typed);
+// A slash command, whose text VS Code (or the command) may show back.
+const isSlash = (typed) => /^\s*\//.test(typed);
+const PAGE_KEY = /^https?:\d{1,5}$/;
 
 class LinkedPaths {
   /**
@@ -54,6 +61,8 @@ class LinkedPaths {
     this.caseless = platform === 'win32';
     this.log = log;
     this.paths = new Map();
+    // Pages on this computer the agent mentioned, by `scheme:port` (http:5173).
+    this.pages = new Set();
     this.tails = new Map();
     this.typed = new Map();
     this._timer = null;
@@ -70,6 +79,7 @@ class LinkedPaths {
     try {
       const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       for (const p of (Array.isArray(saved?.paths) ? saved.paths : []).slice(-MAX_PATHS)) if (typeof p === 'string' && path.isAbsolute(p) && !isNetworkPath(p)) this.paths.set(this._key(p), p);
+      for (const k of (Array.isArray(saved?.pages) ? saved.pages : []).slice(-MAX_PAGES)) if (typeof k === 'string' && PAGE_KEY.test(k)) this.pages.add(k);
     } catch {
       /* none yet */
     }
@@ -84,10 +94,18 @@ class LinkedPaths {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = `${this.file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ v: 1, paths: [...this.paths.values()] }), { mode: 0o600 });
+      fs.writeFileSync(tmp, JSON.stringify({ v: 1, paths: [...this.paths.values()], pages: [...this.pages] }), { mode: 0o600 });
       fs.renameSync(tmp, this.file);
     } catch (err) {
       this.log('warn', `Could not save the linked files: ${err.message}`);
+    }
+  }
+
+  _changed() {
+    this._dirty = true;
+    if (this.file && !this._timer) {
+      this._timer = setTimeout(() => this.flush(), SAVE_AFTER_MS);
+      this._timer.unref?.();
     }
   }
 
@@ -102,11 +120,26 @@ class LinkedPaths {
     }
     this.paths.set(key, abs);
     if (this.paths.size > MAX_PATHS) this.paths.delete(this.paths.keys().next().value);
-    this._dirty = true;
-    if (this.file && !this._timer) {
-      this._timer = setTimeout(() => this.flush(), SAVE_AFTER_MS);
-      this._timer.unref?.();
+    this._changed();
+  }
+
+  /** Notes a page on this computer (from localWebUrl): its port may be opened. */
+  addPage(web) {
+    const key = web?.key;
+    if (!key || !PAGE_KEY.test(key)) return;
+    if (this.pages.has(key)) {
+      this.pages.delete(key);
+      this.pages.add(key);
+      return;
     }
+    this.pages.add(key);
+    if (this.pages.size > MAX_PAGES) this.pages.delete(this.pages.values().next().value);
+    this._changed();
+  }
+
+  /** Whether the agent mentioned a page on this port (localWebUrl's result). */
+  pageLinked(web) {
+    return !!web?.key && this.pages.has(web.key);
   }
 
   /** A place a link never opens, even by itself: a whole drive, the home folder, or a folder that holds it. */
@@ -158,8 +191,17 @@ class LinkedPaths {
    * a link that is already in it is VS Code showing the message back, not the agent's.
    */
   scanText(text, typed = '') {
-    if (typeof text !== 'string' || (!text.includes('](') && !text.includes(']:'))) return;
-    if (isCommand(typed)) return;
+    if (typeof text !== 'string') return;
+    const files = text.includes('](') || text.includes(']:');
+    const pages = text.includes('://');
+    if ((!files && !pages) || isCommand(typed)) return;
+    if (pages) {
+      // An agent's answer may well repeat a page's address from the message: only a slash command's
+      // text is shown back as it is (/rename http://127.0.0.1:9229).
+      const echoed = isSlash(typed) ? typed : '';
+      for (const web of this.parser.localWebMatches(text)) if (!(echoed && echoed.includes(web.text))) this.addPage(web);
+    }
+    if (!files) return;
     for (const { target, text: md } of this.parser.linkMatches(text)) {
       if (typed && typed.includes(md)) continue;
       const link = this.parser.localLink(target);
@@ -212,8 +254,8 @@ class LinkedPaths {
     const key = `${channel}|${turnId}`;
     if (this.typed.has(key)) return;
     const t = typeof text === 'string' ? text : '';
-    // Only what can matter: a terminal command, or a message with a link in it.
-    this.typed.set(key, isCommand(t) || t.includes('](') || t.includes(']:') ? t : '');
+    // Only what can matter: a terminal command, a message with a link in it, or a slash command with an address.
+    this.typed.set(key, isCommand(t) || t.includes('](') || t.includes(']:') || (isSlash(t) && t.includes('://')) ? t : '');
     if (this.typed.size > MAX_TURNS) this.typed.delete(this.typed.keys().next().value);
   }
 
@@ -284,4 +326,4 @@ class LinkedPaths {
   }
 }
 
-module.exports = { LinkedPaths, loadLinkParser, MAX_PATHS };
+module.exports = { LinkedPaths, loadLinkParser, MAX_PATHS, MAX_PAGES };

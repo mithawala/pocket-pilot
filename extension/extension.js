@@ -12,6 +12,7 @@ const { cmpVersion } = agentHost;
 const { SessionMonitor } = require('./core/monitor');
 const { isSessionAttachment, isInFolder, sessionIdOf } = require('./core/attachments');
 const { PersistentTunnel } = require('./core/tunnel');
+const { PreviewManager } = require('./core/preview');
 const { GistRendezvous } = require('./core/rendezvous');
 const { SharedState } = require('./shared');
 const push = require('./core/push');
@@ -316,9 +317,11 @@ class PocketPilotService {
     this.pairing = null;
     const relay = this.relay;
     this.relay = null;
+    const previews = this.previews;
+    this.previews = null;
     this.publicUrl = null;
     this.tunnelReachable = false;
-    await Promise.allSettled([relay?.close(), this.tunnel?.stop({ keep: keepTunnel })]);
+    await Promise.allSettled([relay?.close(), this.tunnel?.stop({ keep: keepTunnel }), previews?.closeAll()]);
     this.monitor?.stop();
   }
 
@@ -385,6 +388,7 @@ class PocketPilotService {
         restartTunnel: () => this.restartTunnel(),
         stop: () => this.stop(),
         enableRendezvous: () => this.enableRendezvous({ silent: true }),
+        closePreview: () => this.closePreview(r.args?.key),
       }[r.action];
       if (run) Promise.resolve(run()).catch((err) => this.logLine('warn', `${r.action} from another window failed: ${err.message}`));
     }
@@ -424,11 +428,15 @@ class PocketPilotService {
 
   async _startRelay() {
     const pwaDir = path.join(this.ctx.extensionUri.fsPath, 'pwa');
+    // The pages sessions run (a dev server, a review page), each opened on a device through a quick tunnel of its own.
+    this.previews = settings().tunnelMode === 'quick' ? new PreviewManager({ storageDir: path.join(this.storageDir, 'previews'), findBinary: () => this.tunnel.findBinary(), log: (l, m) => this.logLine(l, m) }) : null;
+    this.previews?.on('change', () => this.changed());
     this.relay = new RelayServer({
       identity: this.identity,
       store: this.store,
       getAgentEndpoint: () => this.endpoint(),
       restartAgentHost: () => this._restartAgentHost(),
+      previews: this.previews,
       approveDevice: (info) => this._approve(info),
       allowedOrigins: () => this.allowedOrigins(),
       policy: () => {
@@ -525,6 +533,13 @@ class PocketPilotService {
     this.pairing = null;
     this.changed();
     await this.tunnel.restart();
+  }
+
+  /** Closes a page open on devices (its tunnel ends), also from another window's panel. */
+  async closePreview(key) {
+    if (typeof key !== 'string') return undefined;
+    if (this.state === 'standby') return this.shared.request('closePreview', { key });
+    return this.previews?.close(key);
   }
 
   _onPublicUrl(url) {
@@ -953,6 +968,8 @@ class PocketPilotService {
       agentHost: { connected: !!this.monitor?.connected, found: !!this.endpoint(), counts: this.monitor ? this.monitor.counts() : null },
       rendezvous: { enabled: s.rendezvous, status: this.rendezvous?.status, error: this.rendezvous?.lastError },
       pairing: this.pairing ? { link: this.pairing.link, svg: this.pairing.svg, expiresAt: this.pairing.expiresAt } : null,
+      // Pages open on devices (preview.js): each has a tunnel of its own until it's closed.
+      previews: this.previews ? this.previews.list().map((p) => ({ key: p.key, address: p.address, lastUsed: p.lastUsed, devices: p.devices })) : [],
       devices: this.store.list().map((d) => ({
         id: d.id,
         name: d.name,

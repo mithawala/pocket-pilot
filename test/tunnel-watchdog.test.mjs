@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { createRequire } from 'node:module';
 
-const { PersistentTunnel } = createRequire(import.meta.url)('../extension/core/tunnel.js');
+const { PersistentTunnel, TunnelManager } = createRequire(import.meta.url)('../extension/core/tunnel.js');
 
 const temp = [];
 test.after(() => {
@@ -26,7 +27,7 @@ function world() {
   w.fetch = async (url) => {
     const u = new URL(url);
     if (u.hostname === '127.0.0.1') {
-      const p = [...w.procs.values()].find((x) => x.metricsPort === Number(u.port) && x.alive);
+      const p = [...w.procs.values()].find((x) => x.metricsPort === Number(u.port) && x.alive && !x.mute);
       if (!p) throw Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
       if (u.pathname === '/quicktunnel') return json(200, { hostname: p.host });
       if (u.pathname === '/ready') return json(w.connected(p) ? 200 : 503, { readyConnections: w.connected(p) ? 1 : 0 });
@@ -181,6 +182,17 @@ test('tunnel: started offline, it opens by itself once online', async () => {
   await t.stop();
 });
 
+test('tunnel: a cloudflared that runs but no longer answers (just after a wake-up) is ended when a new one opens', async () => {
+  const { w, t, urls, first } = await started();
+  first.mute = true;
+  await pass(t, w, 15000);
+  assert.equal(urls.length, 2, 'a new tunnel');
+  assert.equal(first.alive, false, 'the old cloudflared does not stay on as a tunnel of its own');
+  assert.equal(t.saved().pid, w.last().pid);
+  assert.equal([...w.procs.values()].filter((p) => p.alive).length, 1);
+  await t.stop();
+});
+
 test('tunnel: a new tunnel left opening by an earlier process is ended; the tunnel itself is kept', async () => {
   const w = world();
   const t = tunnelIn(w);
@@ -213,4 +225,55 @@ test('tunnel: reachable once it answers, or connected for a while when this PC c
   w.online = false;
   await assert.rejects(t.waitReachable(20000), /not reachable yet: ENOTFOUND/);
   await t.stop({ keep: true });
+});
+/** A tunnel run by this process (a page's), with cloudflared faked: it connects as soon as it starts. */
+function attachedTunnel(o = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-tunnel-'));
+  temp.push(dir);
+  const t = new TunnelManager({ storageDir: dir, ...o });
+  t.spawned = [];
+  t._spawnAttached = () => {
+    const proc = new EventEmitter();
+    proc.pid = 0;
+    proc.stdout = new PassThrough();
+    proc.stderr = new PassThrough();
+    proc.kill = () => {
+      setImmediate(() => proc.emit('exit', null));
+      return true;
+    };
+    t.spawned.push(proc);
+    const n = t.spawned.length;
+    setImmediate(() => proc.stderr.write(`INF |  https://page-${n}.trycloudflare.com  |\nINF Registered tunnel connection connIndex=0\n`));
+    return proc;
+  };
+  return t;
+}
+
+test('tunnel: a page\'s tunnel that ends is not started again, and neither is one stopped as it ends', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const later = async () => {
+    t.mock.timers.tick(120000);
+    await new Promise((r) => setImmediate(r));
+  };
+  const page = attachedTunnel({ restart: false });
+  assert.equal(await page.start(4000, 'cloudflared'), 'https://page-1.trycloudflare.com');
+  page.spawned[0].emit('exit', 1);
+  await later();
+  assert.equal(page.spawned.length, 1, 'not started again');
+  assert.equal(page.state, 'error');
+
+  // Otherwise it starts again by itself...
+  const relay = attachedTunnel();
+  await relay.start(4001, 'cloudflared');
+  relay.spawned[0].emit('exit', 1);
+  await later();
+  assert.equal(relay.spawned.length, 2);
+  // ...unless it's stopped as it ends (by one told that it dropped).
+  const told = attachedTunnel();
+  await told.start(4002, 'cloudflared');
+  told.on('state', ({ state }) => state === 'error' && told.stop());
+  told.spawned[0].emit('exit', 1);
+  await later();
+  assert.equal(told.spawned.length, 1, 'stopped stays stopped');
+  await Promise.all([page.stop(), relay.stop(), told.stop()]);
 });

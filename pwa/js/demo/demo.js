@@ -272,7 +272,7 @@ function sessionsData() {
     turns: [{ id: 'demo-node-t1', startedAt: ago(200), duration: 240000, state: 'complete', usage: undefined, message: userMsg('Upgrade our CI images and engines field to Node 24.'), responseParts: [{ kind: 'markdown', id: 'nm1', content: 'Done — CI images, `.nvmrc` and `engines` now target **Node 24**. All pipelines are green.' }] }],
   });
   add('notes', 'Write release notes for v2.3', 'copilotcli', 'acme-web', S.Idle | S.IsRead, 60 * 26, undefined, {
-    turns: [{ id: 'demo-notes-t1', startedAt: ago(60 * 26 + 5), duration: 41000, state: 'complete', usage: undefined, message: userMsg('Draft release notes for v2.3 from the merged PRs.'), responseParts: [{ kind: 'markdown', id: 'rm1', content: '## v2.3\n- Dark mode for settings\n- Faster checkout (−38% p95)\n- 14 bug fixes\n\nThe before and after screenshots are in [screenshots](C:/Users/you/code/acme-web/screenshots), and the launch film is [launch-film.mp4](C:/Users/you/code/acme-web/renders/launch-film.mp4).' }] }],
+    turns: [{ id: 'demo-notes-t1', startedAt: ago(60 * 26 + 5), duration: 41000, state: 'complete', usage: undefined, message: userMsg('Draft release notes for v2.3 from the merged PRs.'), responseParts: [{ kind: 'markdown', id: 'rm1', content: '## v2.3\n- Dark mode for settings\n- Faster checkout (−38% p95)\n- 14 bug fixes\n\nThe before and after screenshots are in [screenshots](C:/Users/you/code/acme-web/screenshots), and the launch film is [launch-film.mp4](C:/Users/you/code/acme-web/renders/launch-film.mp4). The release page runs at http://localhost:5173/releases/v2.3 to check before it goes out.' }] }],
   });
   return list;
 }
@@ -297,6 +297,16 @@ class DemoConnection extends EventTarget {
   }
   get canOpenLinks() {
     return true;
+  }
+  get previewSupport() {
+    return 1;
+  }
+  get canPreview() {
+    return true;
+  }
+  async preview() {
+    await new Promise((r) => setTimeout(r, 1200));
+    throw Object.assign(new Error('In the demo, pages don’t open. Paired with your computer, this opens the page the session runs, on your phone.'), { code: 'demo' });
   }
   files(op, params) {
     return demoFiles(op, params);

@@ -1,6 +1,7 @@
 // Links to local files in what an agent writes: `[report](C:/Users/me/report.pdf)`, `[x](file:///…)`,
-// `[src](src/app.ts#L10)`. Shared by the phone (which makes them tappable) and the computer (which lets
-// a paired device open what the agent linked), so both read a link the same way.
+// `[src](src/app.ts#L10)`, and to pages running on the computer (`http://localhost:5173`). Shared by the
+// phone (which makes them tappable) and the computer (which lets a paired device open what the agent
+// linked), so both read a link the same way.
 
 const decode = (s) => {
   try {
@@ -77,4 +78,49 @@ export function linkMatches(markdown) {
 /** The destinations of the links (and pictures) in some markdown, as written (markdown escapes undone). */
 export function linkTargets(markdown) {
   return linkMatches(markdown).map((l) => l.target);
+}
+
+// ---------------------------------------------------------------- pages running on the computer
+
+// The computer's own addresses, and 0.0.0.0 (a server that listens on every address prints that).
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0']);
+
+/**
+ * A page running on the computer (`http://localhost:5173/`, `http://127.0.0.1:5182`, `http://[::1]:8080/x`):
+ * `{ url, scheme, host, port, key, path, address }`, or null for anything else. `key` (`http:5173`) is
+ * what opening it gives access to: everything on that port.
+ */
+export function localWebUrl(href) {
+  const h = String(href || '').trim();
+  if (!/^https?:\/\//i.test(h)) return null;
+  let u;
+  try {
+    u = new URL(h);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  if (!LOOPBACK_HOSTS.has(host) || u.username || u.password) return null;
+  const scheme = u.protocol.slice(0, -1);
+  const port = u.port ? Number(u.port) : scheme === 'https' ? 443 : 80;
+  if (!(port > 0)) return null;
+  const address = `${host}${u.port ? `:${u.port}` : ''}`;
+  const path = `${u.pathname || '/'}${u.search}${u.hash}`;
+  return { url: `${scheme}://${address}${path}`, scheme, host, port, key: `${scheme}:${port}`, path, address };
+}
+
+// Such an address in text, up to its port: what comes next can't continue a host name or port
+// (`http://localhost.example.com` is someone else's), or slip in a user name (`…@example.com`).
+const LOCAL_WEB = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(?::\d{1,5})?(?![\p{L}\p{N}_@%-]|[.:][\p{L}\p{N}_-])/giu;
+
+/** The pages on the computer some text mentions, linked or not: each parsed, with `text`, its address as written. */
+export function localWebMatches(text) {
+  const s = String(text || '');
+  if (!s.includes('://')) return [];
+  const out = [];
+  for (const m of s.matchAll(LOCAL_WEB)) {
+    const web = localWebUrl(m[0]);
+    if (web) out.push({ ...web, text: m[0] });
+  }
+  return out;
 }

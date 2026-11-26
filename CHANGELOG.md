@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.0
+
+- **The pages your sessions run open on your phone.** When an agent starts a page on your computer and links to it in the chat (a dev server at `http://localhost:5173`, a review page at `http://127.0.0.1:5182`), tap the link. Your computer opens a private link to the page, which takes a few seconds the first time. Then tap **Open page**: the page opens in your browser and works as it does on your computer, with its own requests, uploads and live reload.
+  - **Only for you.** Each page gets its own Cloudflare quick tunnel address, and nothing gets through without a key that your phone receives end-to-end encrypted. A key opens the page once, in the browser you tap it in, and the app gets a new one after every tap. Other websites can link to the page but can't use it from their own pages.
+  - **Not end-to-end encrypted like your chats.** Cloudflare carries the page like any https website. The app says so the first time.
+  - **Only what an agent links to.** Pocket Pilot opens only the pages an agent mentions in a chat (not what you type), and never Pocket Pilot itself, the agent host or a debugger.
+  - A page closes after 30 minutes without use. Keeping its link ready in the app doesn't count as use, and a page that was closed isn't opened again until you tap its link. The Pocket Pilot panel in VS Code lists the open pages, with ✕ to close one. At most 4 are open at a time.
+  - Removing a device ends its access to pages at once, including connections it has open (a live-reload or terminal socket).
+  - It needs the quick tunnel (the default). A page that calls another address on your computer (an API on another port) can't reach it from your phone.
+- **Fixed: tunnels left running.** When `cloudflared` didn't answer in time, often right after the computer woke up, Pocket Pilot opened a new tunnel but left the old one running. On one computer, 26 had built up over two weeks, using 1.1 GB of memory together. Now the old one is ended first. The ones already running end when you restart your computer.
+- Tested:
+  - Live through Cloudflare on a simulated iPhone: a page opened 7 to 11 seconds after the tap. Its own requests and its WebSocket worked, and it stayed open after a reload. A real review page loaded completely, with its 74 photos and videos. Without the key nothing got through, and a post from another site was refused. Tapping the link again kept the same tunnel. When a page's `cloudflared` ended, the page closed and no new one started. Every tunnel stopped when the pages closed.
+  - On a simulated iPhone and in Edge: the sheet, the first-time explanation, a new key after each tap, **Open it again** for a page closed meanwhile, and the reasons shown when a page can't open.
+- **Updating:** pages need the new version on your computer. In VS Code, click **Update** in the Pocket Pilot panel, then **Restart Extensions** where VS Code asks. In the GitHub Copilot app, update the plugin on the Plugins page. The phone app updates itself.
+
 ## 0.9.1
 
 - **When VS Code's agent runs out of memory, the phone no longer makes it worse.** VS Code runs every agent session in one background process, its agent host, and sends a conversation all at once when it's opened. A very long conversation (hundreds of megabytes, mostly screenshots) can make it run out of memory and stop. VS Code then starts it again, and after 5 crashes in a row it gives up. On one computer it crashed 11 times in just over an hour, on VS Code 1.145.2 and 1.145.3 alike.

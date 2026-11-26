@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 import * as parser from '../pwa/js/core/links.js';
 import { resolveUri } from '../pwa/js/lib/files.js';
 
-const { localLink, linkTargets, linkMatches, pathToUri } = parser;
+const { localLink, linkTargets, linkMatches, pathToUri, localWebUrl, localWebMatches } = parser;
 const require = createRequire(import.meta.url);
-const { LinkedPaths, MAX_PATHS } = require('../extension/core/links.js');
+const { LinkedPaths, MAX_PATHS, MAX_PAGES } = require('../extension/core/links.js');
 const win = process.platform === 'win32';
 
 test('a link to a file or folder on the computer, however the agent writes it', () => {
@@ -254,4 +254,60 @@ test('links that are not paths on this computer are ignored, and so are files a 
   const c = linked({ covered: (p) => p.toLowerCase().startsWith(work.toLowerCase()) });
   c.scanText(`[a](${pathToUri(path.join(work, 'a.ts'))}) [b](${pathToUri(path.join(work, 'src', 'b.ts'))}) [shots](${pathToUri(abs(win ? 'C:/Shots' : '/shots'))})`);
   assert.deepEqual([...c.paths.values()], [abs(win ? 'C:/Shots' : '/shots')]);
+});
+test('a page running on the computer, however the agent writes its address', () => {
+  assert.deepEqual(localWebUrl('http://127.0.0.1:5182'), { url: 'http://127.0.0.1:5182/', scheme: 'http', host: '127.0.0.1', port: 5182, key: 'http:5182', path: '/', address: '127.0.0.1:5182' });
+  assert.equal(localWebUrl('http://localhost:5173/review?take=2#end').path, '/review?take=2#end');
+  assert.equal(localWebUrl('HTTP://LocalHost:5173/').key, 'http:5173');
+  assert.equal(localWebUrl('https://localhost/').key, 'https:443');
+  assert.equal(localWebUrl('http://[::1]:8080/x').host, '[::1]');
+  assert.equal(localWebUrl('http://0.0.0.0:3000').address, '0.0.0.0:3000');
+  assert.equal(localWebUrl('http://127.1:5182').address, '127.0.0.1:5182', 'another way to write it');
+  for (const no of ['http://localhost.evil.com:5173', 'http://127.0.0.2:80', 'http://user@localhost:5173', 'http://localhost:5173@evil.com', 'ftp://localhost/', 'file:///C:/x', 'http://localhost:0', 'http://localhost:70000', 'javascript:alert(1)', 'localhost:5173', '']) {
+    assert.equal(localWebUrl(no), null, no);
+  }
+
+  const found = (text) => localWebMatches(text).map((m) => m.text);
+  assert.deepEqual(found('Score them at http://127.0.0.1:5182. Then open [the app](http://localhost:5173/app) or <https://[::1]:8443/>, not http://0.0.0.0:3000!'), ['http://127.0.0.1:5182', 'http://localhost:5173', 'https://[::1]:8443', 'http://0.0.0.0:3000']);
+  assert.deepEqual(found('http://localhost.evil.com:5173 http://localhost:5173.evil.com http://localhost@evil.com http://localhost:5173@evil.com http://127.0.0.1-x.com http://localhost_x http://localhost%2e.com'), []);
+  assert.deepEqual(found('(http://localhost:5173) "http://localhost:5174" http://localhost:5175/path'), ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']);
+  assert.deepEqual(found('no address here'), []);
+  const long = `${'http://localhost'.repeat(20000)} ${'a'.repeat(200000)}`;
+  const t = performance.now();
+  localWebMatches(long);
+  assert.ok(performance.now() - t < 1000, 'as long as the text');
+});
+
+test('the computer notes the pages an agent mentions, never one shown back from a slash command or a !command turn, and keeps them', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-pages-'));
+  const file = path.join(dir, 'linked-paths.json');
+  try {
+    const l = linked({ file });
+    const page = (href) => l.pageLinked(localWebUrl(href));
+    l.scanText('Open http://127.0.0.1:5182 to score them.');
+    assert.ok(page('http://127.0.0.1:5182/api/manifest'), 'all of its port');
+    assert.ok(page('http://localhost:5182/'), 'by any name for this computer');
+    assert.equal(page('https://127.0.0.1:5182/'), false, 'not another scheme');
+    assert.equal(page('http://127.0.0.1:5183/'), false);
+    l.scanText('[the app](http://localhost:5173/)', 'make an app');
+    assert.ok(page('http://localhost:5173'));
+    // A page typed in a message the agent answers about is the agent's to mention (unlike a link a slash command shows back).
+    l.scanText('The page at http://localhost:4000 is up.', 'is http://localhost:4000 up?');
+    assert.ok(page('http://localhost:4000'));
+    l.scanText('Renamed: http://127.0.0.1:9230', '/rename http://127.0.0.1:9230');
+    assert.equal(page('http://127.0.0.1:9230'), false, 'what VS Code shows back from a slash command');
+    l.scanText('Listening on http://127.0.0.1:7000', '!node server.js');
+    assert.equal(page('http://127.0.0.1:7000'), false, 'a terminal command VS Code runs itself');
+
+    l.flush();
+    const again = linked({ file });
+    assert.ok(again.pageLinked(localWebUrl('http://127.0.0.1:5182')), 'kept after a restart');
+    for (let i = 0; i < MAX_PAGES + 5; i++) again.addPage(localWebUrl(`http://localhost:${10000 + i}`));
+    assert.equal(again.pages.size, MAX_PAGES);
+    assert.equal(again.pageLinked(localWebUrl('http://127.0.0.1:5182')), false, 'the oldest go first');
+    fs.writeFileSync(file, JSON.stringify({ v: 1, paths: [], pages: ['http:80', 'gopher:70', 'http:x', 42] }));
+    assert.deepEqual([...linked({ file }).pages], ['http:80']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -83,6 +83,8 @@ class SidebarProvider {
         return run('pocketPilot.restartTunnel');
       case 'removeDevice':
         return run('pocketPilot.removeDevice', String(msg.id || ''));
+      case 'closePreview':
+        return this.service.closePreview(String(msg.key || '')).catch(() => {});
       case 'takeOver':
         return run('pocketPilot.takeOver');
       case 'signInRendezvous':

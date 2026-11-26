@@ -18,6 +18,8 @@ export const FILES = {
   log: path.join(HOME, 'hub.log'),
   lock: path.join(HOME, 'hub.lock'),
   tunnel: path.join(HOME, 'tunnel'),
+  // The tunnels of the pages sessions run, opened on a device (extension/core/preview.js).
+  previews: path.join(HOME, 'previews'),
   uploads: path.join(HOME, 'uploads'),
   // The files and folders agents linked in chats, which paired devices may open (extension/core/links.js).
   links: path.join(HOME, 'linked-paths.json'),

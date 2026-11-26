@@ -6,7 +6,7 @@ import { normalizeCode } from '../core/totp.js';
 import { openSocket, SocketClosedError } from './socket.js';
 import { lookupHostUrl } from './rendezvous.js';
 
-export const APP_VERSION = '0.9.1';
+export const APP_VERSION = '0.10.0';
 // How long a typed authenticator code may still go along with a reconnect (codes last 30-90 seconds).
 const CODE_REUSE_MS = 75 * 1000;
 // A message over 64 MB (a very long chat) arrives with every string over 64 KB trimmed: tool output and
@@ -433,8 +433,8 @@ export class HostConnection extends EventTarget {
       this._setState('unpaired', 'This device was removed on your computer.');
     }
     if (m.t === 'ahp.status' && m.connected) this.hostDown = 0;
-    if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong' || m.t === 'files.result') {
-      const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t === 'files.result' ? `files:${m.id}` : m.t;
+    if (m.t === 'upload.result' || m.t === 'push.result' || m.t === 'pong' || m.t === 'files.result' || m.t === 'preview.result') {
+      const key = m.t === 'upload.result' ? `upload:${m.id}` : m.t === 'files.result' ? `files:${m.id}` : m.t === 'preview.result' ? `preview:${m.id}` : m.t;
       const p = this._pending.get(key);
       if (p) {
         this._pending.delete(key);
@@ -565,6 +565,36 @@ export class HostConnection extends EventTarget {
       throw Object.assign(new Error(timeout ? 'Your computer took too long to answer' : 'Not connected to your computer'), { code: timeout ? 'timeout' : 'offline' });
     }
     if (!r.ok) throw Object.assign(new Error(r.error === 'disconnected' ? 'The connection to your computer dropped' : r.error || 'Your computer could not read this'), { code: r.error === 'disconnected' ? 'offline' : r.code || 'error' });
+    return r;
+  }
+
+  /**
+   * Whether the computer opens the pages its sessions run (http://localhost:5173): 1 yes, 0 not with its
+   * tunnel, undefined an older Pocket Pilot that can't.
+   */
+  get previewSupport() {
+    return this.welcome?.previews;
+  }
+
+  get canPreview() {
+    return this.welcome?.previews === 1;
+  }
+
+  /**
+   * A link that opens a page running on the computer (`url`: http://127.0.0.1:5182/…) once, in this
+   * browser: `{ url, expiresIn, address }`. The first time, the computer opens a tunnel for it (seconds).
+   * Rejects with the computer's reason and its `code` (`denied`, `not-running`, `blocked`, …).
+   */
+  async preview(url, { first = false, timeoutMs = 100000 } = {}) {
+    const id = `${Date.now()}-${++this._seq}`;
+    let r;
+    try {
+      r = await this._request(`preview:${id}`, { t: 'preview', id, url, ...(first ? { first: true } : {}) }, timeoutMs);
+    } catch (err) {
+      const timeout = err?.message === 'Timed out';
+      throw Object.assign(new Error(timeout ? 'Your computer took too long to answer' : 'Not connected to your computer'), { code: timeout ? 'timeout' : 'offline' });
+    }
+    if (!r.ok) throw Object.assign(new Error(r.error === 'disconnected' ? 'The connection to your computer dropped' : r.error || 'Your computer could not open this page'), { code: r.error === 'disconnected' ? 'offline' : r.code || 'error' });
     return r;
   }
 

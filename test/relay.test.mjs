@@ -1063,6 +1063,115 @@ test('links: a device cannot plant a link the computer would trust (it ends tool
   }
 });
 
+/** A GET as a browser would send it, without following redirects. */
+function browserGet(url, cookie) {
+  return new Promise((resolve, reject) => {
+    http.get(url, { agent: false, headers: cookie ? { cookie } : {} }, (res) => {
+      let body = '';
+      res.on('data', (d) => (body += d));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
+    }).on('error', reject);
+  });
+}
+
+test('pages: a phone opens a page an agent linked to, through a link of its own; never one it didn\'t, nor Pocket Pilot, the agent host or a debugger', async () => {
+  const { PreviewManager, waitServed } = require('../extension/core/preview.js');
+  const page = http.createServer((req, res) => res.end(`page ${req.url}`));
+  await new Promise((r) => page.listen(0, '127.0.0.1', r));
+  const pagePort = page.address().port;
+  const stopped = [];
+  const logs = [];
+  const previews = new PreviewManager({
+    startTunnel: async (port) => ({ url: `http://127.0.0.1:${port}`, stop: async () => void stopped.push(port) }),
+    waitServed: (u, id) => waitServed(u, id, { timeoutMs: 3000 }),
+  });
+  const { env, conn } = await linkedRelay({
+    relayOptions: { previews, blockedPorts: () => [7777], log: (l, m) => logs.push(`${l} ${m}`) },
+    links: `Score them at http://127.0.0.1:${pagePort}. Or http://127.0.0.1:9229, http://localhost:7777`,
+  });
+  try {
+    assert.equal(conn.canPreview, true);
+    const r = await conn.preview(`http://localhost:${pagePort}/review?take=2`, { first: true });
+    assert.equal(r.address, `localhost:${pagePort}`);
+    assert.ok(r.expiresIn > 60);
+    assert.ok(logs.some((l) => l.includes(`is opening http://localhost:${pagePort}`)));
+    const entered = await browserGet(r.url);
+    assert.equal(entered.status, 303);
+    assert.equal(entered.headers.location, '/review?take=2');
+    const cookie = entered.headers['set-cookie'][0].split(';')[0];
+    const { origin } = new URL(r.url);
+    assert.equal((await browserGet(`${origin}/review?take=2`, cookie)).body, 'page /review?take=2');
+    assert.equal((await browserGet(`${origin}/review?take=2`)).status, 401, 'only in the browser that used the link');
+
+    await assert.rejects(conn.preview('http://127.0.0.1:5183/'), (e) => e.code === 'denied' && /pages an agent links to/.test(e.message));
+    await assert.rejects(conn.preview('http://127.0.0.1:9229/json'), (e) => e.code === 'blocked');
+    await assert.rejects(conn.preview('http://localhost:7777'), (e) => e.code === 'blocked', 'what the host keeps for itself');
+    // Even when an agent links to them.
+    const hostPort = env.fake.endpoint.endpoint.port;
+    env.relay.links.scanText(`http://127.0.0.1:${env.relay.port}/health http://127.0.0.1:${hostPort}/ ${origin}/`);
+    for (const port of [env.relay.port, hostPort, Number(new URL(origin).port)]) await assert.rejects(conn.preview(`http://127.0.0.1:${port}/`), (e) => e.code === 'blocked', String(port));
+    await assert.rejects(conn.preview('https://example.com/'), (e) => e.code === 'invalid');
+    assert.equal(stopped.length, 0);
+
+    // A device removed on the computer is out of its pages too.
+    env.relay.revokeDevice(conn.welcome.deviceId);
+    assert.equal((await browserGet(`${origin}/review`, cookie)).status, 401);
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+    await previews.closeAll();
+    await new Promise((r) => page.close(r));
+  }
+});
+
+test('pages: a phone removed while its page opens gets no link, and the link made for it is taken back', async () => {
+  const { PreviewManager, waitServed } = require('../extension/core/preview.js');
+  const page = http.createServer((req, res) => res.end('page'));
+  await new Promise((r) => page.listen(0, '127.0.0.1', r));
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const previews = new PreviewManager({
+    startTunnel: async (port) => {
+      await gate;
+      return { url: `http://127.0.0.1:${port}`, stop: async () => {} };
+    },
+    waitServed: (u, id) => waitServed(u, id, { timeoutMs: 3000 }),
+  });
+  let opened = false;
+  const open = previews.open.bind(previews);
+  previews.open = (...args) => open(...args).finally(() => { opened = true; });
+  const { env, conn } = await linkedRelay({ relayOptions: { previews }, links: `http://127.0.0.1:${page.address().port}` });
+  try {
+    const asked = conn.preview(`http://127.0.0.1:${page.address().port}/`, { first: true }).then(() => 'a link', (e) => e.code);
+    await waitUntil(() => previews.previews.size === 1);
+    env.relay.revokeDevice(conn.welcome.deviceId);
+    release();
+    await waitUntil(() => opened, 5000);
+    await new Promise((r) => setTimeout(r, 50));
+    const pv = [...previews.previews.values()][0];
+    assert.ok(pv.publicUrl, 'the page opened');
+    assert.equal(pv.keys.size, 0, 'no link left for the removed phone');
+    assert.notEqual(await asked, 'a link');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+    await previews.closeAll();
+    await new Promise((r) => page.close(r));
+  }
+});
+
+test('pages: a computer that can\'t open them says so, and so does an older one', async () => {
+  const { env, conn } = await linkedRelay({ relayOptions: {}, links: 'http://127.0.0.1:5182' });
+  try {
+    assert.equal(conn.canPreview, false);
+    assert.equal(conn.previewSupport, 0);
+    await assert.rejects(conn.preview('http://127.0.0.1:5182/'), (e) => e.code === 'unsupported');
+  } finally {
+    conn?.stop();
+    await env.cleanup();
+  }
+});
+
 test('agent host: when it stops while a phone is opening a chat, the phone is told what was opening, and the computer logs it', async () => {
   const logs = [];
   const env = await setupRelay({ policy: { requireApproval: false, passkey: 'off' }, relayOptions: { log: (l, m) => logs.push(`${l} ${m}`) } });
